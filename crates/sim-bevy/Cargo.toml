@@ -1,0 +1,11 @@
+[package]
+name = "sim-bevy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Bevy plugin wrapping sim-core"
+
+[dependencies]
+sim-core = { workspace = true }
+bevy = { workspace = true }

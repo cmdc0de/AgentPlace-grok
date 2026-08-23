@@ -1,0 +1,35 @@
+# Default experiment config for Milestone 1 (deterministic tick + 3D view).
+# Must fit in signed 64-bit for TOML integer parsing.
+master_seed = 3735928559
+
+[simulation]
+step_duration_secs = 1.0
+max_ticks = 100000
+pause_when_empty = false
+log_level = "info"
+
+[world]
+seed = "auto"
+width = 64
+height = 64
+max_height = 16
+
+[world.terrain]
+octaves = 4
+persistence = 0.5
+lacunarity = 2.0
+
+[world.resources]
+mineral_density = 1.0
+vegetation_density = 1.0
+water_coverage = 0.25
+min_mineral_nodes = 10
+min_fresh_water = 5
+min_vegetation_patches = 20
+
+[agents]
+count = 16
+spawn_mode = "scattered"
+spawn_seed = "auto"
+default_memory_capacity = 128
+start_with_basic_needs = true

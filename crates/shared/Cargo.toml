@@ -1,0 +1,10 @@
+[package]
+name = "shared"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Protocol messages and transport trait (stubs in M1)"
+
+[dependencies]
+serde = { workspace = true }
