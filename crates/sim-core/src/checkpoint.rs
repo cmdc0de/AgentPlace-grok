@@ -1,0 +1,423 @@
+//! Versioned binary checkpoints plus derived Markdown summaries.
+
+use crate::agent::Agent;
+use crate::config::ExperimentConfig;
+use crate::error::SimError;
+use crate::event_log::{EventLog, SimEvent, SimEventKind};
+use crate::seeding::RngBank;
+use crate::simulation::Simulation;
+use crate::world::World;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::Write;
+use std::path::Path;
+
+pub const CHECKPOINT_MAGIC: [u8; 4] = *b"AGTN";
+pub const CHECKPOINT_FORMAT_VERSION: u32 = 2;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PublicBoard {
+    #[serde(default)]
+    pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct IncentiveState {
+    #[serde(default)]
+    pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MetricsState {
+    #[serde(default)]
+    pub values: Vec<(String, f64)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointBody {
+    pub tick: u64,
+    pub master_seed: u64,
+    pub config_hash: [u8; 32],
+    /// TOML of `ExperimentConfig` so SeedSpec can round-trip (postcard cannot
+    /// `deserialize_any`, which the TOML integer-or-string visitor needs).
+    pub config_toml: String,
+    pub world: World,
+    pub agents: BTreeMap<crate::agent::AgentId, Agent>,
+    pub rngs: RngBank,
+    pub events: Vec<SimEvent>,
+    #[serde(default)]
+    pub public_board: PublicBoard,
+    #[serde(default)]
+    pub active_incentives: IncentiveState,
+    #[serde(default)]
+    pub metrics: MetricsState,
+}
+
+pub fn config_hash(config: &ExperimentConfig) -> Result<[u8; 32], SimError> {
+    let bytes = postcard::to_allocvec(config).map_err(|e| {
+        SimError::Checkpoint(format!("failed to serialize config for hash: {e}"))
+    })?;
+    Ok(Sha256::digest(&bytes).into())
+}
+
+pub fn experiment_id(hash: &[u8; 32]) -> String {
+    hex::encode(&hash[..8])
+}
+
+impl Simulation {
+    pub fn config_hash(&self) -> Result<[u8; 32], SimError> {
+        config_hash(&self.config)
+    }
+
+    pub fn to_checkpoint(&self) -> Result<CheckpointBody, SimError> {
+        let config_toml = toml::to_string(&self.config)
+            .map_err(|e| SimError::Checkpoint(format!("config toml encode failed: {e}")))?;
+        Ok(CheckpointBody {
+            tick: self.tick,
+            master_seed: self.config.master_seed,
+            config_hash: config_hash(&self.config)?,
+            config_toml,
+            world: self.world.clone(),
+            agents: self.agents.clone(),
+            rngs: self.rngs.clone(),
+            events: self.events.events.clone(),
+            public_board: PublicBoard::default(),
+            active_incentives: IncentiveState::default(),
+            metrics: MetricsState::default(),
+        })
+    }
+
+    pub fn from_checkpoint(body: CheckpointBody) -> Result<Self, SimError> {
+        let config = ExperimentConfig::from_toml_str(&body.config_toml)?;
+        let expected = config_hash(&config)?;
+        if expected != body.config_hash {
+            return Err(SimError::Checkpoint(
+                "config hash in checkpoint does not match serialized config".into(),
+            ));
+        }
+        if body.master_seed != config.master_seed {
+            return Err(SimError::Checkpoint(
+                "master_seed in checkpoint does not match config".into(),
+            ));
+        }
+        let replay = crate::simulation::replay_or_record(&config).0;
+        Ok(Self {
+            config,
+            tick: body.tick,
+            world: body.world,
+            agents: body.agents,
+            rngs: body.rngs,
+            events: EventLog {
+                events: body.events,
+            },
+            chooser: crate::llm::Chooser::Mock,
+            replay,
+            record_path: None,
+        })
+    }
+
+    pub fn encode_checkpoint(&self) -> Result<Vec<u8>, SimError> {
+        encode_checkpoint(&self.to_checkpoint()?)
+    }
+
+    pub fn decode_checkpoint(bytes: &[u8]) -> Result<Self, SimError> {
+        Self::from_checkpoint(decode_checkpoint(bytes)?)
+    }
+
+    pub fn save_checkpoint(&self, path: impl AsRef<Path>) -> Result<(), SimError> {
+        save_checkpoint_bytes(path, &self.encode_checkpoint()?)
+    }
+
+    pub fn load_checkpoint(path: impl AsRef<Path>) -> Result<Self, SimError> {
+        let bytes = fs::read(path)?;
+        Self::decode_checkpoint(&bytes)
+    }
+}
+
+pub fn encode_checkpoint(body: &CheckpointBody) -> Result<Vec<u8>, SimError> {
+    let payload = postcard::to_allocvec(body)
+        .map_err(|e| SimError::Checkpoint(format!("postcard encode failed: {e}")))?;
+    let mut out = Vec::with_capacity(8 + payload.len());
+    out.extend_from_slice(&CHECKPOINT_MAGIC);
+    out.extend_from_slice(&CHECKPOINT_FORMAT_VERSION.to_le_bytes());
+    out.extend_from_slice(&payload);
+    Ok(out)
+}
+
+pub fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointBody, SimError> {
+    if bytes.len() < 8 {
+        return Err(SimError::Checkpoint(
+            "checkpoint file is truncated".into(),
+        ));
+    }
+    if bytes[0..4] != CHECKPOINT_MAGIC {
+        return Err(SimError::Checkpoint(format!(
+            "invalid magic (expected AGTN, got {:?})",
+            &bytes[0..4]
+        )));
+    }
+    let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    if version != CHECKPOINT_FORMAT_VERSION {
+        return Err(SimError::Checkpoint(format!(
+            "unsupported checkpoint format_version {version} (this binary supports {CHECKPOINT_FORMAT_VERSION})"
+        )));
+    }
+    postcard::from_bytes(&bytes[8..])
+        .map_err(|e| SimError::Checkpoint(format!("postcard decode failed: {e}")))
+}
+
+pub fn save_checkpoint_bytes(path: impl AsRef<Path>, bytes: &[u8]) -> Result<(), SimError> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    let tmp = path.with_extension("ckpt.tmp");
+    fs::write(&tmp, bytes)?;
+    fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+pub fn save_checkpoint_with_retries(
+    sim: &Simulation,
+    path: impl AsRef<Path>,
+    retries: u32,
+) -> Result<(), SimError> {
+    let bytes = sim.encode_checkpoint()?;
+    let path = path.as_ref();
+    let attempts = retries.max(1);
+    let mut last_err = None;
+    for _ in 0..attempts {
+        match save_checkpoint_bytes(path, &bytes) {
+            Ok(()) => return Ok(()),
+            Err(err) => last_err = Some(err),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| {
+        SimError::Checkpoint("checkpoint write failed with no error".into())
+    }))
+}
+
+pub fn cell_label(world: &World, x: u32, y: u32) -> &'static str {
+    if world.is_water(x, y) {
+        "water"
+    } else if world.has_mineral(x, y) {
+        "mineral"
+    } else if world.has_vegetation(x, y) {
+        "vegetation"
+    } else {
+        "land"
+    }
+}
+
+pub fn summary_markdown(sim: &Simulation) -> Result<String, SimError> {
+    let hash = sim.config_hash()?;
+    let id = experiment_id(&hash);
+    Ok(format!(
+        "# Checkpoint summary\n\n\
+         - experiment_id: `{id}`\n\
+         - tick: {}\n\
+         - master_seed: {}\n\
+         - config_hash: `{}`\n\
+         - world_hash: `{}`\n\
+         - state_hash: `{}`\n\
+         - map: {}x{} (max_height {})\n\
+         - agents: {}\n\
+         - water_cells: {}\n\
+         - vegetation_patches: {}\n\
+         - mineral_nodes: {}\n\
+         - animals: {}\n\
+         - fish: {}\n\
+         - events: {}\n",
+        sim.tick,
+        sim.config.master_seed,
+        hex::encode(hash),
+        sim.world_hash(),
+        sim.state_hash(),
+        sim.world.width,
+        sim.world.height,
+        sim.world.max_height,
+        sim.agents.len(),
+        sim.world.water_count(),
+        sim.world.vegetation_count(),
+        sim.world.mineral_count(),
+        sim.world.animal_total(),
+        sim.world.fish_total(),
+        sim.events.events.len(),
+    ))
+}
+
+pub fn agents_markdown(sim: &Simulation) -> String {
+    let mut out = String::from("# Agent summaries\n\n");
+    for agent in sim.agents.values() {
+        out.push_str(&format!(
+            "## Agent {}\n\n\
+             - position: ({}, {})\n\
+             - height: {}\n\
+             - cell: {}\n\
+             - needs: hunger {:.1} thirst {:.1} energy {:.1}\n\
+             - illness_ticks: {}\n\
+             - inventory_items: {}\n\
+             - consumption: veg {} animal {} fish {} toxic {}\n\n",
+            agent.id.0,
+            agent.x,
+            agent.y,
+            sim.world.height_at(agent.x, agent.y),
+            cell_label(&sim.world, agent.x, agent.y),
+            agent.needs.hunger as f64 / 100.0,
+            agent.needs.thirst as f64 / 100.0,
+            agent.needs.energy as f64 / 100.0,
+            agent.illness_ticks,
+            agent.inventory_count(),
+            agent.consumption.vegetation,
+            agent.consumption.animal,
+            agent.consumption.fish,
+            agent.consumption.toxic_events,
+        ));
+    }
+    out
+}
+
+pub fn event_to_jsonl(event: &SimEvent) -> String {
+    let kind = match &event.kind {
+        SimEventKind::Wait => "{\"type\":\"wait\"}".to_string(),
+        SimEventKind::Rest => "{\"type\":\"rest\"}".to_string(),
+        SimEventKind::Move {
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+        } => format!(
+            "{{\"type\":\"move\",\"from_x\":{from_x},\"from_y\":{from_y},\"to_x\":{to_x},\"to_y\":{to_y}}}"
+        ),
+        SimEventKind::Gather { species, qty, .. } => {
+            format!("{{\"type\":\"gather\",\"species\":{species},\"qty\":{qty}}}")
+        }
+        SimEventKind::Drink => "{\"type\":\"drink\"}".to_string(),
+        SimEventKind::Eat { toxic, .. } => format!("{{\"type\":\"eat\",\"toxic\":{toxic}}}"),
+        SimEventKind::Hunt { success } => format!("{{\"type\":\"hunt\",\"success\":{success}}}"),
+        SimEventKind::Fish { success } => format!("{{\"type\":\"fish\",\"success\":{success}}}"),
+        SimEventKind::Farm { species, x, y } => {
+            format!("{{\"type\":\"farm\",\"species\":{species},\"x\":{x},\"y\":{y}}}")
+        }
+        SimEventKind::Craft { success, .. } => {
+            format!("{{\"type\":\"craft\",\"success\":{success}}}")
+        }
+        SimEventKind::Speak {
+            shout,
+            text,
+            broadcast,
+            ..
+        } => {
+            let t = text.replace('\\', "\\\\").replace('"', "\\\"");
+            format!(
+                "{{\"type\":\"speak\",\"shout\":{shout},\"broadcast\":{broadcast},\"text\":\"{t}\"}}"
+            )
+        }
+        SimEventKind::LlmWait => "{\"type\":\"llm_wait\"}".to_string(),
+    };
+    format!(
+        "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",
+        event.tick, event.agent.0
+    )
+}
+
+pub fn append_events_jsonl(path: impl AsRef<Path>, events: &[SimEvent]) -> Result<(), SimError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
+    for event in events {
+        writeln!(file, "{}", event_to_jsonl(event))?;
+    }
+    Ok(())
+}
+
+pub fn write_markdown_summaries(sim: &Simulation, dir: impl AsRef<Path>) -> Result<(), SimError> {
+    let dir = dir.as_ref();
+    fs::create_dir_all(dir)?;
+    let id = experiment_id(&sim.config_hash()?);
+    let stem = format!("{id}_tick_{}", sim.tick);
+    fs::write(dir.join(format!("{stem}_summary.md")), summary_markdown(sim)?)?;
+    fs::write(dir.join(format!("{stem}_agents.md")), agents_markdown(sim))?;
+    Ok(())
+}
+
+pub fn checkpoint_stem(sim: &Simulation) -> Result<String, SimError> {
+    Ok(format!(
+        "{}_tick_{}",
+        experiment_id(&sim.config_hash()?),
+        sim.tick
+    ))
+}
+
+pub fn prune_old_checkpoints(dir: impl AsRef<Path>, keep_last_n: u32) -> Result<(), SimError> {
+    if keep_last_n == 0 {
+        return Ok(());
+    }
+    let dir = dir.as_ref();
+    if !dir.exists() {
+        return Ok(());
+    }
+    let mut ckpts: Vec<(u64, std::path::PathBuf)> = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("ckpt") {
+            continue;
+        }
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        if let Some(tick) = name.rsplit("_tick_").nth(0).and_then(|s| s.parse().ok()) {
+            ckpts.push((tick, path));
+        }
+    }
+    ckpts.sort_by_key(|(tick, _)| *tick);
+    let keep = keep_last_n as usize;
+    if ckpts.len() <= keep {
+        return Ok(());
+    }
+    let drop_n = ckpts.len() - keep;
+    for (_, path) in ckpts.into_iter().take(drop_n) {
+        let _ = fs::remove_file(&path);
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            let dir = path.parent().unwrap_or(Path::new("."));
+            let _ = fs::remove_file(dir.join(format!("{stem}_summary.md")));
+            let _ = fs::remove_file(dir.join(format!("{stem}_agents.md")));
+        }
+    }
+    Ok(())
+}
+
+/// Write binary checkpoint, optional markdown, and return the ckpt path.
+pub fn write_run_checkpoint(
+    sim: &Simulation,
+    dir: impl AsRef<Path>,
+) -> Result<std::path::PathBuf, SimError> {
+    let dir = dir.as_ref();
+    fs::create_dir_all(dir)?;
+    let stem = checkpoint_stem(sim)?;
+    let ckpt_path = dir.join(format!("{stem}.ckpt"));
+    save_checkpoint_with_retries(sim, &ckpt_path, sim.config.checkpoint.write_retries)?;
+    if sim.config.checkpoint.write_markdown_summaries {
+        let id_tick = stem.as_str();
+        fs::write(dir.join(format!("{id_tick}_summary.md")), summary_markdown(sim)?)?;
+        fs::write(dir.join(format!("{id_tick}_agents.md")), agents_markdown(sim))?;
+    }
+    prune_old_checkpoints(dir, sim.config.checkpoint.keep_last_n)?;
+    Ok(ckpt_path)
+}

@@ -1,4 +1,4 @@
-# Default experiment config for Milestone 1 (deterministic tick + 3D view).
+# Default experiment config for Milestone 3 (survival + speech + mock LLM).
 # Must fit in signed 64-bit for TOML integer parsing.
 master_seed = 3735928559
 
@@ -26,6 +26,10 @@ water_coverage = 0.25
 min_mineral_nodes = 10
 min_fresh_water = 5
 min_vegetation_patches = 20
+animal_density = 1.0
+fish_density = 1.0
+min_animals = 8
+min_fish = 8
 
 [agents]
 count = 16
@@ -33,3 +37,45 @@ spawn_mode = "scattered"
 spawn_seed = "auto"
 default_memory_capacity = 128
 start_with_basic_needs = true
+
+[checkpoint]
+auto_interval_ticks = 500
+keep_last_n = 20
+directory = "checkpoints"
+write_markdown_summaries = true
+write_retries = 3
+
+[observation]
+base_vision_range = 12.0
+base_hearing_range = 18.0
+base_agent_identity_range = 8.0
+full_information = false
+
+[needs]
+hunger_max = 100.0
+hunger_decay_per_tick = 0.15
+thirst_max = 100.0
+thirst_decay_per_tick = 0.25
+energy_max = 100.0
+energy_decay_per_tick = 0.08
+energy_regen_while_resting = 0.4
+death_enabled = false
+
+[communication]
+speech_is_free_action = true
+base_speech_range = 18.0
+shout_range_multiplier = 1.8
+shout_energy_cost = 5.0
+max_message_length = 200
+allow_overhearing = true
+warn_cooldown_ticks = 10
+
+[llm]
+provider = "mock"
+base_url = "http://localhost:11434"
+api_key_env = "XAI_API_KEY"
+model = ""
+action_temperature = 0.2
+max_retries = 2
+timeout_ms = 12000
+replay_file = ""

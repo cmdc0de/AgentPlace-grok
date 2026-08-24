@@ -2,6 +2,7 @@ use crate::agent::AgentId;
 use crate::config::SeedSpec;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use twox_hash::XxHash64;
@@ -36,7 +37,7 @@ pub fn resolve_seed(
 }
 
 /// Named ChaCha20 streams keyed in a BTreeMap so iteration order is stable.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RngBank {
     pub master_seed: u64,
     /// Label → derived (or resolved) seed, for run metadata.

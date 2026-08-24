@@ -1,5 +1,6 @@
 use crate::error::SimError;
-use serde::Deserialize;
+use crate::species::{SpeciesTables, default_species_tables};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 
@@ -18,6 +19,18 @@ pub enum SeedSpec {
 impl Default for SeedSpec {
     fn default() -> Self {
         SeedSpec::Auto
+    }
+}
+
+impl Serialize for SeedSpec {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Always a string so postcard (non-self-describing) can round-trip
+        // through the existing string visitor used by TOML.
+        match self {
+            SeedSpec::Auto => serializer.serialize_str("auto"),
+            SeedSpec::Random => serializer.serialize_str("random"),
+            SeedSpec::Explicit(v) => serializer.serialize_str(&v.to_string()),
+        }
     }
 }
 
@@ -57,7 +70,7 @@ impl<'de> Deserialize<'de> for SeedSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SpawnMode {
     Scattered,
@@ -71,7 +84,7 @@ impl Default for SpawnMode {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExperimentConfig {
     pub master_seed: u64,
     #[serde(default)]
@@ -80,9 +93,19 @@ pub struct ExperimentConfig {
     pub world: WorldParams,
     #[serde(default)]
     pub agents: AgentParams,
+    #[serde(default)]
+    pub checkpoint: CheckpointParams,
+    #[serde(default)]
+    pub observation: ObservationParams,
+    #[serde(default)]
+    pub needs: NeedsParams,
+    #[serde(default)]
+    pub communication: CommunicationParams,
+    #[serde(default)]
+    pub llm: LlmParams,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationParams {
     #[serde(default = "default_step_duration")]
     pub step_duration_secs: f64,
@@ -105,7 +128,7 @@ impl Default for SimulationParams {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldParams {
     #[serde(default)]
     pub seed: SeedSpec,
@@ -119,6 +142,8 @@ pub struct WorldParams {
     pub terrain: TerrainParams,
     #[serde(default)]
     pub resources: ResourceParams,
+    #[serde(default)]
+    pub species: SpeciesTables,
 }
 
 impl Default for WorldParams {
@@ -130,11 +155,12 @@ impl Default for WorldParams {
             max_height: default_max_height(),
             terrain: TerrainParams::default(),
             resources: ResourceParams::default(),
+            species: default_species_tables(),
         }
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerrainParams {
     #[serde(default = "default_octaves")]
     pub octaves: u32,
@@ -154,7 +180,7 @@ impl Default for TerrainParams {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceParams {
     #[serde(default = "default_one")]
     pub mineral_density: f64,
@@ -168,6 +194,14 @@ pub struct ResourceParams {
     pub min_fresh_water: u32,
     #[serde(default = "default_min_veg")]
     pub min_vegetation_patches: u32,
+    #[serde(default = "default_one")]
+    pub animal_density: f64,
+    #[serde(default = "default_one")]
+    pub fish_density: f64,
+    #[serde(default = "default_min_animals")]
+    pub min_animals: u32,
+    #[serde(default = "default_min_fish")]
+    pub min_fish: u32,
 }
 
 impl Default for ResourceParams {
@@ -179,11 +213,15 @@ impl Default for ResourceParams {
             min_mineral_nodes: default_min_mineral(),
             min_fresh_water: default_min_water(),
             min_vegetation_patches: default_min_veg(),
+            animal_density: 1.0,
+            fish_density: 1.0,
+            min_animals: default_min_animals(),
+            min_fish: default_min_fish(),
         }
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentParams {
     #[serde(default = "default_agent_count")]
     pub count: u32,
@@ -195,6 +233,10 @@ pub struct AgentParams {
     pub default_memory_capacity: u32,
     #[serde(default = "default_true")]
     pub start_with_basic_needs: bool,
+    #[serde(default = "default_inv_cap")]
+    pub inventory_capacity: u32,
+    #[serde(default)]
+    pub archetypes: Vec<AgentArchetype>,
 }
 
 impl Default for AgentParams {
@@ -205,6 +247,144 @@ impl Default for AgentParams {
             spawn_seed: SeedSpec::Auto,
             default_memory_capacity: default_memory(),
             start_with_basic_needs: true,
+            inventory_capacity: default_inv_cap(),
+            archetypes: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentArchetype {
+    pub name: String,
+    #[serde(default = "default_one")]
+    pub weight: f64,
+    #[serde(default)]
+    pub personality: crate::agent::Personality,
+    #[serde(default)]
+    pub abilities: crate::agent::Abilities,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObservationParams {
+    #[serde(default = "default_vision")]
+    pub base_vision_range: f64,
+    #[serde(default = "default_hearing")]
+    pub base_hearing_range: f64,
+    #[serde(default = "default_identity")]
+    pub base_agent_identity_range: f64,
+    #[serde(default)]
+    pub full_information: bool,
+}
+
+impl Default for ObservationParams {
+    fn default() -> Self {
+        Self {
+            base_vision_range: default_vision(),
+            base_hearing_range: default_hearing(),
+            base_agent_identity_range: default_identity(),
+            full_information: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NeedsParams {
+    #[serde(default = "default_need_max")]
+    pub hunger_max: f64,
+    #[serde(default = "default_hunger_decay")]
+    pub hunger_decay_per_tick: f64,
+    #[serde(default = "default_need_max")]
+    pub thirst_max: f64,
+    #[serde(default = "default_thirst_decay")]
+    pub thirst_decay_per_tick: f64,
+    #[serde(default = "default_need_max")]
+    pub energy_max: f64,
+    #[serde(default = "default_energy_decay")]
+    pub energy_decay_per_tick: f64,
+    #[serde(default = "default_energy_regen")]
+    pub energy_regen_while_resting: f64,
+    #[serde(default)]
+    pub death_enabled: bool,
+}
+
+impl Default for NeedsParams {
+    fn default() -> Self {
+        Self {
+            hunger_max: default_need_max(),
+            hunger_decay_per_tick: default_hunger_decay(),
+            thirst_max: default_need_max(),
+            thirst_decay_per_tick: default_thirst_decay(),
+            energy_max: default_need_max(),
+            energy_decay_per_tick: default_energy_decay(),
+            energy_regen_while_resting: default_energy_regen(),
+            death_enabled: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunicationParams {
+    #[serde(default = "default_true")]
+    pub speech_is_free_action: bool,
+    #[serde(default = "default_hearing")]
+    pub base_speech_range: f64,
+    #[serde(default = "default_shout_mult")]
+    pub shout_range_multiplier: f64,
+    #[serde(default = "default_shout_cost")]
+    pub shout_energy_cost: f64,
+    #[serde(default = "default_msg_len")]
+    pub max_message_length: u32,
+    #[serde(default = "default_true")]
+    pub allow_overhearing: bool,
+    #[serde(default = "default_warn_cd")]
+    pub warn_cooldown_ticks: u64,
+}
+
+impl Default for CommunicationParams {
+    fn default() -> Self {
+        Self {
+            speech_is_free_action: true,
+            base_speech_range: default_hearing(),
+            shout_range_multiplier: default_shout_mult(),
+            shout_energy_cost: default_shout_cost(),
+            max_message_length: default_msg_len(),
+            allow_overhearing: true,
+            warn_cooldown_ticks: default_warn_cd(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmParams {
+    #[serde(default = "default_llm_provider")]
+    pub provider: String,
+    #[serde(default = "default_llm_url")]
+    pub base_url: String,
+    #[serde(default = "default_api_key_env")]
+    pub api_key_env: String,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default = "default_temp")]
+    pub action_temperature: f64,
+    #[serde(default = "default_retries")]
+    pub max_retries: u32,
+    #[serde(default = "default_timeout")]
+    pub timeout_ms: u64,
+    #[serde(default)]
+    pub replay_file: String,
+}
+
+impl Default for LlmParams {
+    fn default() -> Self {
+        Self {
+            provider: default_llm_provider(),
+            base_url: default_llm_url(),
+            api_key_env: default_api_key_env(),
+            model: String::new(),
+            action_temperature: default_temp(),
+            max_retries: default_retries(),
+            timeout_ms: default_timeout(),
+            replay_file: String::new(),
         }
     }
 }
@@ -260,10 +440,112 @@ fn default_memory() -> u32 {
 fn default_true() -> bool {
     true
 }
+fn default_ckpt_interval() -> u64 {
+    500
+}
+fn default_keep_last() -> u32 {
+    20
+}
+fn default_ckpt_dir() -> String {
+    "checkpoints".into()
+}
+fn default_write_retries() -> u32 {
+    3
+}
+fn default_min_animals() -> u32 {
+    8
+}
+fn default_min_fish() -> u32 {
+    8
+}
+fn default_inv_cap() -> u32 {
+    16
+}
+fn default_vision() -> f64 {
+    12.0
+}
+fn default_hearing() -> f64 {
+    18.0
+}
+fn default_identity() -> f64 {
+    8.0
+}
+fn default_need_max() -> f64 {
+    100.0
+}
+fn default_hunger_decay() -> f64 {
+    0.15
+}
+fn default_thirst_decay() -> f64 {
+    0.25
+}
+fn default_energy_decay() -> f64 {
+    0.08
+}
+fn default_energy_regen() -> f64 {
+    0.4
+}
+fn default_shout_mult() -> f64 {
+    1.8
+}
+fn default_shout_cost() -> f64 {
+    5.0
+}
+fn default_msg_len() -> u32 {
+    200
+}
+fn default_warn_cd() -> u64 {
+    10
+}
+fn default_llm_provider() -> String {
+    "mock".into()
+}
+fn default_llm_url() -> String {
+    "http://localhost:11434".into()
+}
+fn default_api_key_env() -> String {
+    "XAI_API_KEY".into()
+}
+fn default_temp() -> f64 {
+    0.2
+}
+fn default_retries() -> u32 {
+    2
+}
+fn default_timeout() -> u64 {
+    12_000
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointParams {
+    #[serde(default = "default_ckpt_interval")]
+    pub auto_interval_ticks: u64,
+    #[serde(default = "default_keep_last")]
+    pub keep_last_n: u32,
+    #[serde(default = "default_ckpt_dir")]
+    pub directory: String,
+    #[serde(default = "default_true")]
+    pub write_markdown_summaries: bool,
+    #[serde(default = "default_write_retries")]
+    pub write_retries: u32,
+}
+
+impl Default for CheckpointParams {
+    fn default() -> Self {
+        Self {
+            auto_interval_ticks: default_ckpt_interval(),
+            keep_last_n: default_keep_last(),
+            directory: default_ckpt_dir(),
+            write_markdown_summaries: true,
+            write_retries: default_write_retries(),
+        }
+    }
+}
 
 impl ExperimentConfig {
     pub fn from_toml_str(s: &str) -> Result<Self, SimError> {
-        let cfg: Self = toml::from_str(s).map_err(|e| SimError::Config(e.to_string()))?;
+        let mut cfg: Self = toml::from_str(s).map_err(|e| SimError::Config(e.to_string()))?;
+        cfg.world.species.ensure_defaults();
         cfg.validate()?;
         Ok(cfg)
     }
@@ -297,6 +579,11 @@ impl ExperimentConfig {
                 "default_memory_capacity must be at least {MIN_MEMORY_CAPACITY}"
             )));
         }
+        if matches!(self.agents.spawn_mode, SpawnMode::FixedList) {
+            return Err(SimError::Config(
+                "spawn_mode=fixed_list requires agents.spawn_list (not implemented in M2)".into(),
+            ));
+        }
         if !(0.0..=1.0).contains(&self.world.resources.water_coverage) {
             return Err(SimError::Config(
                 "water_coverage must be in [0.0, 1.0]".into(),
@@ -308,5 +595,30 @@ impl ExperimentConfig {
             ));
         }
         Ok(())
+    }
+
+    pub fn hunger_max_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.hunger_max)
+    }
+    pub fn thirst_max_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.thirst_max)
+    }
+    pub fn energy_max_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.energy_max)
+    }
+    pub fn hunger_decay_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.hunger_decay_per_tick)
+    }
+    pub fn thirst_decay_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.thirst_decay_per_tick)
+    }
+    pub fn energy_decay_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.energy_decay_per_tick)
+    }
+    pub fn energy_regen_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.needs.energy_regen_while_resting)
+    }
+    pub fn shout_energy_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.communication.shout_energy_cost)
     }
 }

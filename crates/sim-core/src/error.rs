@@ -4,6 +4,7 @@ use std::fmt;
 pub enum SimError {
     Config(String),
     Io(std::io::Error),
+    Checkpoint(String),
 }
 
 impl fmt::Display for SimError {
@@ -11,6 +12,7 @@ impl fmt::Display for SimError {
         match self {
             SimError::Config(msg) => write!(f, "config error: {msg}"),
             SimError::Io(err) => write!(f, "io error: {err}"),
+            SimError::Checkpoint(msg) => write!(f, "checkpoint error: {msg}"),
         }
     }
 }

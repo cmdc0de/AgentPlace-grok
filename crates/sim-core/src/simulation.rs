@@ -1,14 +1,23 @@
-use crate::agent::{Agent, AgentId};
-use crate::config::ExperimentConfig;
+use crate::action::{ChosenAction, Speak, SpeakTarget};
+use crate::agent::{Abilities, Agent, AgentId, Needs, Personality};
+use crate::config::{ExperimentConfig, SpawnMode};
 use crate::error::SimError;
-use crate::event_log::{EventLog, SimEvent, SimEventKind};
-use crate::seeding::{resolve_seed, RngBank};
+use crate::event_log::{hash_kind, EventLog, SimEvent, SimEventKind};
+use crate::execute::{apply_heard_memories, execute_primary};
+use crate::llm::{
+    chosen_to_json, parse_choice_json, prompt_hash, Chooser, ChooseError, ReplayRecord, ReplayTable,
+};
+use crate::memory::{remember, MemoryEntry, MemoryKind};
+use crate::observation;
+use crate::policy::{avoid_toxic, mock_choose};
+use crate::seeding::{derive_seed, resolve_seed, RngBank};
 use crate::world::World;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::path::PathBuf;
 
 /// SHA-256 of canonical simulation state.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -34,6 +43,9 @@ pub struct Simulation {
     pub agents: BTreeMap<AgentId, Agent>,
     pub rngs: RngBank,
     pub events: EventLog,
+    pub chooser: Chooser,
+    pub replay: Option<ReplayTable>,
+    pub record_path: Option<PathBuf>,
 }
 
 impl Simulation {
@@ -64,6 +76,13 @@ impl Simulation {
             let _ = rngs.agent_stream(agent.id);
         }
 
+        let chooser = if config.llm.provider == "wait" {
+            Chooser::Wait
+        } else {
+            Chooser::Mock
+        };
+        let (replay, record_path) = replay_or_record(&config);
+
         Ok(Self {
             config,
             tick: 0,
@@ -71,6 +90,9 @@ impl Simulation {
             agents,
             rngs,
             events: EventLog::default(),
+            chooser,
+            replay,
+            record_path,
         })
     }
 
@@ -78,16 +100,14 @@ impl Simulation {
         self.agents.keys().copied().collect()
     }
 
-    /// Advance one discrete tick. Returns false if max_ticks has been reached.
     pub fn tick(&mut self) -> bool {
         if self.config.simulation.max_ticks > 0 && self.tick >= self.config.simulation.max_ticks {
             return false;
         }
         self.tick += 1;
-
+        self.world_step();
         let mut order: Vec<AgentId> = self.agents.keys().copied().collect();
         order.shuffle(self.rngs.stream("turn_order"));
-
         for id in order {
             self.step_agent(id);
         }
@@ -102,49 +122,229 @@ impl Simulation {
         }
     }
 
+    fn world_step(&mut self) {
+        let hunger_d = self.config.hunger_decay_milli();
+        let thirst_d = self.config.thirst_decay_milli();
+        let energy_d = self.config.energy_decay_milli();
+        for agent in self.agents.values_mut() {
+            agent.needs.hunger = agent.needs.hunger.saturating_sub(hunger_d);
+            agent.needs.thirst = agent.needs.thirst.saturating_sub(thirst_d);
+            let extra = if agent.illness_ticks > 0 { energy_d } else { 0 };
+            agent.needs.energy = agent.needs.energy.saturating_sub(energy_d + extra);
+            if agent.illness_ticks > 0 {
+                agent.illness_ticks -= 1;
+            }
+        }
+        let tick = self.tick;
+        let species = self.config.world.species.clone();
+        let mut ready = Vec::new();
+        for (&pos, crop) in &self.world.crops {
+            let grow = species
+                .veg(crop.species_tag)
+                .map(|s| s.grow_ticks)
+                .unwrap_or(40);
+            if tick >= crop.planted_tick + grow {
+                ready.push((pos, crop.species_tag));
+            }
+        }
+        for (pos, tag) in ready {
+            self.world.crops.remove(&pos);
+            self.world.set_vegetation(pos.0, pos.1, tag);
+        }
+        let regen = self.rngs.stream("event").random_bool(0.05);
+        if regen {
+            let land = self.world.land_cells();
+            if !land.is_empty() {
+                let idx = self.rngs.stream("event").random_range(0..land.len());
+                let (x, y) = land[idx];
+                if self.world.animal_count_at(x, y) < 3 {
+                    self.world.add_animal(x, y, 1);
+                }
+            }
+        }
+    }
+
     fn step_agent(&mut self, id: AgentId) {
-        let current = *self.agents.get(&id).expect("agent exists");
-        let wait = self.rngs.agent_stream(id).random_bool(0.2);
-        if wait {
-            self.events.push(SimEvent {
-                tick: self.tick,
-                agent: id,
-                kind: SimEventKind::Wait,
-            });
-            return;
+        let obs = observation::build(self, id);
+        apply_heard_memories(self, id, &obs.heard);
+
+        let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
+        let call_seed = derive_seed(
+            llm_base,
+            &format!("tick_{}_agent_{}_call_0", self.tick, id.0),
+        );
+        let hash = prompt_hash(&obs);
+        let mut allow_speak = true;
+
+        let mut chosen = if let Some(raw) = self
+            .replay
+            .as_ref()
+            .and_then(|t| t.get(self.tick, id.0).map(|s| s.to_string()))
+        {
+            parse_choice_json(&raw, &obs.legal, &self.config.world.species)
+                .unwrap_or_else(|_| ChosenAction::wait())
+        } else {
+            match &self.chooser {
+                Chooser::Wait => {
+                    allow_speak = false;
+                    self.events.push(SimEvent {
+                        tick: self.tick,
+                        agent: id,
+                        kind: SimEventKind::LlmWait,
+                    });
+                    ChosenAction::wait()
+                }
+                Chooser::Custom(chooser) => match chooser.choose(call_seed, &obs) {
+                    Ok(c) => c,
+                    Err(ChooseError::Timeout) => {
+                        allow_speak = false;
+                        self.events.push(SimEvent {
+                            tick: self.tick,
+                            agent: id,
+                            kind: SimEventKind::LlmWait,
+                        });
+                        ChosenAction::wait()
+                    }
+                    Err(_) => {
+                        allow_speak = false;
+                        self.events.push(SimEvent {
+                            tick: self.tick,
+                            agent: id,
+                            kind: SimEventKind::LlmWait,
+                        });
+                        ChosenAction::wait()
+                    }
+                },
+                Chooser::Mock => {
+                    let Some(agent) = self.agents.get(&id) else {
+                        return;
+                    };
+                    let filtered = avoid_toxic(&obs, &agent.memory);
+                    let identified = filtered.agents.iter().any(|a| a.id.is_some());
+                    let thirst = agent.needs.thirst;
+                    let hunger = agent.needs.hunger;
+                    let energy = agent.needs.energy;
+                    let memory = agent.memory.clone();
+                    let last_warn = agent.last_warn_tick;
+                    let rng = self.rngs.agent_stream(id);
+                    mock_choose(
+                        &filtered,
+                        rng,
+                        thirst,
+                        hunger,
+                        energy,
+                        self.config.thirst_max_milli(),
+                        self.config.hunger_max_milli(),
+                        self.config.energy_max_milli(),
+                        &memory,
+                        last_warn,
+                        self.tick,
+                        self.config.communication.warn_cooldown_ticks,
+                        &self.config.world.species,
+                        identified,
+                    )
+                }
+            }
+        };
+
+        if !obs.legal.iter().any(|a| a == &chosen.primary) {
+            chosen.primary = crate::action::PrimaryAction::Wait;
+        }
+        if !allow_speak {
+            chosen.speak = None;
         }
 
-        let dir = self.rngs.agent_stream(id).random_range(0u8..4);
-        let (dx, dy) = match dir {
-            0 => (0i32, -1),
-            1 => (0, 1),
-            2 => (-1, 0),
-            _ => (1, 0),
-        };
-        let nx = current.x as i32 + dx;
-        let ny = current.y as i32 + dy;
-        if !self.world.in_bounds(nx, ny) {
-            self.events.push(SimEvent {
+        if let Some(path) = &self.record_path {
+            let rec = ReplayRecord {
                 tick: self.tick,
-                agent: id,
-                kind: SimEventKind::Wait,
-            });
+                agent: id.0,
+                call_seed,
+                prompt_hash: hash,
+                response: chosen_to_json(&chosen),
+            };
+            if let Ok(line) = serde_json::to_string(&rec) {
+                let _ = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path)
+                    .and_then(|mut f| {
+                        use std::io::Write;
+                        writeln!(f, "{line}")
+                    });
+            }
+        }
+
+        execute_primary(self, id, &chosen.primary);
+        if allow_speak {
+            if let Some(speak) = chosen.speak {
+                self.execute_speak(id, speak);
+            }
+        }
+    }
+
+    fn execute_speak(&mut self, id: AgentId, mut speak: Speak) {
+        let max_len = self.config.communication.max_message_length as usize;
+        if speak.text.chars().count() > max_len {
+            speak.text = speak.text.chars().take(max_len).collect();
+        }
+        if speak.text.is_empty() {
             return;
         }
-        let to_x = nx as u32;
-        let to_y = ny as u32;
-        if let Some(agent) = self.agents.get_mut(&id) {
-            agent.x = to_x;
-            agent.y = to_y;
+        let Some(speaker) = self.agents.get(&id).cloned() else {
+            return;
+        };
+        let mut shout = speak.shout;
+        if shout {
+            let cost = self.config.shout_energy_milli();
+            if speaker.needs.energy < cost {
+                shout = false;
+            } else if let Some(a) = self.agents.get_mut(&id) {
+                a.needs.energy -= cost;
+            }
         }
+        let cap = self.config.agents.default_memory_capacity;
+        let tick = self.tick;
+        if let Some(a) = self.agents.get_mut(&id) {
+            a.last_warn_tick = tick;
+            remember(
+                &mut a.memory,
+                cap,
+                MemoryEntry {
+                    tick,
+                    kind: MemoryKind::Utterance,
+                    text: format!("said: {}", speak.text),
+                    importance: 40,
+                    last_accessed: tick,
+                    species_tag: 0,
+                },
+            );
+        }
+        let (broadcast, targets) = match speak.to {
+            SpeakTarget::Broadcast => (true, Vec::new()),
+            SpeakTarget::Directed(ids) => {
+                let ident = crate::observation::effective_range(
+                    self.config.observation.base_agent_identity_range,
+                    speaker.personality.perceptiveness,
+                );
+                let valid: Vec<AgentId> = ids
+                    .into_iter()
+                    .filter(|tid| {
+                        self.agents.get(tid).is_some_and(|t| {
+                            crate::observation::chebyshev(speaker.x, speaker.y, t.x, t.y) <= ident
+                        })
+                    })
+                    .collect();
+                (false, valid)
+            }
+        };
         self.events.push(SimEvent {
             tick: self.tick,
             agent: id,
-            kind: SimEventKind::Move {
-                from_x: current.x,
-                from_y: current.y,
-                to_x,
-                to_y,
+            kind: SimEventKind::Speak {
+                shout,
+                text: speak.text,
+                broadcast,
+                targets,
             },
         });
     }
@@ -158,10 +358,8 @@ impl Simulation {
         hasher.update(self.tick.to_le_bytes());
         hasher.update(self.config.master_seed.to_le_bytes());
         hasher.update(self.world.hash_bytes());
-        for (id, agent) in &self.agents {
-            hasher.update(id.0.to_le_bytes());
-            hasher.update(agent.x.to_le_bytes());
-            hasher.update(agent.y.to_le_bytes());
+        for agent in self.agents.values() {
+            agent.hash_bytes(&mut hasher);
         }
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());
@@ -172,23 +370,23 @@ impl Simulation {
         for event in &self.events.events {
             hasher.update(event.tick.to_le_bytes());
             hasher.update(event.agent.0.to_le_bytes());
-            match event.kind {
-                SimEventKind::Wait => hasher.update([0u8]),
-                SimEventKind::Move {
-                    from_x,
-                    from_y,
-                    to_x,
-                    to_y,
-                } => {
-                    hasher.update([1u8]);
-                    hasher.update(from_x.to_le_bytes());
-                    hasher.update(from_y.to_le_bytes());
-                    hasher.update(to_x.to_le_bytes());
-                    hasher.update(to_y.to_le_bytes());
-                }
-            }
+            hash_kind(&event.kind, &mut hasher);
         }
         StateHash(hasher.finalize().into())
+    }
+}
+
+pub(crate) fn replay_or_record(config: &ExperimentConfig) -> (Option<ReplayTable>, Option<PathBuf>) {
+    let path = config.llm.replay_file.trim();
+    if path.is_empty() {
+        return (None, None);
+    }
+    let p = PathBuf::from(path);
+    if p.is_file() {
+        let text = std::fs::read_to_string(&p).unwrap_or_default();
+        (Some(ReplayTable::from_jsonl(&text)), None)
+    } else {
+        (None, Some(p))
     }
 }
 
@@ -197,29 +395,133 @@ fn spawn_agents(
     world: &World,
     rng: &mut rand_chacha::ChaCha20Rng,
 ) -> Result<BTreeMap<AgentId, Agent>, SimError> {
-    let count = config.agents.count;
-    let mut occupied: BTreeSet<(u32, u32)> = BTreeSet::new();
-    let mut agents = BTreeMap::new();
-    let cells = (world.width as u64) * (world.height as u64);
-    let max_attempts = (count as u64).saturating_mul(16).max(cells);
+    let count = config.agents.count as usize;
+    let mut land = world.land_cells();
+    if land.len() < count {
+        return Err(SimError::Config(format!(
+            "not enough land cells ({}) for {} agents",
+            land.len(),
+            count
+        )));
+    }
 
-    for i in 0..count {
-        let id = AgentId(i as u64);
-        let mut pos = None;
-        for _ in 0..max_attempts {
-            let x = rng.random_range(0..world.width);
-            let y = rng.random_range(0..world.height);
-            if occupied.insert((x, y)) {
-                pos = Some((x, y));
-                break;
-            }
+    let chosen = match config.agents.spawn_mode {
+        SpawnMode::Scattered => {
+            land.shuffle(rng);
+            land
         }
-        let (x, y) = pos.unwrap_or_else(|| {
-            let x = rng.random_range(0..world.width);
-            let y = rng.random_range(0..world.height);
-            (x, y)
-        });
-        agents.insert(id, Agent::new(id, x, y));
+        SpawnMode::Clustered => cluster_cells(world, &land, count, rng),
+        SpawnMode::FixedList => {
+            return Err(SimError::Config(
+                "spawn_mode=fixed_list requires agents.spawn_list (not implemented in M2)".into(),
+            ));
+        }
+    };
+
+    let mut agents = BTreeMap::new();
+    let mut occupied: BTreeSet<(u32, u32)> = BTreeSet::new();
+    for (i, &(x, y)) in chosen.iter().take(count).enumerate() {
+        if !occupied.insert((x, y)) {
+            continue;
+        }
+        let id = AgentId(i as u64);
+        let mut agent = Agent::new(id, x, y);
+        agent.inventory_cap = config.agents.inventory_capacity;
+        if config.agents.start_with_basic_needs {
+            agent.needs = Needs::maxed(
+                config.hunger_max_milli(),
+                config.thirst_max_milli(),
+                config.energy_max_milli(),
+            );
+        }
+        sample_body(&mut agent, config, rng);
+        agents.insert(id, agent);
+    }
+    if agents.len() < count {
+        return Err(SimError::Config(format!(
+            "failed to place {} unique land spawns (placed {})",
+            count,
+            agents.len()
+        )));
     }
     Ok(agents)
 }
+
+fn sample_body(agent: &mut Agent, config: &ExperimentConfig, rng: &mut rand_chacha::ChaCha20Rng) {
+    if config.agents.archetypes.is_empty() {
+        agent.abilities = Abilities::default();
+        agent.personality = Personality::default();
+    } else {
+        let total: f64 = config.agents.archetypes.iter().map(|a| a.weight.max(0.0)).sum();
+        let mut pick = rng.random::<f64>() * total.max(0.0001);
+        let mut chosen = &config.agents.archetypes[0];
+        for arch in &config.agents.archetypes {
+            pick -= arch.weight.max(0.0);
+            if pick <= 0.0 {
+                chosen = arch;
+                break;
+            }
+        }
+        agent.abilities = chosen.abilities;
+        agent.personality = chosen.personality.clone();
+    }
+    // ~10% allergic to nightshade / solanaceae
+    if rng.random_bool(0.1)
+        && !agent
+            .personality
+            .allergy_tags
+            .iter()
+            .any(|t| t == "solanaceae")
+    {
+        agent.personality.allergy_tags.push("solanaceae".into());
+    }
+}
+
+fn cluster_cells(
+    world: &World,
+    land: &[(u32, u32)],
+    count: usize,
+    rng: &mut rand_chacha::ChaCha20Rng,
+) -> Vec<(u32, u32)> {
+    let origin = land[rng.random_range(0..land.len())];
+    let (ox, oy) = origin;
+    let mut chosen = Vec::new();
+    let mut seen: BTreeSet<(u32, u32)> = BTreeSet::new();
+    let max_r = world.width.max(world.height);
+    for r in 0..=max_r {
+        let mut ring = Vec::new();
+        let x0 = ox.saturating_sub(r);
+        let x1 = (ox + r).min(world.width.saturating_sub(1));
+        let y0 = oy.saturating_sub(r);
+        let y1 = (oy + r).min(world.height.saturating_sub(1));
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                let dx = (x as i32 - ox as i32).unsigned_abs();
+                let dy = (y as i32 - oy as i32).unsigned_abs();
+                if dx.max(dy) != r {
+                    continue;
+                }
+                if world.is_land(x, y) && seen.insert((x, y)) {
+                    ring.push((x, y));
+                }
+            }
+        }
+        ring.shuffle(rng);
+        chosen.extend(ring);
+        if chosen.len() >= count {
+            break;
+        }
+    }
+    if chosen.len() < count {
+        let mut rest: Vec<(u32, u32)> = land
+            .iter()
+            .copied()
+            .filter(|c| !seen.contains(c))
+            .collect();
+        rest.shuffle(rng);
+        chosen.extend(rest);
+    }
+    chosen
+}
+
+

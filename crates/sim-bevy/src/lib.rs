@@ -15,14 +15,21 @@ pub struct SimState {
 pub struct SimTickTimer(pub Timer);
 
 pub struct SimPlugin {
-    pub config: ExperimentConfig,
+    pub sim: Simulation,
     pub tick_interval_secs: f32,
 }
 
 impl SimPlugin {
     pub fn new(config: ExperimentConfig) -> Self {
         Self {
-            config,
+            sim: Simulation::new(config).expect("invalid experiment config"),
+            tick_interval_secs: 0.2,
+        }
+    }
+
+    pub fn from_simulation(sim: Simulation) -> Self {
+        Self {
+            sim,
             tick_interval_secs: 0.2,
         }
     }
@@ -30,9 +37,8 @@ impl SimPlugin {
 
 impl Plugin for SimPlugin {
     fn build(&self, app: &mut App) {
-        let sim = Simulation::new(self.config.clone()).expect("invalid experiment config");
         app.insert_resource(SimState {
-            sim,
+            sim: self.sim.clone(),
             paused: false,
             follow: None,
         })

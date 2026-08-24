@@ -12,12 +12,20 @@ pub fn heightmap_mesh(world: &World) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(w * h);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(w * h);
     let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(w * h);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(w * h);
+    let max_h = world.max_height.max(1) as f32;
 
     for z in 0..h {
         for x in 0..w {
             let y = world.height_at(x as u32, z as u32) as f32;
             positions.push([x as f32, y, z as f32]);
             uvs.push([x as f32 / (w as f32).max(1.0), z as f32 / (h as f32).max(1.0)]);
+            if world.is_water(x as u32, z as u32) {
+                colors.push([0.12, 0.34, 0.62, 1.0]);
+            } else {
+                let t = (y / max_h).clamp(0.0, 1.0);
+                colors.push([0.22 + 0.18 * t, 0.42 + 0.22 * t, 0.16 + 0.08 * t, 1.0]);
+            }
         }
     }
 
@@ -51,6 +59,7 @@ pub fn heightmap_mesh(world: &World) -> Mesh {
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
     .with_inserted_indices(Indices::U32(indices))
 }
 
@@ -63,4 +72,9 @@ fn sample(positions: &[[f32; 3]], w: usize, h: usize, x: i32, z: i32) -> [f32; 3
 pub fn agent_world_pos(world: &World, x: u32, y: u32) -> Vec3 {
     let h = world.height_at(x, y) as f32;
     Vec3::new(x as f32 + 0.5, h + 0.7, y as f32 + 0.5)
+}
+
+pub fn resource_world_pos(world: &World, x: u32, y: u32, lift: f32) -> Vec3 {
+    let h = world.height_at(x, y) as f32;
+    Vec3::new(x as f32 + 0.5, h + lift, y as f32 + 0.5)
 }

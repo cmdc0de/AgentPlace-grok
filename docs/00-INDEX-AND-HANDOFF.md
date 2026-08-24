@@ -10,6 +10,21 @@ Supports Windows, Linux (Debian-based), and macOS. Clients attach via in-process
 
 ---
 
+## Implementation progress
+
+Read this table first in a new session, then the specs, then the current milestone plan.
+
+| Milestone | Status | Doc | What it is |
+|-----------|--------|-----|------------|
+| **M1** | Done (`ff3d21b`) | (commit message; no separate plan file) | Workspace, seeded ticks, heightmap, random-walk agents, hash tests, headless `sim-cli`, in-process Bevy viewer |
+| **M2** | Done | [`M2-plan.md`](M2-plan.md) | Water/vegetation/mineral layers, land-only spawn, versioned checkpoints + Markdown + JSONL, viewer `--load` |
+| **M3** | **Done (mock default; live LLM optional)** | [`M3-plan.md`](M3-plan.md) | Observation, needs, abilities, toxicity, speech, mock + Ollama/xAI action selection |
+| M4+ | Not started | listed at the bottom of `M3-plan.md` | Proposal board, full memory/relationships, imgui/POV, TCP/WebSocket, incentives |
+
+Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
+
+---
+
 ## Specification Files (read in this order)
 
 | Order | File | Contents |
@@ -20,15 +35,17 @@ Supports Windows, Linux (Debian-based), and macOS. Clients attach via in-process
 | 4 | `memory-goals-incentives-spec.md` | Hybrid memory + eviction, relationship summaries, public goals & rule proposal lifecycle, incentive schedule format |
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
+| 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
+| 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach **all six `.md` files** plus this `00-INDEX-AND-HANDOFF.md` into the Grok Build session / project. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md`, `M3-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the complete design specifications for the multi-agent simulation. Read `00-INDEX-AND-HANDOFF.md` first, then the files in the listed order. We are ready to begin implementation. Propose the initial crate/workspace layout and the first concrete milestone.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M3-plan.md`. Implement the current milestone; do not expand into items it defers.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -54,17 +71,19 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ---
 
-## Suggested first request to Grok Build
+## Suggested next request to Grok Build
+
+M1 and M2 are done. Next work is M3.
 
 ```
-We are starting implementation of the multi-agent simulation described in the attached specs.
-Please:
-1. Propose a Cargo workspace / crate layout that matches the architecture doc.
-2. Define the first vertical-slice milestone that gets us to a deterministic headless tick + minimal 3D view of agent positions.
-3. List the exact next implementation steps after that.
-Do not re-open settled design decisions unless you see a clear contradiction in the specs.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M3-plan.md.
+Implement M3 as specified there (observation, needs, Gather/Drink/Eat, hunt/fish/farm/craft,
+toxicity, speech as a free secondary action, thin memory, mock + optional live LLM).
+Do not add the proposal board, imgui, incentives, or TCP/WebSocket. Do not re-open
+settled design decisions unless M3-plan.md contradicts a spec on timing — in that
+case follow M3-plan.md.
 ```
 
 ---
 
-*Generated from the design conversation. All detailed requirements live in the six specification files listed above.*
+*Generated from the design conversation. Detailed requirements live in the specification files; current-slice scope lives in the milestone plans.*
