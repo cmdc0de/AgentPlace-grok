@@ -48,7 +48,7 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 
 | Later | What |
 |---|---|
-| **M4** | Public proposal board, support/oppose, formal rule text. Speech in M3 is informal only. |
+| **M4** | [`M4-plan.md`](M4-plan.md) — public board, Propose/Support/Oppose, structured adopted rules, food-economy summary report. |
 | **M5** | Full hybrid memory, embeddings, relationship summaries, influence pipeline (speech in M3 writes memories but does not move trust/affinity). |
 | **M6** | imgui inspectors + agent-POV fog-of-war that renders the same `Observation` the agent got. |
 | **M7** | TCP / WebSocket (`shared::transport`). |
