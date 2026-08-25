@@ -82,8 +82,8 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 |---|---|
 | **M5** | Done — [`M5-plan.md`](M5-plan.md) (hybrid memory, relationship summaries, influence, decision JSONL, viewer legend + per-kind meshes) |
 | **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, slash-command console) |
-| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`) |
-| **M8** | Incentive schedules + load-checkpoint-and-inject |
+| **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach) |
+| **M8** | [`M8-plan.md`](M8-plan.md) — incentive schedules + load-checkpoint-and-inject + timing |
 | Later | Transfer/Store, shared stockpiles, meta-rules, Attack/Flee/death, dialects, lie detection, weighted-by-status voting |
 
 Do not pull incentives into M4. The A/B loop needs a working board and a readable food report first.

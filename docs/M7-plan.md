@@ -1,6 +1,6 @@
 # M7 — Attachable TCP and WebSocket clients
 
-**Status:** implemented (this tree; tag after merge)  
+**Status:** implemented (git tag `M7`, commit `789fc81`).  
 **Depends on:** M6 complete (`docs/M6-plan.md`, git tag `M6`, commit `46c75e0`)  
 **Specs:** `simulation-architecture-spec.md` §4–5 (attachable clients, TCP **and** WebSocket), `deterministic-seeding-design.md` (hash-identical continuation), `medium-priority-specs.md` §4 (client disconnect: core continues), `00-INDEX-AND-HANDOFF.md` (in-process / TCP / WS)
 
@@ -64,7 +64,7 @@ Server → Client:
 
 | Later | What |
 |---|---|
-| **M8** | Incentive TOML, apply at tick 0 or on load, viewer `/inject`, `IncentiveSeed` stream, fill `IncentiveState` |
+| **M8** | [`M8-plan.md`](M8-plan.md) — incentive TOML, apply at tick 0 or on load, viewer `/inject`, processing metrics |
 | Later | TLS / `wss`, Unix sockets, multiple exclusive writers, jump-to-tick without a file, delta compression, browser client, vote weighting, world-mutation `/set` `/give` |
 
 Do **not** implement payoff/influence stubs that would change hashes.

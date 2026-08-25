@@ -127,8 +127,8 @@ HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line
 | Later | What |
 |---|---|
 | **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, slash-command console (`/report`)) |
-| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`) |
-| **M8** | Incentive schedules + load-checkpoint-and-inject (`influence_factor_delta`, `relationship_delta`, …) |
+| **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach) |
+| **M8** | [`M8-plan.md`](M8-plan.md) — incentive schedules + load-checkpoint-and-inject + timing |
 | Later | Weighted-by-status voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, Transfer/Store, death, meta-rules |
 
 Do **not** pull incentives into M5. Relationships have to exist before an incentive can target them.

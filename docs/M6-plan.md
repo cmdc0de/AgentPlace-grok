@@ -61,8 +61,8 @@ No `/set`, `/give`, `/inject`. Those wait for M8.
 
 | Later | What |
 |---|---|
-| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`); remote GUI clients |
-| **M8** | Incentive schedule editor / load-checkpoint-and-inject |
+| **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket; remote GUI clients) |
+| **M8** | [`M8-plan.md`](M8-plan.md) — incentive schedule inject + processing metrics |
 | Later | Timeline scrubber, metrics charts, browser imgui, vote weighting, live embeddings, world-mutation console |
 
 ## Key decisions
