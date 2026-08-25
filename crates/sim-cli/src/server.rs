@@ -5,8 +5,8 @@ use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
 use shared::PROTOCOL_VERSION;
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, experiment_id, summary_markdown, write_report,
-    write_run_checkpoint, SimEvent, Simulation,
+    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, experiment_id,
+    summary_markdown, write_report, write_run_checkpoint, SimEvent, Simulation,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,6 +30,7 @@ pub struct Hub {
     token: Option<String>,
     jsonl_path: Option<PathBuf>,
     decisions_path: Option<PathBuf>,
+    timing_path: Option<PathBuf>,
     last_event: usize,
     out_dir: Option<PathBuf>,
     interval: u64,
@@ -71,6 +72,9 @@ impl Hub {
         if let Some(path) = &self.decisions_path {
             let _ = append_decisions_jsonl(path, &self.sim.last_tick_decisions);
         }
+        if let (Some(path), Some(t)) = (&self.timing_path, &self.sim.last_tick_timing) {
+            let _ = append_timing_jsonl(path, t);
+        }
         if let Some(dir) = &self.out_dir {
             if self.interval > 0 && self.sim.tick % self.interval == 0 {
                 let _ = write_run_checkpoint(&self.sim, dir);
@@ -106,11 +110,18 @@ impl Hub {
             } else {
                 Vec::new()
             };
+            let metrics = self
+                .sim
+                .last_tick_timing
+                .as_ref()
+                .and_then(|t| serde_json::to_vec(t).ok())
+                .unwrap_or_default();
             let _ = sub.tx.send(ServerMessage::Tick {
                 tick,
                 state_hash,
                 events,
                 decisions,
+                metrics,
             });
         }
     }
@@ -192,6 +203,7 @@ pub struct ServeOpts {
     pub quiet: bool,
     pub out_dir: Option<PathBuf>,
     pub checkpoint_every: Option<u64>,
+    pub write_timing: bool,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -201,12 +213,16 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut jsonl_path = None;
     let mut decisions_path = None;
+    let mut timing_path = None;
     let last_event = opts.sim.events.events.len();
     if let Some(dir) = &opts.out_dir {
         std::fs::create_dir_all(dir)?;
         let id = experiment_id(&opts.sim.config_hash()?);
         jsonl_path = Some(dir.join(format!("{id}_events.jsonl")));
         decisions_path = Some(dir.join(format!("{id}_decisions.jsonl")));
+        if opts.write_timing {
+            timing_path = Some(dir.join(format!("{id}_timing.jsonl")));
+        }
         if let Some(path) = &jsonl_path {
             append_events_jsonl(path, &opts.sim.events.events)?;
         }
@@ -225,6 +241,7 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         token: opts.token,
         jsonl_path,
         decisions_path,
+        timing_path,
         last_event,
         out_dir: opts.out_dir.clone(),
         interval,
@@ -430,11 +447,31 @@ fn handle_client(
                 };
                 conn.send_msg(&reply)?;
             }
-            Ok(ClientMessage::InjectIncentive { .. }) => {
-                conn.send_msg(&ServerMessage::Error {
-                    code: ErrorCode::NotImplemented,
-                    message: "not implemented".into(),
-                })?;
+            Ok(ClientMessage::InjectIncentive { schedule_toml }) => {
+                let reply = {
+                    let mut hub = hub.lock().unwrap();
+                    if !hub.allow_control {
+                        ServerMessage::Error {
+                            code: ErrorCode::ControlDisabled,
+                            message: "control disabled (start with --allow-control)".into(),
+                        }
+                    } else {
+                        match hub.sim.inject_schedule_toml(&schedule_toml) {
+                            Ok(()) => ServerMessage::ReportReady {
+                                markdown_or_path: format!(
+                                    "injected {} incentive(s) at tick {}",
+                                    hub.sim.incentives.incentives.len(),
+                                    hub.sim.tick
+                                ),
+                            },
+                            Err(e) => ServerMessage::Error {
+                                code: ErrorCode::Internal,
+                                message: e.to_string(),
+                            },
+                        }
+                    }
+                };
+                conn.send_msg(&reply)?;
             }
             Ok(ClientMessage::Hello { .. }) => {
                 conn.send_msg(&ServerMessage::Error {

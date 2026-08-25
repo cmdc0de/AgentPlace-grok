@@ -71,12 +71,19 @@ ws_listen = ""
 token = ""
 allow_control = false
 
+# Overlay only. Empty schedule = baseline (no incentives). See docs/incentive-schedule-format.md
+[incentives]
+schedule = ""
+
 [observation]
 base_vision_range = 12.0
 base_hearing_range = 18.0
 base_agent_identity_range = 8.0
 full_information = false
 
+# 0–100 display scale; stored as millipoints (×100). Decay every tick before agents act.
+# Mock treats thirsty = thirst<50, hungry = hunger<50, tired = energy<max/3.
+# Full write-up: docs/needs-and-survival.md
 [needs]
 hunger_max = 100.0
 hunger_decay_per_tick = 0.15
@@ -85,7 +92,7 @@ thirst_decay_per_tick = 0.25
 energy_max = 100.0
 energy_decay_per_tick = 0.08
 energy_regen_while_resting = 0.4
-death_enabled = false
+death_enabled = true
 
 [communication]
 speech_is_free_action = true
@@ -120,3 +127,6 @@ export_csv = true
 track_consumption = true
 track_proposal_stats = true
 track_relationship_graph = true
+# Overlay only (ignored by ExperimentConfig). Timing JSONL is on when --out-dir is set
+# unless this is false.
+# timing = true

@@ -408,7 +408,9 @@ pub fn agent_visible_in_observation(obs: &Observation, id: AgentId, x: u32, y: u
     if obs.agent_id == id {
         return true;
     }
-    obs.agents.iter().any(|a| a.id == Some(id) || (a.id.is_none() && a.x == x && a.y == y))
+    obs.agents
+        .iter()
+        .any(|a| a.id == Some(id) || (a.id.is_none() && a.x == x && a.y == y))
 }
 
 /// Legal-list matching. `Propose` in the list is a placeholder with empty text.

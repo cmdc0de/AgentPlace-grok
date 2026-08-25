@@ -1,0 +1,40 @@
+# Incentive *schedule* — one file may contain several [[incentives]] tables.
+# Not part of ExperimentConfig / state_hash.
+#
+#   sim-cli --incentives configs/incentives/coop.toml
+#   sim-cli --load T.ckpt --inject configs/incentives/coop.toml
+#   viewer: /inject configs/incentives/coop.toml   (needs --allow-control on the server)
+#
+# Full field list: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "early_cooperation_bonus"
+description = "Reward supporters of public goals and nudge adoption"
+start_tick = 0
+# end_tick = 3000          # optional; omit = stays on
+applies_to = "all"         # all | agent:N | archetype:name
+
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"          # food | animal | fish
+multiplier = 1.4
+condition = "has_supported_public_goal"  # or omit / ""
+
+[[incentives.effects]]
+type = "proposal_threshold_modifier"
+delta = -0.1
+
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "keep the shared storage stocked"
+scope = "personal"         # personal | public
+priority = 0.7
+
+# Additional incentives in the *same* file:
+# [[incentives]]
+# id = "late_leadership"
+# start_tick = 40
+# applies_to = "agent:0"
+# [[incentives.effects]]
+# type = "influence_factor_delta"
+# delta = 0.15

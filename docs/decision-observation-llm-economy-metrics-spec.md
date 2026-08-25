@@ -258,6 +258,8 @@ Keep the economy relatively simple and grounded in the natural world. The primar
 
 ### Needs
 
+**As implemented (M3–M8):** [`needs-and-survival.md`](needs-and-survival.md). Display 0–100 in TOML; stored as millipoints (`×100`). Mock policy: thirsty if thirst **< half max**, hungry if hunger **< half max**, tired if energy **< one third max**. Decay runs every tick before actions. `death_enabled = true` in default config: hunger or thirst at 0 removes the agent.
+
 ```toml
 [needs]
 hunger_max = 100.0

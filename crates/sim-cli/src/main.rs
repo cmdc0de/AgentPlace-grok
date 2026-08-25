@@ -1,9 +1,11 @@
 mod network;
+mod overlay;
 mod server;
 
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, experiment_id, report_markdown, summary_markdown,
-    write_report, write_run_checkpoint, ExperimentConfig, Simulation,
+    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, experiment_id,
+    report_markdown, summary_markdown, write_report, write_run_checkpoint, ExperimentConfig,
+    Simulation,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -33,6 +35,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut listen: Vec<String> = Vec::new();
     let mut allow_control = false;
     let mut token: Option<String> = None;
+    let mut incentives_path: Option<PathBuf> = None;
+    let mut inject_path: Option<PathBuf> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -85,6 +89,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 i += 1;
                 token = Some(args.get(i).ok_or("--token requires a value")?.clone());
             }
+            "--incentives" => {
+                i += 1;
+                incentives_path = Some(PathBuf::from(
+                    args.get(i).ok_or("--incentives requires a path")?,
+                ));
+            }
+            "--inject" => {
+                i += 1;
+                inject_path = Some(PathBuf::from(
+                    args.get(i).ok_or("--inject requires a path")?,
+                ));
+            }
             "--help" | "-h" => {
                 print_help();
                 return Ok(());
@@ -111,10 +127,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         token = Some(net.token.clone());
     }
     let listen = server::merge_listen(&net, &listen);
+    let overlay = overlay::OverlayFile::from_path(&config_path);
+    if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
+        incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
+    }
+    let schedule_path = inject_path.or(incentives_path);
+    if let Some(path) = &schedule_path {
+        let text = std::fs::read_to_string(path)?;
+        sim.inject_schedule_toml(&text)?;
+    }
 
     if checkpoint_every.is_some() && out_dir.is_none() {
         out_dir = Some(PathBuf::from(&sim.config.checkpoint.directory));
     }
+    let write_timing = overlay.metrics.timing.unwrap_or(out_dir.is_some());
 
     let n = ticks.unwrap_or(if (summarize || report) && load_path.is_some() {
         0
@@ -154,6 +180,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             quiet,
             out_dir,
             checkpoint_every,
+            write_timing,
         });
     }
 
@@ -171,12 +198,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut jsonl_path = None;
     let mut decisions_path = None;
+    let mut timing_path = None;
     let mut last_event = sim.events.events.len();
+    let mut tick_ns_sum = 0u128;
+    let mut tick_ns_n = 0u64;
+    let mut tick_ns_last = 0u64;
     if let Some(dir) = &out_dir {
         std::fs::create_dir_all(dir)?;
         let id = experiment_id(&sim.config_hash()?);
         jsonl_path = Some(dir.join(format!("{id}_events.jsonl")));
         decisions_path = Some(dir.join(format!("{id}_decisions.jsonl")));
+        if write_timing {
+            timing_path = Some(dir.join(format!("{id}_timing.jsonl")));
+        }
         if let Some(path) = &jsonl_path {
             append_events_jsonl(path, &sim.events.events)?;
             last_event = sim.events.events.len();
@@ -202,6 +236,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(path) = &decisions_path {
             append_decisions_jsonl(path, &sim.last_tick_decisions)?;
         }
+        if let Some(t) = &sim.last_tick_timing {
+            tick_ns_sum += u128::from(t.wall_ns);
+            tick_ns_n += 1;
+            tick_ns_last = t.wall_ns;
+            if let Some(path) = &timing_path {
+                append_timing_jsonl(path, t)?;
+            }
+        }
         if let Some(dir) = &out_dir {
             if interval > 0 && sim.tick % interval == 0 {
                 write_run_checkpoint(&sim, dir)?;
@@ -225,6 +267,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("final_tick={}", sim.tick);
     println!("final_hash={}", sim.state_hash());
+    if tick_ns_n > 0 {
+        eprintln!(
+            "tick_ns_last={tick_ns_last} tick_ns_mean={}",
+            tick_ns_sum / u128::from(tick_ns_n)
+        );
+    }
     if !quiet {
         for agent in sim.agents.values() {
             println!(
@@ -251,6 +299,7 @@ Usage:
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--allow-control] [--token SECRET]
+          [--incentives PATH] [--inject PATH]
 
 Options:
   -c, --config PATH         Experiment TOML (default: configs/default.toml)
@@ -265,6 +314,8 @@ Options:
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
       --allow-control       Accept pause/play/step/save/report/summarize from clients
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
+      --incentives PATH     Apply incentive TOML from tick 0
+      --inject PATH         Replace schedule (typical with --load)
   -h, --help                Show this help"
     );
 }

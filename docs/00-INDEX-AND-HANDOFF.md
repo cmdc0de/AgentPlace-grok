@@ -23,7 +23,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M5** | Done (`7de52be`) | [`M5-plan.md`](M5-plan.md) | Hybrid memory, relationships, influence, decision JSONL, viewer legend + per-kind meshes |
 | **M6** | Done (tag `M6`, `46c75e0`) | [`M6-plan.md`](M6-plan.md) | imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
 | **M7** | Done (tag `M7`, `789fc81`) | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
-| **M8** | **Planned — next** | [`M8-plan.md`](M8-plan.md) | Incentive A/B inject + processing (wall-clock) metrics |
+| **M8** | Done | [`M8-plan.md`](M8-plan.md) | Incentive A/B inject + processing (wall-clock) metrics |
 | M9+ | Not started | listed at the bottom of `M8-plan.md` | Protobuf/JSON envelope, TLS, timeline scrubber |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -37,7 +37,9 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 1 | `deterministic-seeding-design.md` | Hierarchical master seed, RNG streams, reproducibility, checkpoint branching |
 | 2 | `simulation-architecture-spec.md` | Bevy recommendation, platform support, attachable clients, TCP **and** WebSocket transports, GUI, project layout |
 | 3 | `simulation-and-agents-spec.md` | Config-driven world generation, agent population, personality, memory capacity, personal/public goals, social influence |
-| 4 | `memory-goals-incentives-spec.md` | Hybrid memory + eviction, relationship summaries, public goals & rule proposal lifecycle, incentive schedule format |
+| 4 | `memory-goals-incentives-spec.md` | Hybrid memory + eviction, relationship summaries, public goals & rule proposal lifecycle, incentive schedule format (long-term) |
+| 4b | `incentive-schedule-format.md` | **M8 file format:** one TOML schedule, many `[[incentives]]`, closed effect fields |
+| 4c | `needs-and-survival.md` | Hunger / thirst / energy: millipoints, decay, mock “hungry” cutoffs, refill actions |
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
@@ -46,7 +48,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 10 | `M5-plan.md` | Milestone 5 (done): hybrid memory, relationships, influence, decision logs, viewer legend |
 | 11 | `M6-plan.md` | Milestone 6 (done): imgui UI, agent-POV fog-of-war, viewer commands |
 | 12 | `M7-plan.md` | Milestone 7 (done): TCP + WebSocket attachable clients |
-| 13 | `M8-plan.md` | Milestone 8 (next): incentive A/B inject + processing metrics |
+| 13 | `M8-plan.md` | Milestone 8 (done): incentive A/B inject + processing metrics |
 
 ---
 
@@ -55,7 +57,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M8-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M8-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M8-plan.md`. M8 is implemented; do not expand into items it defers.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -83,15 +85,12 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M7 are done (tag `M7`, commit `789fc81`). Next work is M8.
+M1–M8 are done. Next work is listed at the bottom of `M8-plan.md` (protobuf/JSON envelope, TLS, timeline scrubber). Do not expand M8.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M8-plan.md.
-Implement M8 as specified there (incentive TOML, --incentives/--inject,
-viewer /inject, closed millipoint effects, wall-clock tick/agent timing).
-Keep the M7 postcard codec; implement InjectIncentive; do not switch to
-protobuf or a JSON envelope. Do not add ExperimentConfig fields or bump
-checkpoint format_version. Timing must not enter state_hash.
+M8 is implemented. Do not rewrite the postcard codec, add TLS, or
+visibility_modifier unless a new milestone plan says so.
 ```
 
 ---

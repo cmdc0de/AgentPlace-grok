@@ -1,6 +1,6 @@
 # M8 — Incentive A/B inject and processing metrics
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (this tree; tag after merge)  
 **Depends on:** M7 complete (`docs/M7-plan.md`, git tag `M7`, commit `789fc81`)  
 **Specs:** `memory-goals-incentives-spec.md` §3 (schedule TOML + effect vocabulary), `deterministic-seeding-design.md` §4/§6 (load T, change only incentives, hashes diverge), `decision-observation-llm-economy-metrics-spec.md` §5 (metrics; M8 adds **wall-clock** timing, not the full social time-series dashboard)
 
@@ -122,6 +122,8 @@ cargo run -p sim-cli -- --listen tcp://127.0.0.1:9000 --allow-control --ticks 10
 cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 # /inject configs/incentives/coop.toml
 ```
+
+**File format:** one TOML file is a *schedule* (array of `[[incentives]]`), not one file per incentive. Full fields: [`incentive-schedule-format.md`](incentive-schedule-format.md). Example: `configs/incentives/coop.toml`.
 
 Example schedule (`configs/incentives/coop.toml`):
 

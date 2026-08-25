@@ -33,6 +33,7 @@ pub struct UiState {
     pub decision_ring: VecDeque<(u64, Vec<sim_core::DecisionRecord>)>,
     pub event_filter_agent: String,
     pub event_filter_kind: String,
+    pub timing_ring: VecDeque<u64>,
 }
 
 impl Default for UiState {
@@ -74,6 +75,7 @@ impl UiState {
             decision_ring: VecDeque::new(),
             event_filter_agent: String::new(),
             event_filter_kind: String::new(),
+            timing_ring: VecDeque::new(),
         };
         if let Ok(text) = fs::read_to_string(ui_persist_path()) {
             if let Ok(p) = serde_json::from_str::<UiPersist>(&text) {
@@ -153,6 +155,12 @@ fn record_decisions(state: &mut SimState, ui: &mut UiState) {
                 ui.decision_ring.pop_front();
             }
         }
+        if let Some(t) = &state.sim.last_tick_timing {
+            ui.timing_ring.push_back(t.wall_ns);
+            while ui.timing_ring.len() > 64 {
+                ui.timing_ring.pop_front();
+            }
+        }
     }
 }
 
@@ -187,6 +195,20 @@ fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&Net
                 state.sim.world.animal_total(),
                 state.sim.world.fish_total()
             ));
+            if let Some(t) = &state.sim.last_tick_timing {
+                let last_ms = t.wall_ns as f64 / 1_000_000.0;
+                let (mean_ms, max_ms) = if us.timing_ring.is_empty() {
+                    (last_ms, last_ms)
+                } else {
+                    let n = us.timing_ring.len() as f64;
+                    let sum: u64 = us.timing_ring.iter().copied().sum();
+                    let max = us.timing_ring.iter().copied().max().unwrap_or(t.wall_ns);
+                    (sum as f64 / n / 1_000_000.0, max as f64 / 1_000_000.0)
+                };
+                ui.text(format!(
+                    "tick {last_ms:.2} ms  mean {mean_ms:.2}  max {max_ms:.2}"
+                ));
+            }
             if ui.button("Pause") {
                 state.paused = true;
                 if state.remote {
@@ -295,6 +317,17 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 return;
             };
             ui.text(format!("agent {}  pos=({}, {})", id.0, a.x, a.y));
+            if let Some(t) = &state.sim.last_tick_timing {
+                if let Some(at) = t.agents.iter().find(|x| x.agent == id.0) {
+                    ui.text(format!(
+                        "step µs  perc {}  retr {}  sel {}  exec {}",
+                        at.perceive_ns / 1000,
+                        at.retrieve_ns / 1000,
+                        at.select_ns / 1000,
+                        at.execute_ns / 1000
+                    ));
+                }
+            }
             need_bar(ui, "hunger", a.needs.hunger);
             need_bar(ui, "thirst", a.needs.thirst);
             need_bar(ui, "energy", a.needs.energy);
@@ -501,6 +534,12 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
                 "board open {}  rel pairs {pairs}",
                 state.sim.board.open().count()
             ));
+            if let Some(t) = &state.sim.last_tick_timing {
+                ui.text(format!(
+                    "ns wall {} world {} board {} inc {} agents {}",
+                    t.wall_ns, t.world_ns, t.board_ns, t.incentive_ns, t.agents_ns
+                ));
+            }
         });
 }
 
@@ -541,6 +580,17 @@ fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&Ne
                             if let Some(verb) = remote_control(&cmd) {
                                 send_control(net, ClientMessage::Control(verb));
                             }
+                            if let crate::commands::UiCommand::Inject { path: Some(p) } = &cmd {
+                                match std::fs::read_to_string(p) {
+                                    Ok(toml) => send_control(
+                                        net,
+                                        ClientMessage::InjectIncentive {
+                                            schedule_toml: toml,
+                                        },
+                                    ),
+                                    Err(e) => us.scrollback.push(format!("inject read error: {e}")),
+                                }
+                            }
                         }
                         let msgs = run_command(cmd, state, &mut us.fog, &mut us.windows);
                         us.scrollback.extend(msgs);
@@ -573,6 +623,9 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Support { .. } => "support",
         SimEventKind::Oppose { .. } => "oppose",
         SimEventKind::RuleBlocked { .. } => "rule_blocked",
+        SimEventKind::IncentiveApplied { .. } => "incentive_applied",
+        SimEventKind::IncentiveEnded { .. } => "incentive_ended",
+        SimEventKind::Died { .. } => "died",
     }
 }
 

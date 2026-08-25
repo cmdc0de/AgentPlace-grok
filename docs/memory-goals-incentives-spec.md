@@ -169,6 +169,8 @@ Incentives are the primary experimental intervention. They must be:
 - able to target any of the agent variables we have defined (memory importance, influence factor, goal priorities, proposal thresholds, resource payoffs, etc.),
 - fully recorded so a run can be exactly reproduced or counterfactualised.
 
+**M8 shipping format** (what `sim-cli --incentives` / `--inject` actually parse): [`incentive-schedule-format.md`](incentive-schedule-format.md). One file = one schedule = many `[[incentives]]`. `visibility_modifier` and `applies_to = "supporters_of:…"` are specified below but **not** implemented in M8.
+
 ### Recommended format (TOML)
 
 ```toml

@@ -1,7 +1,7 @@
 use sim_core::event_log::SimEventKind;
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::species::Toxicity;
-use sim_core::{AgentId, CHECKPOINT_FORMAT_VERSION, ExperimentConfig, ItemId, Simulation};
+use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation, CHECKPOINT_FORMAT_VERSION};
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -39,11 +39,11 @@ fn drink_raises_thirst() {
         "thirst should recover after drink, got {}",
         a.needs.thirst
     );
-    assert!(
-        sim.events.events.iter().any(|e| {
-            e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait)
-        })
-    );
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .any(|e| { e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait) }));
 }
 
 #[test]
@@ -217,18 +217,16 @@ fn wait_chooser_does_not_speak() {
     let mut sim = Simulation::new(tiny_config(15)).unwrap();
     sim.chooser = sim_core::Chooser::Wait;
     sim.run_ticks(8);
-    assert!(
-        sim.events
-            .events
-            .iter()
-            .all(|e| !matches!(e.kind, SimEventKind::Speak { .. }))
-    );
-    assert!(
-        sim.events
-            .events
-            .iter()
-            .any(|e| matches!(e.kind, SimEventKind::LlmWait))
-    );
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .all(|e| !matches!(e.kind, SimEventKind::Speak { .. })));
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::LlmWait)));
 }
 
 #[test]
@@ -341,6 +339,39 @@ fn replay_table_round_trip() {
     let jsonl = r#"{"tick":1,"agent":0,"call_seed":1,"prompt_hash":"ab","response":"{\"action\":\"Wait\"}"}"#;
     let table = sim_core::ReplayTable::from_jsonl(jsonl);
     assert_eq!(table.get(1, 0).unwrap().contains("Wait"), true);
+}
+
+#[test]
+fn death_disabled_keeps_zero_thirst_agent() {
+    let mut sim = Simulation::new(tiny_config(11)).unwrap();
+    sim.config.needs.death_enabled = false;
+    sim.config.needs.thirst_decay_per_tick = 100.0;
+    let n = sim.agents.len();
+    sim.tick();
+    assert_eq!(sim.agents.len(), n);
+    assert!(sim.agents.values().any(|a| a.needs.thirst == 0));
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .all(|e| !matches!(e.kind, SimEventKind::Died { .. })));
+}
+
+#[test]
+fn death_enabled_removes_agent_at_zero_thirst() {
+    let mut sim = Simulation::new(tiny_config(12)).unwrap();
+    sim.config.needs.death_enabled = true;
+    sim.config.needs.thirst_decay_per_tick = 100.0;
+    let n = sim.agents.len();
+    sim.tick();
+    assert!(sim.agents.is_empty(), "all should dehydrate in one tick");
+    let deaths = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::Died { thirst_zero: true, .. }))
+        .count();
+    assert_eq!(deaths, n);
 }
 
 fn find_land_next_to_water(sim: &Simulation) -> Option<(u32, u32)> {

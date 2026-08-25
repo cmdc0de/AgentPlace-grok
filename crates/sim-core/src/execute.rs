@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
+use crate::memory::{knows_toxin, MemoryEntry, MemoryKind};
 use crate::observation::neighbors4;
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -205,6 +205,17 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
     }
     let mut got_item = ItemId::Wood;
     let mut qty = 0u32;
+    let food_n = {
+        let basket = sim
+            .agents
+            .get(&id)
+            .is_some_and(|a| a.has_tool(ItemId::Basket));
+        crate::incentive::scale_u32(
+            1 + u32::from(basket),
+            crate::incentive::resource_mult_milli(sim, id, "food"),
+        )
+        .max(1)
+    };
     if let Some(a) = sim.agents.get_mut(&id) {
         match spec.yield_kind {
             VegYield::Wood => {
@@ -213,8 +224,7 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
             }
             VegYield::Food => {
                 got_item = ItemId::Food(species);
-                let n = 1 + u32::from(a.has_tool(ItemId::Basket));
-                qty = a.try_add_item(ItemId::Food(species), n);
+                qty = a.try_add_item(ItemId::Food(species), food_n);
                 if spec.fiber_yield > 0 {
                     let _ = a.try_add_item(ItemId::Fiber, spec.fiber_yield);
                 }
@@ -348,6 +358,19 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         )
     };
     let _ = allergic;
+    let resource = if is_veg {
+        "food"
+    } else if is_animal {
+        "animal"
+    } else if is_fish {
+        "fish"
+    } else {
+        "food"
+    };
+    let nutr = crate::incentive::scale_u32(
+        nutr,
+        crate::incentive::resource_mult_milli(sim, id, resource),
+    );
 
     let Some(agent) = sim.agents.get_mut(&id) else {
         return;
@@ -784,11 +807,14 @@ fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) 
     );
 }
 
-pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, entry: MemoryEntry) {
+pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, mut entry: MemoryEntry) {
     let cap = sim.config.memory_capacity();
     let policy = sim.config.agents.memory.eviction_policy;
     let bonus = sim.config.social_bonus_milli();
     let persist = sim.config.agents.memory.persistent_relationships;
+    let milli = crate::incentive::memory_boost_milli(sim, id, entry.kind);
+    entry.importance =
+        crate::incentive::scale_u32(u32::from(entry.importance), milli).min(255) as u8;
     if let Some(a) = sim.agents.get_mut(&id) {
         a.remember(cap, policy, bonus, persist, entry);
     }

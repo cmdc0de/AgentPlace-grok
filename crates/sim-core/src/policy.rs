@@ -4,8 +4,8 @@ use crate::memory::knows_toxin;
 use crate::observation::Observation;
 use crate::social::RelationshipSummary;
 use crate::species::SpeciesTables;
-use rand::Rng;
 use rand::seq::IndexedRandom;
+use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::BTreeMap;
 

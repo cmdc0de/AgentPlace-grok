@@ -226,7 +226,13 @@ impl Simulation {
             rngs: self.rngs.clone(),
             events: self.events.events.clone(),
             public_board: board_to_wire(self),
-            active_incentives: IncentiveState::default(),
+            active_incentives: IncentiveState {
+                entries: if self.incentive_toml.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![self.incentive_toml.clone()]
+                },
+            },
             metrics: MetricsState::default(),
         })
     }
@@ -256,6 +262,18 @@ impl Simulation {
                 a.next_memory_id = 1;
             }
         }
+        let incentive_toml = body
+            .active_incentives
+            .entries
+            .first()
+            .cloned()
+            .unwrap_or_default();
+        let incentives = if incentive_toml.is_empty() {
+            crate::incentive::IncentiveSchedule::default()
+        } else {
+            crate::incentive::IncentiveSchedule::from_toml_str(&incentive_toml).unwrap_or_default()
+        };
+        let incentive_active = crate::incentive::reconstruct_active(&body.events);
         Ok(Self {
             config,
             tick: body.tick,
@@ -270,6 +288,10 @@ impl Simulation {
             replay,
             record_path: None,
             last_tick_decisions: Vec::new(),
+            incentives,
+            incentive_toml,
+            incentive_active,
+            last_tick_timing: None,
         })
     }
 
@@ -510,6 +532,21 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
             let r = reason.replace('\\', "\\\\").replace('"', "\\\"");
             format!("{{\"type\":\"rule_blocked\",\"reason\":\"{r}\"}}")
         }
+        SimEventKind::IncentiveApplied { id, detail } => {
+            let i = id.replace('\\', "\\\\").replace('"', "\\\"");
+            let d = detail.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("{{\"type\":\"incentive_applied\",\"id\":\"{i}\",\"detail\":\"{d}\"}}")
+        }
+        SimEventKind::IncentiveEnded { id } => {
+            let i = id.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("{{\"type\":\"incentive_ended\",\"id\":\"{i}\"}}")
+        }
+        SimEventKind::Died {
+            hunger_zero,
+            thirst_zero,
+        } => format!(
+            "{{\"type\":\"died\",\"hunger_zero\":{hunger_zero},\"thirst_zero\":{thirst_zero}}}"
+        ),
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

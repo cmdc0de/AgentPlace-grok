@@ -1,6 +1,8 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M7** (`docs/M7-plan.md`).
+Deterministic multi-agent simulation. Current slice: **M8** (`docs/M8-plan.md`).
+
+Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md).
 
 ## Test
 
@@ -65,11 +67,32 @@ cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 # or: cargo run -p viewer -- --connect ws://127.0.0.1:9001
 ```
 
-Opt-in remote pause/step/save/report: add `--allow-control` (and optional `--token SECRET` on both sides).
+Opt-in remote pause/step/save/report/inject: add `--allow-control` (and optional `--token SECRET` on both sides).
+
+Incentive A/B (postcard wire unchanged except `PROTOCOL_VERSION = 2` for `Tick.metrics`; timing is not hashed).
+
+**A schedule is one TOML file with one or more `[[incentives]]` tables** — not one file per incentive. `--inject` / `/inject` replace the whole schedule with that file. Field reference: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md). Example: [`configs/incentives/coop.toml`](configs/incentives/coop.toml).
+
+```bash
+cargo run -p sim-cli -- --config configs/default.toml --ticks 80 --llm mock --quiet
+cargo run -p sim-cli -- --config configs/default.toml \
+  --incentives configs/incentives/coop.toml --ticks 80 --llm mock --quiet
+# hashes should differ; a second treated run should match the first treated hash
+
+cargo run -p sim-cli -- --config configs/default.toml --ticks 40 \
+  --out-dir /tmp/m8 --checkpoint-every 40 --llm mock --quiet
+ID=$(basename /tmp/m8/*_tick_40.ckpt _tick_40.ckpt)
+cargo run -p sim-cli -- --load /tmp/m8/${ID}_tick_40.ckpt \
+  --inject configs/incentives/coop.toml --ticks 40 --llm mock --quiet
+
+# viewer: /inject configs/incentives/coop.toml
+```
 
 ```bash
 cargo test -p shared
+cargo test -p sim-core
 cargo test -p sim-cli --test net
+cargo test -p sim-cli --test ab
 ```
 
 Optional live LLM (not required for CI):

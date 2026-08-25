@@ -4,22 +4,25 @@ use crate::board::{Goal, PublicBoard};
 use crate::config::{ExperimentConfig, SpawnMode};
 use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
-use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
+use crate::event_log::{hash_kind, EventLog, SimEvent, SimEventKind};
 use crate::execute::{apply_heard_memories, execute_primary};
+use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    ChooseError, Chooser, ReplayRecord, ReplayTable, chosen_to_json, parse_choice_json, prompt_hash,
+    chosen_to_json, parse_choice_json, prompt_hash, ChooseError, Chooser, ReplayRecord, ReplayTable,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
-use crate::seeding::{RngBank, derive_seed, resolve_seed};
+use crate::seeding::{derive_seed, resolve_seed, RngBank};
+use crate::timing::{self, AgentTiming, TickTiming};
 use crate::world::World;
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// SHA-256 of canonical simulation state.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -50,6 +53,11 @@ pub struct Simulation {
     pub replay: Option<ReplayTable>,
     pub record_path: Option<PathBuf>,
     pub last_tick_decisions: Vec<DecisionRecord>,
+    pub incentives: IncentiveSchedule,
+    pub incentive_toml: String,
+    pub incentive_active: BTreeSet<String>,
+    /// Wall-clock of the last tick. Not hashed.
+    pub last_tick_timing: Option<TickTiming>,
 }
 
 impl Simulation {
@@ -94,7 +102,18 @@ impl Simulation {
             replay,
             record_path,
             last_tick_decisions: Vec::new(),
+            incentives: IncentiveSchedule::default(),
+            incentive_toml: String::new(),
+            incentive_active: BTreeSet::new(),
+            last_tick_timing: None,
         })
+    }
+
+    pub fn inject_schedule_toml(&mut self, toml: &str) -> Result<(), SimError> {
+        let sched = IncentiveSchedule::from_toml_str(toml)?;
+        self.incentives = sched;
+        self.incentive_toml = toml.to_string();
+        Ok(())
     }
 
     pub fn agent_ids(&self) -> Vec<AgentId> {
@@ -105,6 +124,10 @@ impl Simulation {
         if self.config.simulation.max_ticks > 0 && self.tick >= self.config.simulation.max_ticks {
             return false;
         }
+        if self.config.simulation.pause_when_empty && self.agents.is_empty() {
+            return false;
+        }
+        let wall0 = Instant::now();
         self.tick += 1;
         self.last_tick_decisions.clear();
         for a in self.agents.values_mut() {
@@ -116,20 +139,40 @@ impl Simulation {
                 crate::social::decay_map(&mut a.relationships, step);
             }
         }
+        let inc0 = Instant::now();
+        incentive::sync(self);
+        let incentive_ns = timing::ns_since(inc0);
+        let world0 = Instant::now();
         self.world_step();
+        self.reap_dead();
+        let world_ns = timing::ns_since(world0);
+        let board0 = Instant::now();
         let pop = self.agents.len() as u32;
-        let th = self.config.proposals.default_acceptance_threshold;
+        let th = incentive::proposal_threshold(self);
         let life = self.config.proposals.proposal_lifetime_ticks;
         let tick = self.tick;
         self.board.tick_lifecycle(pop, th, life, tick);
+        let board_ns = timing::ns_since(board0);
+        let agents0 = Instant::now();
         let mut order: Vec<AgentId> = self.agents.keys().copied().collect();
         order.shuffle(self.rngs.stream("turn_order"));
+        let mut agent_times = Vec::with_capacity(order.len());
         for id in order {
-            self.step_agent(id);
+            agent_times.push(self.step_agent(id));
         }
+        let agents_ns = timing::ns_since(agents0);
         for a in self.agents.values_mut() {
             a.gathers_this_tick = 0;
         }
+        self.last_tick_timing = Some(TickTiming {
+            tick: self.tick,
+            wall_ns: timing::ns_since(wall0),
+            world_ns,
+            board_ns,
+            incentive_ns,
+            agents_ns,
+            agents: agent_times,
+        });
         true
     }
 
@@ -138,6 +181,29 @@ impl Simulation {
             if !self.tick() {
                 break;
             }
+        }
+    }
+
+    fn reap_dead(&mut self) {
+        if !self.config.needs.death_enabled {
+            return;
+        }
+        let dead: Vec<(crate::agent::AgentId, bool, bool)> = self
+            .agents
+            .iter()
+            .filter(|(_, a)| a.needs.hunger == 0 || a.needs.thirst == 0)
+            .map(|(id, a)| (*id, a.needs.hunger == 0, a.needs.thirst == 0))
+            .collect();
+        for (id, hunger_zero, thirst_zero) in dead {
+            self.events.push(SimEvent {
+                tick: self.tick,
+                agent: id,
+                kind: SimEventKind::Died {
+                    hunger_zero,
+                    thirst_zero,
+                },
+            });
+            self.agents.remove(&id);
         }
     }
 
@@ -183,9 +249,13 @@ impl Simulation {
         }
     }
 
-    fn step_agent(&mut self, id: AgentId) {
+    fn step_agent(&mut self, id: AgentId) -> AgentTiming {
+        let mut timing = AgentTiming::new(id);
+        let p0 = Instant::now();
         let obs = observation::build(self, id);
         apply_heard_memories(self, id, &obs.heard);
+        timing.perceive_ns = timing::ns_since(p0);
+        let r0 = Instant::now();
 
         let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
         let call_seed = derive_seed(
@@ -209,8 +279,10 @@ impl Simulation {
                 })
                 .unwrap_or_default()
         };
+        timing.retrieve_ns = timing::ns_since(r0);
         let relation_ids: Vec<u64> = obs.relationships.iter().map(|r| r.id.0).collect();
 
+        let s0 = Instant::now();
         let mut chosen = if let Some(raw) = self
             .replay
             .as_ref()
@@ -264,7 +336,7 @@ impl Simulation {
                 }
                 Chooser::Mock => {
                     let Some(agent) = self.agents.get(&id) else {
-                        return;
+                        return timing;
                     };
                     let filtered = avoid_toxic(&obs, &agent.memory);
                     let identified = filtered.agents.iter().any(|a| a.id.is_some());
@@ -313,6 +385,7 @@ impl Simulation {
         if !allow_speak {
             chosen.speak = None;
         }
+        timing.select_ns = timing::ns_since(s0);
 
         self.last_tick_decisions.push(decision_log::record(
             self.tick,
@@ -348,12 +421,15 @@ impl Simulation {
             }
         }
 
+        let e0 = Instant::now();
         execute_primary(self, id, &chosen.primary);
         if allow_speak {
             if let Some(speak) = chosen.speak {
                 self.execute_speak(id, speak);
             }
         }
+        timing.execute_ns = timing::ns_since(e0);
+        timing
     }
 
     fn execute_speak(&mut self, id: AgentId, mut speak: Speak) {

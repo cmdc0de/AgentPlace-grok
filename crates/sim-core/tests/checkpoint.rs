@@ -108,11 +108,7 @@ fn encode_starts_with_magic_and_version() {
 
 #[test]
 fn write_run_checkpoint_emits_markdown_and_reloads() {
-    let dir = std::env::temp_dir().join(format!(
-        "agentplace-m2-{}-{}",
-        std::process::id(),
-        42
-    ));
+    let dir = std::env::temp_dir().join(format!("agentplace-m2-{}-{}", std::process::id(), 42));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let mut sim = Simulation::new(tiny_config(9)).unwrap();

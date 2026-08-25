@@ -272,11 +272,7 @@ fn place_resources(
         minerals[cell_index(width, x, y)] = 1;
     }
 
-    let remaining: Vec<(u32, u32)> = land
-        .iter()
-        .copied()
-        .skip(mineral_target as usize)
-        .collect();
+    let remaining: Vec<(u32, u32)> = land.iter().copied().skip(mineral_target as usize).collect();
     let veg_target = scaled_count(
         params.resources.vegetation_density,
         area as u32,
@@ -334,7 +330,8 @@ fn lerp(a: f64, b: f64, t: f64) -> f64 {
 }
 
 fn lattice(ix: i32, iy: i32, perm: &[u8; 256]) -> f64 {
-    let mut h = perm[(ix.wrapping_mul(1597).wrapping_add(iy.wrapping_mul(3119)) as u32 as usize) & 255]
+    let mut h = perm
+        [(ix.wrapping_mul(1597).wrapping_add(iy.wrapping_mul(3119)) as u32 as usize) & 255]
         as usize;
     h = perm[(h + (iy.wrapping_mul(197) as u32 as usize)) & 255] as usize;
     perm[h] as f64 / 255.0

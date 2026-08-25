@@ -16,7 +16,6 @@ pub enum ClientMessage {
     },
     RequestSnapshot,
     Control(ControlVerb),
-    /// Reserved for M8. Servers in M7 always reply `Error { NotImplemented }`.
     InjectIncentive {
         schedule_toml: String,
     },
@@ -49,6 +48,8 @@ pub enum ServerMessage {
         events: Vec<u8>,
         /// JSON `Vec<sim_core::DecisionRecord>` (empty if the client did not ask).
         decisions: Vec<u8>,
+        /// JSON `sim_core::TickTiming` (empty if unmeasured).
+        metrics: Vec<u8>,
     },
     ReportReady {
         markdown_or_path: String,
@@ -188,6 +189,7 @@ mod tests {
             state_hash: [9; 32],
             events: b"[{\"tick\":1}]".to_vec(),
             decisions: b"[]".to_vec(),
+            metrics: b"{}".to_vec(),
         });
         round_trip_server(ServerMessage::Error {
             code: ErrorCode::Protocol,

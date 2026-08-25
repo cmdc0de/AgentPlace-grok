@@ -57,6 +57,18 @@ pub enum SimEventKind {
     RuleBlocked {
         reason: String,
     },
+    IncentiveApplied {
+        id: String,
+        #[serde(default)]
+        detail: String,
+    },
+    IncentiveEnded {
+        id: String,
+    },
+    Died {
+        hunger_zero: bool,
+        thirst_zero: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,6 +167,22 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
         SimEventKind::RuleBlocked { reason } => {
             hasher.update([15u8]);
             hasher.update(reason.as_bytes());
+        }
+        SimEventKind::IncentiveApplied { id, detail } => {
+            hasher.update([16u8]);
+            hasher.update(id.as_bytes());
+            hasher.update(detail.as_bytes());
+        }
+        SimEventKind::IncentiveEnded { id } => {
+            hasher.update([17u8]);
+            hasher.update(id.as_bytes());
+        }
+        SimEventKind::Died {
+            hunger_zero,
+            thirst_zero,
+        } => {
+            hasher.update([18u8]);
+            hasher.update([u8::from(*hunger_zero), u8::from(*thirst_zero)]);
         }
     }
 }

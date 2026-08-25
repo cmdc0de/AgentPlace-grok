@@ -21,6 +21,7 @@ pub enum UiCommand {
     ToggleBoard,
     ToggleLog,
     Tick,
+    Inject { path: Option<String> },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -67,7 +68,8 @@ commands:
   /pause  /play  /step [n]
   /fog on|off
   /legend  /inspector  /board  /log
-  /tick"
+  /tick
+  /inject PATH     load incentive TOML (needs --allow-control when remote)"
 }
 
 pub fn parse_command(line: &str) -> Result<UiCommand, String> {
@@ -115,6 +117,9 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
         "board" => Ok(UiCommand::ToggleBoard),
         "log" => Ok(UiCommand::ToggleLog),
         "tick" => Ok(UiCommand::Tick),
+        "inject" => Ok(UiCommand::Inject {
+            path: arg.map(|s| s.to_string()),
+        }),
         other => Err(format!("unknown: /{other}  (try /help)")),
     }
 }
@@ -233,6 +238,24 @@ pub fn run_command(
             let short = if hash.len() >= 12 { &hash[..12] } else { &hash };
             vec![format!("tick={} hash={}", state.sim.tick, short)]
         }
+        UiCommand::Inject { path } => {
+            if state.remote {
+                return vec!["inject sent".into()];
+            }
+            let Some(path) = path else {
+                return vec!["inject requires a toml path".into()];
+            };
+            match std::fs::read_to_string(&path) {
+                Ok(text) => match state.sim.inject_schedule_toml(&text) {
+                    Ok(()) => vec![format!(
+                        "injected {} incentive(s)",
+                        state.sim.incentives.incentives.len()
+                    )],
+                    Err(e) => vec![format!("inject error: {e}")],
+                },
+                Err(e) => vec![format!("inject read error: {e}")],
+            }
+        }
     }
 }
 
@@ -285,6 +308,7 @@ mod tests {
         let text = help_text();
         assert!(text.contains("/report"));
         assert!(text.contains("/follow"));
+        assert!(text.contains("/inject"));
     }
 
     #[test]
@@ -308,6 +332,12 @@ mod tests {
         assert_eq!(
             parse_command("/fog on").unwrap(),
             UiCommand::Fog { on: Some(true) }
+        );
+        assert_eq!(
+            parse_command("/inject configs/incentives/coop.toml").unwrap(),
+            UiCommand::Inject {
+                path: Some("configs/incentives/coop.toml".into())
+            }
         );
     }
 

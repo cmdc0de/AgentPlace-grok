@@ -3,7 +3,7 @@ use sim_core::board::{AdoptedRule, ProposalStatus, StructuredRule};
 use sim_core::event_log::SimEventKind;
 use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::{
-    AgentId, ExperimentConfig, ItemId, Simulation, build_report, observation, report_markdown,
+    build_report, observation, report_markdown, AgentId, ExperimentConfig, ItemId, Simulation,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -74,11 +74,10 @@ fn propose_appears_on_board_and_in_every_observation() {
             "agent {} missing board",
             id.0
         );
-        assert!(
-            obs.legal
-                .iter()
-                .any(|a| matches!(a, PrimaryAction::Support { proposal_id: 0 }))
-        );
+        assert!(obs
+            .legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Support { proposal_id: 0 })));
     }
 }
 

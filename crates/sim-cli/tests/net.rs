@@ -210,20 +210,57 @@ fn control_without_flag_errors() {
 }
 
 #[test]
-fn inject_incentive_not_implemented() {
+fn inject_incentive_without_flag_errors() {
     let (mut child, url, out_h, err_h) = spawn_listen(&[]);
     let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
     conn.send_msg(&ClientMessage::InjectIncentive {
-        schedule_toml: "[[incentives]]".into(),
+        schedule_toml: r#"
+[[incentives]]
+id = "x"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "cooperate"
+"#
+        .into(),
     })
     .unwrap();
     let msg: ServerMessage = conn.recv_msg().unwrap();
     match msg {
         ServerMessage::Error {
-            code: ErrorCode::NotImplemented,
-            message,
-        } => assert!(message.contains("not implemented"), "{message}"),
-        other => panic!("expected NotImplemented, got {other:?}"),
+            code: ErrorCode::ControlDisabled,
+            ..
+        } => {}
+        other => panic!("expected ControlDisabled, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn inject_incentive_with_flag() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::InjectIncentive {
+        schedule_toml: r#"
+[[incentives]]
+id = "wire_inject"
+start_tick = 0
+applies_to = "all"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "cooperate"
+scope = "personal"
+priority = 0.9
+"#
+        .into(),
+    })
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert!(markdown_or_path.contains("injected"), "{markdown_or_path}");
+        }
+        other => panic!("expected ReportReady inject, got {other:?}"),
     }
     let _ = conn.close();
     let _ = wait_hash(&mut child, out_h, err_h);
@@ -271,7 +308,7 @@ fn control_pause_with_flag() {
 
 #[test]
 fn protocol_version_constant() {
-    assert_eq!(PROTOCOL_VERSION, 1);
+    assert_eq!(PROTOCOL_VERSION, 2);
 }
 
 #[test]

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use shared::protocol::{hello, ClientMessage, ServerMessage};
 use shared::transport::Connection;
 use sim_bevy::SimState;
-use sim_core::Simulation;
+use sim_core::{Simulation, TickTiming};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
@@ -107,17 +107,27 @@ pub fn apply_remote(
     while let Ok(msg) = rx.try_recv() {
         match msg {
             ServerMessage::Snapshot { checkpoint_bytes } => {
+                let timing = state.sim.last_tick_timing.clone();
                 if let Ok(mut sim) = Simulation::decode_checkpoint(&checkpoint_bytes) {
                     sim.last_tick_decisions = std::mem::take(&mut state.sim.last_tick_decisions);
+                    sim.last_tick_timing = timing;
                     state.sim = sim;
                 }
             }
             ServerMessage::Tick {
-                tick, decisions, ..
+                tick,
+                decisions,
+                metrics,
+                ..
             } => {
                 saw_tick = true;
                 if let Ok(recs) = serde_json::from_slice(&decisions) {
                     state.sim.last_tick_decisions = recs;
+                }
+                if !metrics.is_empty() {
+                    if let Ok(t) = serde_json::from_slice::<TickTiming>(&metrics) {
+                        state.sim.last_tick_timing = Some(t);
+                    }
                 }
                 let _ = tick;
             }

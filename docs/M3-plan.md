@@ -31,7 +31,7 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 | Area | M3 meaning |
 |---|---|
 | **Observation** | Per-tick `Observation` from Chebyshev vision/hearing/identity ranges. Two agents on the same cell can see different things. `full_information = true` debug flag. |
-| **Needs** | Hunger, thirst, energy as millipoints. Decay every tick. At 0: movement/action penalties. `death_enabled = false`. |
+| **Needs** | Hunger, thirst, energy as millipoints. Decay every tick. At 0: movement/action penalties. Default config now `death_enabled = true` (hunger or thirst at 0 removes the agent). Field-level write-up: [`needs-and-survival.md`](needs-and-survival.md). |
 | **Gather / Drink / Eat** | Gather food or wood from a vegetation species on the standing cell or a 4-neighbour. Drink from fresh water in-world. Eat consumes inventory food (Gather does not auto-eat). |
 | **Toxicity** | Each food species is `safe`, `toxic` (hurts everyone), or `allergenic` (hurts agents with that allergy tag). Eat applies nutrition and possible illness. |
 | **Abilities** | Per-agent 0–100 skills: `gather`, `hunt`, `fish`, `farm`, `craft`. Sampled at spawn from archetypes. Gate success chance and yield. |

@@ -1,5 +1,5 @@
 use crate::error::SimError;
-use crate::species::{SpeciesTables, default_species_tables};
+use crate::species::{default_species_tables, SpeciesTables};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
