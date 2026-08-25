@@ -1,6 +1,6 @@
 # M4 — Public board, adopted rules, and food-economy reports
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (`6b4cf93`).  
 **Depends on:** M3 complete (`docs/M3-plan.md`, git tag `M3`)  
 **Specs:** `memory-goals-incentives-spec.md` §2, `simulation-and-agents-spec.md` §5.3, `medium-priority-specs.md` §1–2, `decision-observation-llm-economy-metrics-spec.md` §5 and §7 item 5
 
@@ -80,7 +80,7 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 
 | Later | What |
 |---|---|
-| **M5** | Hybrid memory, embeddings, relationship summaries, influence factor |
+| **M5** | [`M5-plan.md`](M5-plan.md) — hybrid memory, relationship summaries, influence, decision JSONL, viewer legend + per-kind meshes |
 | **M6** | imgui inspectors, agent-POV fog-of-war matching `Observation` |
 | **M7** | TCP / WebSocket (`shared::transport`) |
 | **M8** | Incentive schedules + load-checkpoint-and-inject |

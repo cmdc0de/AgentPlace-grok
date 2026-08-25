@@ -48,8 +48,8 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 
 | Later | What |
 |---|---|
-| **M4** | [`M4-plan.md`](M4-plan.md) — public board, Propose/Support/Oppose, structured adopted rules, food-economy summary report. |
-| **M5** | Full hybrid memory, embeddings, relationship summaries, influence pipeline (speech in M3 writes memories but does not move trust/affinity). |
+| **M4** | Done — [`M4-plan.md`](M4-plan.md) (public board, Propose/Support/Oppose, structured adopted rules, food-economy report). |
+| **M5** | [`M5-plan.md`](M5-plan.md) — hybrid memory, relationship summaries, influence, decision JSONL, viewer legend (speech in M3 writes memories but does not yet move trust/affinity). |
 | **M6** | imgui inspectors + agent-POV fog-of-war that renders the same `Observation` the agent got. |
 | **M7** | TCP / WebSocket (`shared::transport`). |
 | **M8** | Incentive schedules + load-checkpoint-and-inject A/B harness. |

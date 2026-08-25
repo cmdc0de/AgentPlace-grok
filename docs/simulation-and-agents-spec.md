@@ -1,5 +1,7 @@
 # Simulation Parameters & Agent Model Specification
 
+> **Current slice:** [`M5-plan.md`](M5-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+
 **Purpose**: Define the configurable surface of the simulation and the internal structure of agents so that experiments (baseline governance emergence vs. incentive interventions) are fully controllable, reproducible, and inspectable.
 
 Related documents:

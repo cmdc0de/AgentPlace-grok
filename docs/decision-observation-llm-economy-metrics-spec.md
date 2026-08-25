@@ -1,6 +1,8 @@
 # High-Priority Runtime Specs
 ## Agent Decision Loop • Observation Model • LLM Contract • Resources/Needs • Metrics
 
+> **Current slice:** [`M5-plan.md`](M5-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+
 Related documents:
 - `simulation-and-agents-spec.md`
 - `memory-goals-incentives-spec.md`
