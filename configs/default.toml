@@ -1,4 +1,4 @@
-# Default experiment config for Milestone 3 (survival + speech + mock LLM).
+# Default experiment config for Milestone 4 (board, rules, food-economy report).
 # Must fit in signed 64-bit for TOML integer parsing.
 master_seed = 3735928559
 
@@ -37,6 +37,11 @@ spawn_mode = "scattered"
 spawn_seed = "auto"
 default_memory_capacity = 128
 start_with_basic_needs = true
+
+[agents.goals]
+max_personal_goals = 5
+max_public_goals = 3
+can_adopt_public_goals = true
 
 [checkpoint]
 auto_interval_ticks = 500
@@ -79,3 +84,17 @@ action_temperature = 0.2
 max_retries = 2
 timeout_ms = 12000
 replay_file = ""
+
+[proposals]
+max_open_proposals_per_agent = 3
+default_acceptance_threshold = 0.5
+proposal_lifetime_ticks = 2000
+max_proposal_length = 200
+allow_meta_rules = false
+public_board_always_visible = true
+
+[metrics]
+compute_every_n_ticks = 50
+export_csv = true
+track_consumption = true
+track_proposal_stats = true

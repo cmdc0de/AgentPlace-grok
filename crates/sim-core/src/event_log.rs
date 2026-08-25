@@ -45,6 +45,18 @@ pub enum SimEventKind {
         targets: Vec<AgentId>,
     },
     LlmWait,
+    Propose {
+        proposal_id: u64,
+    },
+    Support {
+        proposal_id: u64,
+    },
+    Oppose {
+        proposal_id: u64,
+    },
+    RuleBlocked {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,5 +140,21 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             }
         }
         SimEventKind::LlmWait => hasher.update([11u8]),
+        SimEventKind::Propose { proposal_id } => {
+            hasher.update([12u8]);
+            hasher.update(proposal_id.to_le_bytes());
+        }
+        SimEventKind::Support { proposal_id } => {
+            hasher.update([13u8]);
+            hasher.update(proposal_id.to_le_bytes());
+        }
+        SimEventKind::Oppose { proposal_id } => {
+            hasher.update([14u8]);
+            hasher.update(proposal_id.to_le_bytes());
+        }
+        SimEventKind::RuleBlocked { reason } => {
+            hasher.update([15u8]);
+            hasher.update(reason.as_bytes());
+        }
     }
 }

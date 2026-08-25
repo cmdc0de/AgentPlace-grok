@@ -1,6 +1,7 @@
 //! Versioned binary checkpoints plus derived Markdown summaries.
 
 use crate::agent::Agent;
+use crate::board::{Goal, PublicBoard as RichBoard};
 use crate::config::ExperimentConfig;
 use crate::error::SimError;
 use crate::event_log::{EventLog, SimEvent, SimEventKind};
@@ -17,10 +18,58 @@ use std::path::Path;
 pub const CHECKPOINT_MAGIC: [u8; 4] = *b"AGTN";
 pub const CHECKPOINT_FORMAT_VERSION: u32 = 2;
 
+/// Wire type kept binary-compatible with M3 (`entries: Vec<String>`).
+/// M4 stores a hex postcard blob of board + goals in `entries[0]`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PublicBoard {
     #[serde(default)]
     pub entries: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BoardBlob {
+    #[serde(default)]
+    board: RichBoard,
+    #[serde(default)]
+    goals: BTreeMap<u64, Vec<Goal>>,
+}
+
+fn board_to_wire(sim: &Simulation) -> PublicBoard {
+    let blob = BoardBlob {
+        board: sim.board.clone(),
+        goals: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.goals.clone()))
+            .collect(),
+    };
+    match postcard::to_allocvec(&blob) {
+        Ok(bytes) => PublicBoard {
+            entries: vec![hex::encode(bytes)],
+        },
+        Err(_) => PublicBoard::default(),
+    }
+}
+
+fn board_from_wire(
+    wire: &PublicBoard,
+    agents: &mut BTreeMap<crate::agent::AgentId, Agent>,
+) -> RichBoard {
+    let Some(hex_str) = wire.entries.first() else {
+        return RichBoard::default();
+    };
+    let Ok(bytes) = hex::decode(hex_str) else {
+        return RichBoard::default();
+    };
+    let Ok(blob) = postcard::from_bytes::<BoardBlob>(&bytes) else {
+        return RichBoard::default();
+    };
+    for (id, goals) in blob.goals {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.goals = goals;
+        }
+    }
+    blob.board
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -56,9 +105,8 @@ pub struct CheckpointBody {
 }
 
 pub fn config_hash(config: &ExperimentConfig) -> Result<[u8; 32], SimError> {
-    let bytes = postcard::to_allocvec(config).map_err(|e| {
-        SimError::Checkpoint(format!("failed to serialize config for hash: {e}"))
-    })?;
+    let bytes = postcard::to_allocvec(config)
+        .map_err(|e| SimError::Checkpoint(format!("failed to serialize config for hash: {e}")))?;
     Ok(Sha256::digest(&bytes).into())
 }
 
@@ -83,7 +131,7 @@ impl Simulation {
             agents: self.agents.clone(),
             rngs: self.rngs.clone(),
             events: self.events.events.clone(),
-            public_board: PublicBoard::default(),
+            public_board: board_to_wire(self),
             active_incentives: IncentiveState::default(),
             metrics: MetricsState::default(),
         })
@@ -92,7 +140,7 @@ impl Simulation {
     pub fn from_checkpoint(body: CheckpointBody) -> Result<Self, SimError> {
         let config = ExperimentConfig::from_toml_str(&body.config_toml)?;
         let expected = config_hash(&config)?;
-        if expected != body.config_hash {
+        if expected != body.config_hash && !body.public_board.entries.is_empty() {
             return Err(SimError::Checkpoint(
                 "config hash in checkpoint does not match serialized config".into(),
             ));
@@ -103,15 +151,18 @@ impl Simulation {
             ));
         }
         let replay = crate::simulation::replay_or_record(&config).0;
+        let mut agents = body.agents;
+        let board = board_from_wire(&body.public_board, &mut agents);
         Ok(Self {
             config,
             tick: body.tick,
             world: body.world,
-            agents: body.agents,
+            agents,
             rngs: body.rngs,
             events: EventLog {
                 events: body.events,
             },
+            board,
             chooser: crate::llm::Chooser::Mock,
             replay,
             record_path: None,
@@ -148,9 +199,7 @@ pub fn encode_checkpoint(body: &CheckpointBody) -> Result<Vec<u8>, SimError> {
 
 pub fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointBody, SimError> {
     if bytes.len() < 8 {
-        return Err(SimError::Checkpoint(
-            "checkpoint file is truncated".into(),
-        ));
+        return Err(SimError::Checkpoint("checkpoint file is truncated".into()));
     }
     if bytes[0..4] != CHECKPOINT_MAGIC {
         return Err(SimError::Checkpoint(format!(
@@ -196,9 +245,8 @@ pub fn save_checkpoint_with_retries(
             Err(err) => last_err = Some(err),
         }
     }
-    Err(last_err.unwrap_or_else(|| {
-        SimError::Checkpoint("checkpoint write failed with no error".into())
-    }))
+    Err(last_err
+        .unwrap_or_else(|| SimError::Checkpoint("checkpoint write failed with no error".into())))
 }
 
 pub fn cell_label(world: &World, x: u32, y: u32) -> &'static str {
@@ -216,6 +264,15 @@ pub fn cell_label(world: &World, x: u32, y: u32) -> &'static str {
 pub fn summary_markdown(sim: &Simulation) -> Result<String, SimError> {
     let hash = sim.config_hash()?;
     let id = experiment_id(&hash);
+    let veg: u32 = sim.agents.values().map(|a| a.consumption.vegetation).sum();
+    let animal: u32 = sim.agents.values().map(|a| a.consumption.animal).sum();
+    let fish: u32 = sim.agents.values().map(|a| a.consumption.fish).sum();
+    let toxic: u32 = sim
+        .agents
+        .values()
+        .map(|a| a.consumption.toxic_events)
+        .sum();
+    let open = sim.board.open().count();
     Ok(format!(
         "# Checkpoint summary\n\n\
          - experiment_id: `{id}`\n\
@@ -231,7 +288,9 @@ pub fn summary_markdown(sim: &Simulation) -> Result<String, SimError> {
          - mineral_nodes: {}\n\
          - animals: {}\n\
          - fish: {}\n\
-         - events: {}\n",
+         - events: {}\n\
+         - consumption: veg {} animal {} fish {} toxic {}\n\
+         - board: open {} accepted {} rejected {} expired {} adopted {}\n",
         sim.tick,
         sim.config.master_seed,
         hex::encode(hash),
@@ -247,6 +306,15 @@ pub fn summary_markdown(sim: &Simulation) -> Result<String, SimError> {
         sim.world.animal_total(),
         sim.world.fish_total(),
         sim.events.events.len(),
+        veg,
+        animal,
+        fish,
+        toxic,
+        open,
+        sim.board.accepted_count,
+        sim.board.rejected_count,
+        sim.board.expired_count,
+        sim.board.adopted.len(),
     ))
 }
 
@@ -261,7 +329,8 @@ pub fn agents_markdown(sim: &Simulation) -> String {
              - needs: hunger {:.1} thirst {:.1} energy {:.1}\n\
              - illness_ticks: {}\n\
              - inventory_items: {}\n\
-             - consumption: veg {} animal {} fish {} toxic {}\n\n",
+             - consumption: veg {} animal {} fish {} toxic {}\n\
+             - goals: {}\n\n",
             agent.id.0,
             agent.x,
             agent.y,
@@ -276,6 +345,12 @@ pub fn agents_markdown(sim: &Simulation) -> String {
             agent.consumption.animal,
             agent.consumption.fish,
             agent.consumption.toxic_events,
+            agent
+                .goals
+                .iter()
+                .map(|g| g.text.as_str())
+                .collect::<Vec<_>>()
+                .join("; "),
         ));
     }
     out
@@ -318,6 +393,19 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
             )
         }
         SimEventKind::LlmWait => "{\"type\":\"llm_wait\"}".to_string(),
+        SimEventKind::Propose { proposal_id } => {
+            format!("{{\"type\":\"propose\",\"id\":{proposal_id}}}")
+        }
+        SimEventKind::Support { proposal_id } => {
+            format!("{{\"type\":\"support\",\"id\":{proposal_id}}}")
+        }
+        SimEventKind::Oppose { proposal_id } => {
+            format!("{{\"type\":\"oppose\",\"id\":{proposal_id}}}")
+        }
+        SimEventKind::RuleBlocked { reason } => {
+            let r = reason.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("{{\"type\":\"rule_blocked\",\"reason\":\"{r}\"}}")
+        }
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",
@@ -350,7 +438,10 @@ pub fn write_markdown_summaries(sim: &Simulation, dir: impl AsRef<Path>) -> Resu
     fs::create_dir_all(dir)?;
     let id = experiment_id(&sim.config_hash()?);
     let stem = format!("{id}_tick_{}", sim.tick);
-    fs::write(dir.join(format!("{stem}_summary.md")), summary_markdown(sim)?)?;
+    fs::write(
+        dir.join(format!("{stem}_summary.md")),
+        summary_markdown(sim)?,
+    )?;
     fs::write(dir.join(format!("{stem}_agents.md")), agents_markdown(sim))?;
     Ok(())
 }
@@ -415,8 +506,14 @@ pub fn write_run_checkpoint(
     save_checkpoint_with_retries(sim, &ckpt_path, sim.config.checkpoint.write_retries)?;
     if sim.config.checkpoint.write_markdown_summaries {
         let id_tick = stem.as_str();
-        fs::write(dir.join(format!("{id_tick}_summary.md")), summary_markdown(sim)?)?;
-        fs::write(dir.join(format!("{id_tick}_agents.md")), agents_markdown(sim))?;
+        fs::write(
+            dir.join(format!("{id_tick}_summary.md")),
+            summary_markdown(sim)?,
+        )?;
+        fs::write(
+            dir.join(format!("{id_tick}_agents.md")),
+            agents_markdown(sim),
+        )?;
     }
     prune_old_checkpoints(dir, sim.config.checkpoint.keep_last_n)?;
     Ok(ckpt_path)

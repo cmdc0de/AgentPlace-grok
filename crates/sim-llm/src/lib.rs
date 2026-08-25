@@ -5,7 +5,7 @@
 
 use serde::Deserialize;
 use sim_core::action::ChosenAction;
-use sim_core::llm::{parse_choice_json, ActionChooser, ChooseError};
+use sim_core::llm::{ActionChooser, ChooseError, parse_choice_json};
 use sim_core::observation::Observation;
 use std::time::Duration;
 
@@ -142,25 +142,46 @@ fn build_prompt(obs: &Observation) -> String {
     let heard: Vec<String> = obs
         .heard
         .iter()
-        .map(|h| format!("{}: {}", h.speaker.map(|id| id.0.to_string()).unwrap_or_else(|| "?".into()), h.text))
+        .map(|h| {
+            format!(
+                "{}: {}",
+                h.speaker
+                    .map(|id| id.0.to_string())
+                    .unwrap_or_else(|| "?".into()),
+                h.text
+            )
+        })
+        .collect();
+    let goals: Vec<String> = obs.goals.iter().map(|g| g.text.clone()).collect();
+    let board: Vec<String> = obs
+        .board
+        .iter()
+        .map(|p| {
+            format!(
+                "#{} {:?} yes={} no={} you_support={} {:?}",
+                p.id, p.status, p.support, p.oppose, p.you_support, p.rule
+            )
+        })
         .collect();
     format!(
-        "Agent {} at ({}, {}). Vision {}. Heard: [{}]\n\
+        "Agent {} at ({}, {}). Vision {}. Goals: [{}]\n\
+         Board: [{}]\n\
+         Heard: [{}]\n\
          Legal primary actions (you MUST pick one of these):\n{}\n\
-         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative\",\"target\":\"species or item\",\"dx\":0,\"dy\":0,\"recipe\":\"spear\",\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
-         Omit speak if silent.",
+         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose\",\"target\":\"species or item\",\"dx\":0,\"dy\":0,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
+         Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent.",
         obs.agent_id.0,
         obs.x,
         obs.y,
         obs.vision,
+        goals.join(" | "),
+        board.join(" ; "),
         heard.join(" | "),
         legal.join("\n"),
     )
 }
 
-pub fn chooser_from_config(
-    cfg: &sim_core::ExperimentConfig,
-) -> Result<sim_core::Chooser, String> {
+pub fn chooser_from_config(cfg: &sim_core::ExperimentConfig) -> Result<sim_core::Chooser, String> {
     match cfg.llm.provider.as_str() {
         "" | "mock" => Ok(sim_core::Chooser::Mock),
         "wait" => Ok(sim_core::Chooser::Wait),

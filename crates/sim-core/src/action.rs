@@ -5,14 +5,35 @@ use serde::{Deserialize, Serialize};
 pub enum PrimaryAction {
     Wait,
     Rest,
-    MoveRelative { dx: i32, dy: i32 },
-    Gather { species: u8 },
+    MoveRelative {
+        dx: i32,
+        dy: i32,
+    },
+    Gather {
+        species: u8,
+    },
     Drink,
-    Eat { item: ItemId },
+    Eat {
+        item: ItemId,
+    },
     Hunt,
     Fish,
-    Farm { species: u8 },
-    Craft { recipe: Recipe },
+    Farm {
+        species: u8,
+    },
+    Craft {
+        recipe: Recipe,
+    },
+    Propose {
+        text: String,
+        rule: Option<crate::board::StructuredRule>,
+    },
+    Support {
+        proposal_id: u64,
+    },
+    Oppose {
+        proposal_id: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

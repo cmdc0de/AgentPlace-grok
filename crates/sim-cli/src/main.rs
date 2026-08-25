@@ -1,6 +1,6 @@
 use sim_core::{
-    append_events_jsonl, experiment_id, summary_markdown, write_run_checkpoint, ExperimentConfig,
-    Simulation,
+    ExperimentConfig, Simulation, append_events_jsonl, experiment_id, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -25,23 +25,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut checkpoint_every: Option<u64> = None;
     let mut load_path: Option<PathBuf> = None;
     let mut summarize = false;
+    let mut report = false;
     let mut llm_override: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
                 i += 1;
-                config_path = PathBuf::from(
-                    args.get(i).ok_or("--config requires a path")?,
-                );
+                config_path = PathBuf::from(args.get(i).ok_or("--config requires a path")?);
             }
             "--ticks" | "-n" => {
                 i += 1;
-                ticks = Some(
-                    args.get(i)
-                        .ok_or("--ticks requires a number")?
-                        .parse()?,
-                );
+                ticks = Some(args.get(i).ok_or("--ticks requires a number")?.parse()?);
             }
             "--quiet" | "-q" => quiet = true,
             "--out-dir" | "-o" => {
@@ -60,11 +55,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--load" => {
                 i += 1;
-                load_path = Some(PathBuf::from(
-                    args.get(i).ok_or("--load requires a path")?,
-                ));
+                load_path = Some(PathBuf::from(args.get(i).ok_or("--load requires a path")?));
             }
             "--summarize" => summarize = true,
+            "--report" => report = true,
             "--llm" => {
                 i += 1;
                 let provider = args
@@ -96,7 +90,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         out_dir = Some(PathBuf::from(&sim.config.checkpoint.directory));
     }
 
-    let n = ticks.unwrap_or(if summarize && load_path.is_some() {
+    let n = ticks.unwrap_or(if (summarize || report) && load_path.is_some() {
         0
     } else {
         100
@@ -124,8 +118,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if summarize && n == 0 {
-        print!("{}", summary_markdown(&sim)?);
+    if (summarize || report) && n == 0 {
+        if summarize {
+            print!("{}", summary_markdown(&sim)?);
+        }
+        if report {
+            emit_report(&sim, out_dir.as_deref())?;
+        }
         println!("final_tick={}", sim.tick);
         println!("final_hash={}", sim.state_hash());
         return Ok(());
@@ -176,6 +175,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if summarize {
         print!("{}", summary_markdown(&sim)?);
     }
+    if report {
+        emit_report(&sim, out_dir.as_deref())?;
+    }
 
     println!("final_tick={}", sim.tick);
     println!("final_hash={}", sim.state_hash());
@@ -202,7 +204,7 @@ sim-cli — headless AgentTown runner
 Usage:
   sim-cli [--config PATH] [--ticks N] [--quiet]
           [--out-dir DIR] [--checkpoint-every K]
-          [--load PATH] [--summarize]
+          [--load PATH] [--summarize] [--report]
 
 Options:
   -c, --config PATH         Experiment TOML (default: configs/default.toml)
@@ -212,9 +214,24 @@ Options:
       --checkpoint-every K  Checkpoint every K ticks (implies --out-dir from config if omitted)
       --load PATH           Restore a .ckpt and continue
       --summarize           Print the Markdown world summary
+      --report              Write food-economy report (md/csv); prints markdown if no --out-dir
       --llm PROVIDER        mock | wait | ollama | openai_compatible (xAI)
   -h, --help                Show this help"
     );
+}
+
+fn emit_report(sim: &Simulation, out_dir: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(dir) = out_dir {
+        let (md, csv) = write_report(sim, dir)?;
+        println!("report={}", md.display());
+        if let Some(csv) = csv {
+            println!("report_csv={}", csv.display());
+        }
+    } else {
+        let built = sim_core::build_report(sim)?;
+        print!("{}", report_markdown(&built));
+    }
+    Ok(())
 }
 
 fn default_config_path() -> PathBuf {

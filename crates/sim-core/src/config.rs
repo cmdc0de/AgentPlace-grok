@@ -103,6 +103,10 @@ pub struct ExperimentConfig {
     pub communication: CommunicationParams,
     #[serde(default)]
     pub llm: LlmParams,
+    #[serde(default)]
+    pub proposals: ProposalParams,
+    #[serde(default)]
+    pub metrics: MetricsParams,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,6 +241,8 @@ pub struct AgentParams {
     pub inventory_capacity: u32,
     #[serde(default)]
     pub archetypes: Vec<AgentArchetype>,
+    #[serde(default)]
+    pub goals: GoalParams,
 }
 
 impl Default for AgentParams {
@@ -249,6 +255,79 @@ impl Default for AgentParams {
             start_with_basic_needs: true,
             inventory_capacity: default_inv_cap(),
             archetypes: Vec::new(),
+            goals: GoalParams::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalParams {
+    #[serde(default = "default_max_personal")]
+    pub max_personal_goals: u32,
+    #[serde(default = "default_max_public")]
+    pub max_public_goals: u32,
+    #[serde(default = "default_true")]
+    pub can_adopt_public_goals: bool,
+}
+
+impl Default for GoalParams {
+    fn default() -> Self {
+        Self {
+            max_personal_goals: default_max_personal(),
+            max_public_goals: default_max_public(),
+            can_adopt_public_goals: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposalParams {
+    #[serde(default = "default_max_open_prop")]
+    pub max_open_proposals_per_agent: u32,
+    #[serde(default = "default_accept")]
+    pub default_acceptance_threshold: f64,
+    #[serde(default = "default_prop_life")]
+    pub proposal_lifetime_ticks: u64,
+    #[serde(default = "default_msg_len")]
+    pub max_proposal_length: u32,
+    #[serde(default)]
+    pub allow_meta_rules: bool,
+    #[serde(default = "default_true")]
+    pub public_board_always_visible: bool,
+}
+
+impl Default for ProposalParams {
+    fn default() -> Self {
+        Self {
+            max_open_proposals_per_agent: default_max_open_prop(),
+            default_acceptance_threshold: default_accept(),
+            proposal_lifetime_ticks: default_prop_life(),
+            max_proposal_length: default_msg_len(),
+            allow_meta_rules: false,
+            public_board_always_visible: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricsParams {
+    #[serde(default = "default_metrics_every")]
+    pub compute_every_n_ticks: u64,
+    #[serde(default = "default_true")]
+    pub export_csv: bool,
+    #[serde(default = "default_true")]
+    pub track_consumption: bool,
+    #[serde(default = "default_true")]
+    pub track_proposal_stats: bool,
+}
+
+impl Default for MetricsParams {
+    fn default() -> Self {
+        Self {
+            compute_every_n_ticks: default_metrics_every(),
+            export_csv: true,
+            track_consumption: true,
+            track_proposal_stats: true,
         }
     }
 }
@@ -514,6 +593,24 @@ fn default_retries() -> u32 {
 }
 fn default_timeout() -> u64 {
     12_000
+}
+fn default_max_personal() -> u32 {
+    5
+}
+fn default_max_public() -> u32 {
+    3
+}
+fn default_max_open_prop() -> u32 {
+    3
+}
+fn default_accept() -> f64 {
+    0.5
+}
+fn default_prop_life() -> u64 {
+    2000
+}
+fn default_metrics_every() -> u64 {
+    50
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

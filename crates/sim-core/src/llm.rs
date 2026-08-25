@@ -102,6 +102,22 @@ struct LlmJson {
     recipe: Option<String>,
     #[serde(default)]
     speak: Option<SpeakJson>,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    proposal_id: Option<u64>,
+    #[serde(default)]
+    rule: Option<RuleJson>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuleJson {
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    species: Option<serde_json::Value>,
+    #[serde(default)]
+    n: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,9 +163,7 @@ pub fn parse_choice_json(
             let item = parsed
                 .item
                 .as_deref()
-                .or_else(|| {
-                    parsed.target.as_ref().and_then(|v| v.as_str())
-                })
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
                 .and_then(|s| parse_item(s, species))
                 .unwrap_or(ItemId::Food(1));
             PrimaryAction::Eat { item }
@@ -167,9 +181,28 @@ pub fn parse_choice_json(
             };
             PrimaryAction::Craft { recipe }
         }
+        "propose" => match &parsed.rule {
+            Some(r) => match parse_rule(r, species) {
+                Some(rule) => PrimaryAction::Propose {
+                    text: parsed.text.clone().unwrap_or_default(),
+                    rule: Some(rule),
+                },
+                None => PrimaryAction::Wait,
+            },
+            None => PrimaryAction::Propose {
+                text: parsed.text.clone().unwrap_or_default(),
+                rule: None,
+            },
+        },
+        "support" => PrimaryAction::Support {
+            proposal_id: parsed.proposal_id.unwrap_or(0),
+        },
+        "oppose" => PrimaryAction::Oppose {
+            proposal_id: parsed.proposal_id.unwrap_or(0),
+        },
         _ => PrimaryAction::Wait,
     };
-    let primary = if legal.iter().any(|a| a == &primary) {
+    let primary = if crate::observation::is_legal_choice(legal, &primary) {
         primary
     } else {
         PrimaryAction::Wait
@@ -181,10 +214,7 @@ pub fn parse_choice_json(
         let to = if s.to.as_str() == Some("broadcast") || s.to.is_null() {
             SpeakTarget::Broadcast
         } else if let Some(arr) = s.to.as_array() {
-            let ids: Vec<AgentId> = arr
-                .iter()
-                .filter_map(|v| v.as_u64().map(AgentId))
-                .collect();
+            let ids: Vec<AgentId> = arr.iter().filter_map(|v| v.as_u64().map(AgentId)).collect();
             SpeakTarget::Directed(ids)
         } else if let Some(n) = s.to.as_u64() {
             SpeakTarget::Directed(vec![AgentId(n)])
@@ -198,6 +228,24 @@ pub fn parse_choice_json(
         })
     });
     Ok(ChosenAction { primary, speak })
+}
+
+fn parse_rule(r: &RuleJson, species: &SpeciesTables) -> Option<crate::board::StructuredRule> {
+    let kind = r.kind.as_deref()?.to_ascii_lowercase();
+    match kind.as_str() {
+        "baneatspecies" | "ban_eat" => {
+            let tag = resolve_species_target(r.species.as_ref(), species)?;
+            Some(crate::board::StructuredRule::BanEatSpecies { species: tag })
+        }
+        "bangatherspecies" | "ban_gather" => {
+            let tag = resolve_species_target(r.species.as_ref(), species)?;
+            Some(crate::board::StructuredRule::BanGatherSpecies { species: tag })
+        }
+        "maxgatherpertick" | "max_gather" => Some(crate::board::StructuredRule::MaxGatherPerTick {
+            n: r.n.unwrap_or(1),
+        }),
+        _ => None,
+    }
 }
 
 fn resolve_species_target(v: Option<&serde_json::Value>, species: &SpeciesTables) -> Option<u8> {

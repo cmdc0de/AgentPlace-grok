@@ -3,8 +3,8 @@ use crate::agent::ItemId;
 use crate::memory::knows_toxin;
 use crate::observation::Observation;
 use crate::species::SpeciesTables;
-use rand::seq::IndexedRandom;
 use rand::Rng;
+use rand::seq::IndexedRandom;
 use rand_chacha::ChaCha20Rng;
 
 pub fn mock_choose(
@@ -23,7 +23,24 @@ pub fn mock_choose(
     species: &SpeciesTables,
     identified_others: bool,
 ) -> ChosenAction {
-    let primary = choose_primary(obs, rng, thirst, hunger, energy, thirst_max, hunger_max, energy_max);
+    if let Some(gov) = choose_governance(obs, memory, species) {
+        let speak = maybe_warn(
+            obs,
+            memory,
+            last_warn_tick,
+            tick,
+            warn_cooldown,
+            species,
+            identified_others,
+        );
+        return ChosenAction {
+            primary: gov,
+            speak,
+        };
+    }
+    let primary = choose_primary(
+        obs, rng, thirst, hunger, energy, thirst_max, hunger_max, energy_max,
+    );
     let speak = maybe_warn(
         obs,
         memory,
@@ -34,6 +51,44 @@ pub fn mock_choose(
         identified_others,
     );
     ChosenAction { primary, speak }
+}
+
+fn choose_governance(
+    obs: &Observation,
+    memory: &[crate::memory::MemoryEntry],
+    species: &SpeciesTables,
+) -> Option<PrimaryAction> {
+    use crate::board::{ProposalStatus, StructuredRule};
+    for (i, spec) in species.vegetation.iter().enumerate() {
+        let tag = (i + 1) as u8;
+        if !knows_toxin(memory, tag) {
+            continue;
+        }
+        if let Some(p) = obs.board.iter().find(|p| {
+            p.status == ProposalStatus::Open
+                && matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
+                && !p.you_support
+        }) {
+            return Some(PrimaryAction::Support { proposal_id: p.id });
+        }
+        let already = obs.board.iter().any(|p| {
+            matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
+                && p.status != ProposalStatus::Rejected
+                && p.status != ProposalStatus::Expired
+        });
+        if !already
+            && obs
+                .legal
+                .iter()
+                .any(|a| matches!(a, PrimaryAction::Propose { .. }))
+        {
+            return Some(PrimaryAction::Propose {
+                text: format!("do not eat {}", spec.id),
+                rule: Some(StructuredRule::BanEatSpecies { species: tag }),
+            });
+        }
+    }
+    None
 }
 
 fn choose_primary(
@@ -69,16 +124,19 @@ fn choose_primary(
                 return a.clone();
             }
         }
-        if let Some(PrimaryAction::Hunt) = obs.legal.iter().find(|a| matches!(a, PrimaryAction::Hunt))
+        if let Some(PrimaryAction::Hunt) =
+            obs.legal.iter().find(|a| matches!(a, PrimaryAction::Hunt))
         {
             return PrimaryAction::Hunt;
         }
-        if let Some(PrimaryAction::Fish) = obs.legal.iter().find(|a| matches!(a, PrimaryAction::Fish))
+        if let Some(PrimaryAction::Fish) =
+            obs.legal.iter().find(|a| matches!(a, PrimaryAction::Fish))
         {
             return PrimaryAction::Fish;
         }
-        if let Some(mv) = move_toward(obs, rng, |t| t.vegetation != 0 || t.animals > 0 || t.fish > 0)
-        {
+        if let Some(mv) = move_toward(obs, rng, |t| {
+            t.vegetation != 0 || t.animals > 0 || t.fish > 0
+        }) {
             return mv;
         }
     }
@@ -102,7 +160,10 @@ fn move_toward(
     rng: &mut ChaCha20Rng,
     pred: impl Fn(&crate::observation::TileView) -> bool,
 ) -> Option<PrimaryAction> {
-    let target = obs.tiles.iter().find(|t| pred(t) && (t.x != obs.x || t.y != obs.y))?;
+    let target = obs
+        .tiles
+        .iter()
+        .find(|t| pred(t) && (t.x != obs.x || t.y != obs.y))?;
     let dx = (target.x as i32 - obs.x as i32).signum();
     let dy = (target.y as i32 - obs.y as i32).signum();
     let cand = if dx != 0 && dy != 0 {

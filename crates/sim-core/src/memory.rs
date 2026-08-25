@@ -9,6 +9,7 @@ pub enum MemoryKind {
     ToxinFact,
     Utterance,
     Action,
+    Proposal,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,11 +39,7 @@ impl MemoryEntry {
     }
 }
 
-pub fn remember(
-    store: &mut Vec<MemoryEntry>,
-    cap: u32,
-    entry: MemoryEntry,
-) {
+pub fn remember(store: &mut Vec<MemoryEntry>, cap: u32, entry: MemoryEntry) {
     store.push(entry);
     evict(store, cap);
 }

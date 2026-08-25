@@ -114,6 +114,11 @@ pub struct Agent {
     pub memory: Vec<crate::memory::MemoryEntry>,
     #[serde(default)]
     pub last_warn_tick: u64,
+    /// Packed into the checkpoint `public_board` blob so M3 agent layouts still decode.
+    #[serde(default, skip)]
+    pub goals: Vec<crate::board::Goal>,
+    #[serde(default, skip)]
+    pub gathers_this_tick: u32,
 }
 
 impl Default for Needs {
@@ -141,6 +146,8 @@ impl Agent {
             illness_ticks: 0,
             memory: Vec::new(),
             last_warn_tick: 0,
+            goals: Vec::new(),
+            gathers_this_tick: 0,
         }
     }
 
@@ -220,6 +227,10 @@ impl Agent {
         hasher.update(self.consumption.fish.to_le_bytes());
         hasher.update(self.consumption.toxic_events.to_le_bytes());
         hasher.update(self.last_warn_tick.to_le_bytes());
+        hasher.update(self.gathers_this_tick.to_le_bytes());
+        for g in &self.goals {
+            g.hash_into(hasher);
+        }
         for mem in &self.memory {
             mem.hash_into(hasher);
         }

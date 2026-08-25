@@ -2,7 +2,7 @@ mod render;
 
 use bevy::prelude::*;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
-use sim_bevy::{step_once, SimPlugin, SimState};
+use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::observation::{chebyshev, effective_range};
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::env;
@@ -272,10 +272,7 @@ fn handle_input(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<SimState>) {
     }
 }
 
-fn sync_agent_transforms(
-    state: Res<SimState>,
-    mut query: Query<(&AgentVisual, &mut Transform)>,
-) {
+fn sync_agent_transforms(state: Res<SimState>, mut query: Query<(&AgentVisual, &mut Transform)>) {
     for (visual, mut transform) in &mut query {
         if let Some(agent) = state.sim.agents.get(&visual.id) {
             transform.translation = agent_world_pos(&state.sim.world, agent.x, agent.y);
@@ -357,17 +354,38 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
     let short = if hash.len() >= 12 { &hash[..12] } else { &hash };
     let needs = if let Some(id) = state.follow {
         state.sim.agents.get(&id).map(|a| {
+            let known = a
+                .memory
+                .iter()
+                .filter(|m| m.species_tag != 0)
+                .map(|m| m.species_tag)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len();
+            let goals = a
+                .goals
+                .iter()
+                .map(|g| g.text.as_str())
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" | ");
             format!(
-                "h:{:.0} t:{:.0} e:{:.0} ill:{}",
+                "h:{:.0} t:{:.0} e:{:.0} ill:{} veg:{} an:{} fi:{} tox:{} known:{} goals:{}",
                 a.needs.hunger as f32 / 100.0,
                 a.needs.thirst as f32 / 100.0,
                 a.needs.energy as f32 / 100.0,
-                a.illness_ticks
+                a.illness_ticks,
+                a.consumption.vegetation,
+                a.consumption.animal,
+                a.consumption.fish,
+                a.consumption.toxic_events,
+                known,
+                if goals.is_empty() { "-" } else { &goals }
             )
         })
     } else {
         None
     };
+    let open_board = state.sim.board.open().count();
     let last_line = state
         .sim
         .events
@@ -380,7 +398,7 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
         })
         .unwrap_or_default();
     let text = format!(
-        "tick {}  {}  {}  hash {}\nwater {}  veg {}  mineral {}  animals {}  fish {}\n{}\n{}\nSpace pause  . step  F follow  0-9 follow agent",
+        "tick {}  {}  {}  hash {}\nwater {}  veg {}  mineral {}  animals {}  fish {}  open proposals {}\n{}\n{}\nSpace pause  . step  F follow  0-9 follow agent",
         state.sim.tick,
         paused,
         follow,
@@ -390,6 +408,7 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
         state.sim.world.mineral_count(),
         state.sim.world.animal_total(),
         state.sim.world.fish_total(),
+        open_board,
         needs.unwrap_or_else(|| "follow an agent for needs".into()),
         last_line,
     );

@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{knows_toxin, remember, MemoryEntry, MemoryKind};
+use crate::memory::{MemoryEntry, MemoryKind, knows_toxin, remember};
 use crate::observation::neighbors4;
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -11,6 +11,10 @@ use rand_chacha::ChaCha20Rng;
 const ILLNESS_TICKS: u32 = 12;
 
 pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction) {
+    if let Some(reason) = rule_block(sim, id, action) {
+        push(sim, id, SimEventKind::RuleBlocked { reason });
+        return;
+    }
     if !is_legal(sim, id, action) {
         push(sim, id, SimEventKind::Wait);
         return;
@@ -26,6 +30,31 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Fish => fish(sim, id),
         PrimaryAction::Farm { species } => farm(sim, id, *species),
         PrimaryAction::Craft { recipe } => craft(sim, id, *recipe),
+        PrimaryAction::Propose { text, rule } => propose(sim, id, text, *rule),
+        PrimaryAction::Support { proposal_id } => vote(sim, id, *proposal_id, true),
+        PrimaryAction::Oppose { proposal_id } => vote(sim, id, *proposal_id, false),
+    }
+}
+
+fn rule_block(sim: &Simulation, id: AgentId, action: &PrimaryAction) -> Option<String> {
+    match action {
+        PrimaryAction::Eat {
+            item: crate::agent::ItemId::Food(tag),
+        } if *tag < 100 && sim.board.blocks_eat(*tag) => Some(format!("ban eat species {tag}")),
+        PrimaryAction::Gather { species } if *species != 0 && sim.board.blocks_gather(*species) => {
+            Some(format!("ban gather species {species}"))
+        }
+        PrimaryAction::Gather { species } if *species != 0 => {
+            if let Some(max) = sim.board.max_gather_per_tick() {
+                if let Some(a) = sim.agents.get(&id) {
+                    if a.gathers_this_tick >= max {
+                        return Some("max gather per tick".into());
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }
 
@@ -33,7 +62,19 @@ fn is_legal(sim: &Simulation, id: AgentId, action: &PrimaryAction) -> bool {
     let Some(agent) = sim.agents.get(&id) else {
         return false;
     };
-    crate::observation::legal_actions(sim, agent).iter().any(|a| a == action)
+    match action {
+        PrimaryAction::Propose { text, .. } => {
+            !text.is_empty()
+                && sim.board.author_open_count(id)
+                    < sim.config.proposals.max_open_proposals_per_agent as usize
+        }
+        PrimaryAction::Support { proposal_id } | PrimaryAction::Oppose { proposal_id } => {
+            sim.board.open().any(|p| p.id == *proposal_id)
+        }
+        other => crate::observation::legal_actions(sim, agent)
+            .iter()
+            .any(|a| a == other),
+    }
 }
 
 fn push(sim: &mut Simulation, id: AgentId, kind: SimEventKind) {
@@ -133,7 +174,11 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let bonus = if agent.has_tool(ItemId::Basket) { 15 } else { 0 };
+    let bonus = if agent.has_tool(ItemId::Basket) {
+        15
+    } else {
+        0
+    };
     let ok = {
         let rng = sim.rngs.agent_stream(id);
         skill_roll(
@@ -177,6 +222,11 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
         }
     }
     sim.world.set_vegetation(x, y, 0);
+    if qty > 0 {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            a.gathers_this_tick = a.gathers_this_tick.saturating_add(1);
+        }
+    }
     remember_obs(sim, id, species, x, y);
     push(
         sim,
@@ -356,7 +406,11 @@ fn hunt(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let bonus = if agent.has_tool(ItemId::Spear) { 25 } else { -15 };
+    let bonus = if agent.has_tool(ItemId::Spear) {
+        25
+    } else {
+        -15
+    };
     let ok = {
         let rng = sim.rngs.agent_stream(id);
         skill_roll(
@@ -428,12 +482,14 @@ fn farm(sim: &mut Simulation, id: AgentId, species: u8) {
     let Some(agent) = sim.agents.get(&id).cloned() else {
         return;
     };
-    let cell = neighbors4(&sim.world, agent.x, agent.y).into_iter().find(|&(x, y)| {
-        sim.world.is_land(x, y)
-            && sim.world.vegetation_species(x, y) == 0
-            && !sim.world.has_mineral(x, y)
-            && !sim.world.crops.contains_key(&(x, y))
-    });
+    let cell = neighbors4(&sim.world, agent.x, agent.y)
+        .into_iter()
+        .find(|&(x, y)| {
+            sim.world.is_land(x, y)
+                && sim.world.vegetation_species(x, y) == 0
+                && !sim.world.has_mineral(x, y)
+                && !sim.world.crops.contains_key(&(x, y))
+        });
     let Some((x, y)) = cell else {
         push(sim, id, SimEventKind::Wait);
         return;
@@ -477,18 +533,25 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     let (need, out) = match recipe {
         Recipe::Basket => (vec![(ItemId::Fiber, 2)], ItemId::Basket),
         Recipe::Spear => (vec![(ItemId::Wood, 1), (ItemId::Stone, 1)], ItemId::Spear),
-        Recipe::FishingRod => (vec![(ItemId::Wood, 1), (ItemId::Fiber, 1)], ItemId::FishingRod),
+        Recipe::FishingRod => (
+            vec![(ItemId::Wood, 1), (ItemId::Fiber, 1)],
+            ItemId::FishingRod,
+        ),
     };
-    let has_all = need.iter().all(|(item, n)| {
-        agent.inventory.get(item).copied().unwrap_or(0) >= *n
-    });
+    let has_all = need
+        .iter()
+        .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n);
     let room = agent.inventory_cap.saturating_sub(agent.inventory_count()) >= 1
         || agent.inventory.contains_key(&out);
     if !has_all || !room {
-        push(sim, id, SimEventKind::Craft {
-            recipe,
-            success: false,
-        });
+        push(
+            sim,
+            id,
+            SimEventKind::Craft {
+                recipe,
+                success: false,
+            },
+        );
         return;
     }
     let ok = {
@@ -504,10 +567,14 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
         )
     };
     if !ok {
-        push(sim, id, SimEventKind::Craft {
-            recipe,
-            success: false,
-        });
+        push(
+            sim,
+            id,
+            SimEventKind::Craft {
+                recipe,
+                success: false,
+            },
+        );
         return;
     }
     let Some(a) = sim.agents.get_mut(&id) else {
@@ -518,6 +585,107 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     }
     let success = a.try_add_item(out, 1) > 0;
     push(sim, id, SimEventKind::Craft { recipe, success });
+}
+
+fn propose(
+    sim: &mut Simulation,
+    id: AgentId,
+    text: &str,
+    rule: Option<crate::board::StructuredRule>,
+) {
+    let cap = sim.config.proposals.max_open_proposals_per_agent as usize;
+    if sim.board.author_open_count(id) >= cap {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let max_len = sim.config.proposals.max_proposal_length as usize;
+    let mut text = text.to_string();
+    if text.chars().count() > max_len {
+        text = text.chars().take(max_len).collect();
+    }
+    if text.is_empty() {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let pid = sim.board.next_id;
+    sim.board.next_id += 1;
+    let mut supporters = std::collections::BTreeSet::new();
+    supporters.insert(id);
+    sim.board.proposals.push(crate::board::Proposal {
+        id: pid,
+        author: id,
+        tick_created: sim.tick,
+        text: text.clone(),
+        rule,
+        supporters,
+        opposers: std::collections::BTreeSet::new(),
+        status: crate::board::ProposalStatus::Open,
+    });
+    let mem_cap = sim.config.agents.default_memory_capacity;
+    let tick = sim.tick;
+    if let Some(a) = sim.agents.get_mut(&id) {
+        remember(
+            &mut a.memory,
+            mem_cap,
+            MemoryEntry {
+                tick,
+                kind: MemoryKind::Proposal,
+                text: format!("proposed #{pid}: {text}"),
+                importance: 70,
+                last_accessed: tick,
+                species_tag: 0,
+            },
+        );
+    }
+    push(sim, id, SimEventKind::Propose { proposal_id: pid });
+}
+
+fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
+    let ok = if let Some(p) = sim
+        .board
+        .proposals
+        .iter_mut()
+        .find(|p| p.id == proposal_id && p.status == crate::board::ProposalStatus::Open)
+    {
+        if support {
+            p.opposers.remove(&id);
+            p.supporters.insert(id);
+        } else {
+            p.supporters.remove(&id);
+            p.opposers.insert(id);
+        }
+        true
+    } else {
+        false
+    };
+    if !ok {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let mem_cap = sim.config.agents.default_memory_capacity;
+    let tick = sim.tick;
+    if let Some(a) = sim.agents.get_mut(&id) {
+        remember(
+            &mut a.memory,
+            mem_cap,
+            MemoryEntry {
+                tick,
+                kind: MemoryKind::Proposal,
+                text: format!(
+                    "{} #{proposal_id}",
+                    if support { "supported" } else { "opposed" }
+                ),
+                importance: 60,
+                last_accessed: tick,
+                species_tag: 0,
+            },
+        );
+    }
+    if support {
+        push(sim, id, SimEventKind::Support { proposal_id });
+    } else {
+        push(sim, id, SimEventKind::Oppose { proposal_id });
+    }
 }
 
 fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) {
@@ -539,7 +707,11 @@ fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) 
     }
 }
 
-pub fn apply_heard_memories(sim: &mut Simulation, id: AgentId, heard: &[crate::observation::HeardSpeech]) {
+pub fn apply_heard_memories(
+    sim: &mut Simulation,
+    id: AgentId,
+    heard: &[crate::observation::HeardSpeech],
+) {
     let cap = sim.config.agents.default_memory_capacity;
     let tick = sim.tick;
     let species = sim.config.world.species.clone();
@@ -580,5 +752,3 @@ pub fn apply_heard_memories(sim: &mut Simulation, id: AgentId, heard: &[crate::o
         }
     }
 }
-
-

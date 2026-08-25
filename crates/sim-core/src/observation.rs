@@ -1,5 +1,6 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
+use crate::board::ProposalView;
 use crate::event_log::SimEventKind;
 use crate::simulation::Simulation;
 use crate::species::VegYield;
@@ -43,6 +44,10 @@ pub struct Observation {
     pub tiles: Vec<TileView>,
     pub agents: Vec<AgentView>,
     pub heard: Vec<HeardSpeech>,
+    #[serde(default)]
+    pub board: Vec<ProposalView>,
+    #[serde(default)]
+    pub goals: Vec<crate::board::Goal>,
     pub legal: Vec<PrimaryAction>,
 }
 
@@ -84,7 +89,9 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         sim.world.width.max(sim.world.height)
     } else {
         effective_range(
-            cfg.communication.base_speech_range.max(cfg.observation.base_hearing_range),
+            cfg.communication
+                .base_speech_range
+                .max(cfg.observation.base_hearing_range),
             agent.personality.perceptiveness,
         )
     };
@@ -132,6 +139,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
 
     let heard = heard_last_tick(sim, agent, hear, ident);
     let legal = legal_actions(sim, agent);
+    let board = board_view(sim, ident, agent);
     Observation {
         agent_id: id,
         x: agent.x,
@@ -142,16 +150,43 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         tiles,
         agents,
         heard,
+        board,
+        goals: agent.goals.clone(),
         legal,
     }
 }
 
-fn heard_last_tick(
-    sim: &Simulation,
-    listener: &Agent,
-    hear: u32,
-    ident: u32,
-) -> Vec<HeardSpeech> {
+fn board_view(sim: &Simulation, ident: u32, agent: &Agent) -> Vec<ProposalView> {
+    if !sim.config.proposals.public_board_always_visible {
+        return Vec::new();
+    }
+    sim.board
+        .proposals
+        .iter()
+        .map(|p| {
+            let named = ident >= 255
+                || sim.config.observation.full_information
+                || sim
+                    .agents
+                    .get(&p.author)
+                    .is_some_and(|a| chebyshev(agent.x, agent.y, a.x, a.y) <= ident)
+                || p.author == agent.id;
+            ProposalView {
+                id: p.id,
+                author: named.then_some(p.author),
+                text: p.text.clone(),
+                status: p.status,
+                support: p.supporters.len() as u32,
+                oppose: p.opposers.len() as u32,
+                rule: p.rule,
+                you_support: p.supporters.contains(&agent.id),
+                you_oppose: p.opposers.contains(&agent.id),
+            }
+        })
+        .collect()
+}
+
+fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) -> Vec<HeardSpeech> {
     if sim.tick == 0 {
         return Vec::new();
     }
@@ -231,9 +266,15 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let mut farm_spots = false;
     for &(x, y) in &near {
         let tag = sim.world.vegetation_species(x, y);
-        if tag != 0 && !seen_gather.contains(&tag) {
+        if tag != 0 && !seen_gather.contains(&tag) && !sim.board.blocks_gather(tag) {
             seen_gather.push(tag);
-            legal.push(PrimaryAction::Gather { species: tag });
+            if sim
+                .board
+                .max_gather_per_tick()
+                .is_none_or(|m| agent.gathers_this_tick < m)
+            {
+                legal.push(PrimaryAction::Gather { species: tag });
+            }
         }
         if sim.world.has_mineral(x, y) && !seen_gather.contains(&0) {
             seen_gather.push(0);
@@ -267,8 +308,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     }
     for (item, qty) in &agent.inventory {
         if *qty > 0 {
-            if let ItemId::Food(_) = item {
-                legal.push(PrimaryAction::Eat { item: *item });
+            if let ItemId::Food(tag) = item {
+                if *tag >= 100 || !sim.board.blocks_eat(*tag) {
+                    legal.push(PrimaryAction::Eat { item: *item });
+                }
             }
         }
     }
@@ -305,6 +348,18 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             recipe: Recipe::FishingRod,
         });
     }
+    if sim.board.author_open_count(agent.id)
+        < sim.config.proposals.max_open_proposals_per_agent as usize
+    {
+        legal.push(PrimaryAction::Propose {
+            text: String::new(),
+            rule: None,
+        });
+    }
+    for p in sim.board.open() {
+        legal.push(PrimaryAction::Support { proposal_id: p.id });
+        legal.push(PrimaryAction::Oppose { proposal_id: p.id });
+    }
     legal
 }
 
@@ -324,4 +379,23 @@ pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {
 
 pub fn encode_for_hash(obs: &Observation) -> Vec<u8> {
     postcard::to_allocvec(obs).unwrap_or_default()
+}
+
+/// Legal-list matching. `Propose` in the list is a placeholder with empty text.
+pub fn is_legal_choice(legal: &[PrimaryAction], action: &PrimaryAction) -> bool {
+    match action {
+        PrimaryAction::Propose { text, .. } => {
+            !text.is_empty()
+                && legal
+                    .iter()
+                    .any(|a| matches!(a, PrimaryAction::Propose { .. }))
+        }
+        PrimaryAction::Support { proposal_id } => legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Support { proposal_id: id } if id == proposal_id)),
+        PrimaryAction::Oppose { proposal_id } => legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Oppose { proposal_id: id } if id == proposal_id)),
+        other => legal.iter().any(|a| a == other),
+    }
 }
