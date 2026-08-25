@@ -64,7 +64,8 @@ Server → Client:
 
 | Later | What |
 |---|---|
-| **M8** | [`M8-plan.md`](M8-plan.md) — incentive TOML, apply at tick 0 or on load, viewer `/inject`, processing metrics |
+| **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive TOML, `/inject`, processing metrics, death) |
+| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
 | Later | TLS / `wss`, Unix sockets, multiple exclusive writers, jump-to-tick without a file, delta compression, browser client, vote weighting, world-mutation `/set` `/give` |
 
 Do **not** implement payoff/influence stubs that would change hashes.

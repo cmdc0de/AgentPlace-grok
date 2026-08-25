@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M7 are done (tag `M7`, `789fc81`). **Current next slice:** [`M8-plan.md`](M8-plan.md) (incentive A/B inject + processing metrics). Later milestones are listed at the bottom of that file.
+M3–M8 are done (tag `M8`, `b0b9d14`). **Current next slice:** [`M9-plan.md`](M9-plan.md) (LLM prompts, replay, `--compare`). Later milestones are listed at the bottom of that file.
 
 ## PR Plan
 

@@ -1,6 +1,6 @@
 # M8 — Incentive A/B inject and processing metrics
 
-**Status:** implemented (this tree; tag after merge)  
+**Status:** implemented (git tag `M8`, commit `b0b9d14`).  
 **Depends on:** M7 complete (`docs/M7-plan.md`, git tag `M7`, commit `789fc81`)  
 **Specs:** `memory-goals-incentives-spec.md` §3 (schedule TOML + effect vocabulary), `deterministic-seeding-design.md` §4/§6 (load T, change only incentives, hashes diverge), `decision-observation-llm-economy-metrics-spec.md` §5 (metrics; M8 adds **wall-clock** timing, not the full social time-series dashboard)
 
@@ -91,7 +91,8 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 
 | Later | What |
 |---|---|
-| After M8 | Protobuf or JSON-envelope rewrite; TLS / `wss`; timeline scrubber; `visibility_modifier`; vote weighting; `/set` `/give`; LLM reflection-on-evict |
+| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
+| After M9 | Protobuf or JSON-envelope rewrite; TLS / `wss`; timeline scrubber; `visibility_modifier`; vote weighting; `/set` `/give`; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions
