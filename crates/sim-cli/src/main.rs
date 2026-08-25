@@ -1,6 +1,9 @@
+mod network;
+mod server;
+
 use sim_core::{
-    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, experiment_id,
-    report_markdown, summary_markdown, write_report, write_run_checkpoint,
+    append_decisions_jsonl, append_events_jsonl, experiment_id, report_markdown, summary_markdown,
+    write_report, write_run_checkpoint, ExperimentConfig, Simulation,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -27,6 +30,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut summarize = false;
     let mut report = false;
     let mut llm_override: Option<String> = None;
+    let mut listen: Vec<String> = Vec::new();
+    let mut allow_control = false;
+    let mut token: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -66,6 +72,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .ok_or("--llm requires mock|wait|ollama|openai_compatible")?;
                 llm_override = Some(provider.clone());
             }
+            "--listen" => {
+                i += 1;
+                listen.push(
+                    args.get(i)
+                        .ok_or("--listen requires tcp:// or ws:// URL")?
+                        .clone(),
+                );
+            }
+            "--allow-control" => allow_control = true,
+            "--token" => {
+                i += 1;
+                token = Some(args.get(i).ok_or("--token requires a value")?.clone());
+            }
             "--help" | "-h" => {
                 print_help();
                 return Ok(());
@@ -85,6 +104,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.config.llm.provider = provider.clone();
     }
     sim.chooser = sim_llm::chooser_from_config(&sim.config)?;
+
+    let net = network::NetworkParams::from_path(&config_path);
+    allow_control = allow_control || net.allow_control;
+    if token.is_none() && !net.token.is_empty() {
+        token = Some(net.token.clone());
+    }
+    let listen = server::merge_listen(&net, &listen);
 
     if checkpoint_every.is_some() && out_dir.is_none() {
         out_dir = Some(PathBuf::from(&sim.config.checkpoint.directory));
@@ -116,6 +142,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             sim.world.vegetation_count(),
             sim.world.mineral_count()
         );
+    }
+
+    if !listen.is_empty() && !(summarize || report) {
+        return server::serve(server::ServeOpts {
+            sim,
+            ticks: n,
+            listen,
+            allow_control,
+            token,
+            quiet,
+            out_dir,
+            checkpoint_every,
+        });
     }
 
     if (summarize || report) && n == 0 {
@@ -210,6 +249,8 @@ Usage:
   sim-cli [--config PATH] [--ticks N] [--quiet]
           [--out-dir DIR] [--checkpoint-every K]
           [--load PATH] [--summarize] [--report]
+          [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
+          [--allow-control] [--token SECRET]
 
 Options:
   -c, --config PATH         Experiment TOML (default: configs/default.toml)
@@ -221,6 +262,9 @@ Options:
       --summarize           Print the Markdown world summary
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir
       --llm PROVIDER        mock | wait | ollama | openai_compatible (xAI)
+      --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
+      --allow-control       Accept pause/play/step/save/report/summarize from clients
+      --token SECRET        Require matching token on Hello (LAN auth, not TLS)
   -h, --help                Show this help"
     );
 }

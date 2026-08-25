@@ -1,16 +1,18 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
-use crate::commands::{help_text, parse_command, run_command, WindowFlags};
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
+use crate::commands::{help_text, parse_command, remote_control, run_command, WindowFlags};
+use crate::net::NetLink;
 use bevy::prelude::*;
 use bevy_mod_imgui::prelude::*;
+use serde::{Deserialize, Serialize};
+use shared::protocol::ClientMessage;
 use sim_bevy::{step_once, SimState};
 use sim_core::event_log::SimEventKind;
 use sim_core::markers;
 use sim_core::{AgentId, ItemId};
 use std::collections::VecDeque;
+use std::fs;
+use std::path::PathBuf;
 
 const DECISION_RING: usize = 16;
 const EVENT_CAP: usize = 200;
@@ -100,13 +102,19 @@ pub fn persist_ui_on_exit(ui: Res<UiState>, mut exits: MessageReader<AppExit>) {
     }
 }
 
-pub fn imgui_ui(mut context: NonSendMut<ImguiContext>, mut state: ResMut<SimState>, mut ui: ResMut<UiState>) {
+pub fn imgui_ui(
+    mut context: NonSendMut<ImguiContext>,
+    mut state: ResMut<SimState>,
+    mut ui: ResMut<UiState>,
+    net: Option<Res<NetLink>>,
+) {
     record_decisions(&mut state, &mut ui);
     let imgui_ui = context.ui();
     ui.want_keyboard = imgui_ui.io().want_capture_keyboard;
+    let net = net.as_deref();
 
     if ui.windows.status {
-        draw_status(imgui_ui, &mut state, &mut ui);
+        draw_status(imgui_ui, &mut state, &mut ui, net);
     }
     if ui.windows.help {
         draw_help(imgui_ui, &mut ui.windows.help);
@@ -130,7 +138,7 @@ pub fn imgui_ui(mut context: NonSendMut<ImguiContext>, mut state: ResMut<SimStat
         draw_world(imgui_ui, &state, &mut ui.windows.world);
     }
     if ui.windows.console {
-        draw_console(imgui_ui, &mut state, &mut ui);
+        draw_console(imgui_ui, &mut state, &mut ui, net);
     }
 }
 
@@ -148,7 +156,13 @@ fn record_decisions(state: &mut SimState, ui: &mut UiState) {
     }
 }
 
-fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState) {
+fn send_control(net: Option<&NetLink>, msg: ClientMessage) {
+    if let Some(net) = net {
+        let _ = net.tx.send(msg);
+    }
+}
+
+fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&NetLink>) {
     ui.window("Status")
         .opened(&mut us.windows.status)
         .size([420.0, 140.0], Condition::FirstUseEver)
@@ -175,14 +189,33 @@ fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState) {
             ));
             if ui.button("Pause") {
                 state.paused = true;
+                if state.remote {
+                    send_control(
+                        net,
+                        ClientMessage::Control(shared::protocol::ControlVerb::Pause),
+                    );
+                }
             }
             ui.same_line();
             if ui.button("Play") {
                 state.paused = false;
+                if state.remote {
+                    send_control(
+                        net,
+                        ClientMessage::Control(shared::protocol::ControlVerb::Play),
+                    );
+                }
             }
             ui.same_line();
             if ui.button("Step") {
-                step_once(state);
+                if state.remote {
+                    send_control(
+                        net,
+                        ClientMessage::Control(shared::protocol::ControlVerb::Step(1)),
+                    );
+                } else {
+                    step_once(state);
+                }
             }
             ui.same_line();
             if ui.checkbox("fog (POV)", &mut us.fog) {}
@@ -238,11 +271,7 @@ fn draw_agents(ui: &Ui, state: &mut SimState, open: &mut bool) {
                     .find(|d| d.agent == id.0)
                     .map(|d| d.policy_branch.as_str())
                     .unwrap_or("-");
-                let label = format!(
-                    "#{} h:{:.0} {branch}",
-                    id.0,
-                    a.needs.hunger as f32 / 100.0
-                );
+                let label = format!("#{} h:{:.0} {branch}", id.0, a.needs.hunger as f32 / 100.0);
                 let selected = state.follow == Some(id);
                 if ui.selectable_config(&label).selected(selected).build() {
                     state.follow = Some(id);
@@ -284,14 +313,21 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 a.abilities.craft
             ));
             if !a.personality.allergy_tags.is_empty() {
-                ui.text(format!("allergies: {}", a.personality.allergy_tags.join(", ")));
+                ui.text(format!(
+                    "allergies: {}",
+                    a.personality.allergy_tags.join(", ")
+                ));
             }
             ui.text(format!(
                 "goals: {}",
                 if a.goals.is_empty() {
                     "(none)".into()
                 } else {
-                    a.goals.iter().map(|g| g.text.as_str()).collect::<Vec<_>>().join("; ")
+                    a.goals
+                        .iter()
+                        .map(|g| g.text.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
                 }
             ));
             ui.separator();
@@ -333,7 +369,11 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
 
 fn need_bar(ui: &Ui, label: &str, milli: u32) {
     let frac = (milli as f32 / 10_000.0).clamp(0.0, 1.0);
-    ui.text(format!("{label} {:.1}  [{:.0}%]", milli as f32 / 100.0, frac * 100.0));
+    ui.text(format!(
+        "{label} {:.1}  [{:.0}%]",
+        milli as f32 / 100.0,
+        frac * 100.0
+    ));
 }
 
 fn draw_board(ui: &Ui, state: &SimState, open: &mut bool) {
@@ -381,8 +421,10 @@ fn draw_logs(ui: &Ui, state: &SimState, us: &mut UiState) {
         .size([420.0, 300.0], Condition::FirstUseEver)
         .position([12.0, 520.0], Condition::FirstUseEver)
         .build(|| {
-            ui.input_text("filter agent", &mut us.event_filter_agent).build();
-            ui.input_text("filter kind", &mut us.event_filter_kind).build();
+            ui.input_text("filter agent", &mut us.event_filter_agent)
+                .build();
+            ui.input_text("filter kind", &mut us.event_filter_kind)
+                .build();
             ui.separator();
             ui.text("events");
             let filter_id = us.event_filter_agent.parse::<u64>().ok();
@@ -419,10 +461,25 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
         .position([940.0, 450.0], Condition::FirstUseEver)
         .build(|| {
             let n = state.sim.agents.len().max(1) as f32;
-            let veg: u32 = state.sim.agents.values().map(|a| a.consumption.vegetation).sum();
-            let animal: u32 = state.sim.agents.values().map(|a| a.consumption.animal).sum();
+            let veg: u32 = state
+                .sim
+                .agents
+                .values()
+                .map(|a| a.consumption.vegetation)
+                .sum();
+            let animal: u32 = state
+                .sim
+                .agents
+                .values()
+                .map(|a| a.consumption.animal)
+                .sum();
             let fish: u32 = state.sim.agents.values().map(|a| a.consumption.fish).sum();
-            let toxic: u32 = state.sim.agents.values().map(|a| a.consumption.toxic_events).sum();
+            let toxic: u32 = state
+                .sim
+                .agents
+                .values()
+                .map(|a| a.consumption.toxic_events)
+                .sum();
             let hunger: f32 = state
                 .sim
                 .agents
@@ -430,8 +487,15 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
                 .map(|a| a.needs.hunger as f32 / 100.0)
                 .sum::<f32>()
                 / n;
-            let pairs: usize = state.sim.agents.values().map(|a| a.relationships.len()).sum();
-            ui.text(format!("consumed veg {veg} animal {animal} fish {fish} toxic {toxic}"));
+            let pairs: usize = state
+                .sim
+                .agents
+                .values()
+                .map(|a| a.relationships.len())
+                .sum();
+            ui.text(format!(
+                "consumed veg {veg} animal {animal} fish {fish} toxic {toxic}"
+            ));
             ui.text(format!("mean hunger {hunger:.1}"));
             ui.text(format!(
                 "board open {}  rel pairs {pairs}",
@@ -440,20 +504,18 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
         });
 }
 
-fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState) {
+fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&NetLink>) {
     let mut open = us.windows.console;
     ui.window("Console")
         .opened(&mut open)
         .size([520.0, 220.0], Condition::FirstUseEver)
         .position([280.0, 540.0], Condition::FirstUseEver)
         .build(|| {
-            ui.child_window("scroll")
-                .size([0.0, 140.0])
-                .build(|| {
-                    for line in &us.scrollback {
-                        ui.text_wrapped(line);
-                    }
-                });
+            ui.child_window("scroll").size([0.0, 140.0]).build(|| {
+                for line in &us.scrollback {
+                    ui.text_wrapped(line);
+                }
+            });
             if us.request_console_focus {
                 ui.set_keyboard_focus_here();
                 us.request_console_focus = false;
@@ -475,6 +537,11 @@ fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState) {
                 us.scrollback.push(format!("> {line}"));
                 match parse_command(&line) {
                     Ok(cmd) => {
+                        if state.remote {
+                            if let Some(verb) = remote_control(&cmd) {
+                                send_control(net, ClientMessage::Control(verb));
+                            }
+                        }
                         let msgs = run_command(cmd, state, &mut us.fog, &mut us.windows);
                         us.scrollback.extend(msgs);
                     }

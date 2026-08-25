@@ -22,7 +22,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M4** | Done (`6b4cf93`) | [`M4-plan.md`](M4-plan.md) | Public board, Propose/Support/Oppose, structured adopted rules, food-economy summary report |
 | **M5** | Done (`7de52be`) | [`M5-plan.md`](M5-plan.md) | Hybrid memory, relationships, influence, decision JSONL, viewer legend + per-kind meshes |
 | **M6** | Done (tag `M6`, `46c75e0`) | [`M6-plan.md`](M6-plan.md) | imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
-| **M7** | **Planned — next** | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
+| **M7** | Done | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
 | M8+ | Not started | listed at the bottom of `M7-plan.md` | Incentive inject / A/B |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -44,7 +44,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 9 | `M4-plan.md` | Milestone 4 (done): public board, adopted rules, food-economy report |
 | 10 | `M5-plan.md` | Milestone 5 (done): hybrid memory, relationships, influence, decision logs, viewer legend |
 | 11 | `M6-plan.md` | Milestone 6 (done): imgui UI, agent-POV fog-of-war, viewer commands |
-| 12 | `M7-plan.md` | Milestone 7 (next): TCP + WebSocket attachable clients |
+| 12 | `M7-plan.md` | Milestone 7 (done): TCP + WebSocket attachable clients |
 
 ---
 
@@ -53,7 +53,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M7-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M7-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M7-plan.md`. M7 is implemented; next is M8 (incentive inject) unless you are fixing M7.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -81,15 +81,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M6 are done (tag `M6`, commit `46c75e0`). Next work is M7.
+M1–M7 are done. Next work is M8 (incentive schedules + load-checkpoint-and-inject). There is not yet an `M8-plan.md`.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M7-plan.md.
-Implement M7 as specified there (postcard protocol, TCP + WebSocket,
-sim-cli --listen, viewer --connect, hash-neutral read-only attach).
-Do not add incentive effects, TLS/wss, timeline scrubbing, or world-mutation
-commands. Do not re-open settled design decisions unless M7-plan.md contradicts
-a spec on timing — in that case follow M7-plan.md.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M7-plan.md (out of scope).
+Write docs/M8-plan.md for incentive TOML, apply at tick 0 or on load,
+viewer /inject, and IncentiveSeed — without changing the M7 wire codec
+beyond implementing InjectIncentive.
 ```
 
 ---

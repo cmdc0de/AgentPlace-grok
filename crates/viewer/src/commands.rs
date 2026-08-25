@@ -1,9 +1,8 @@
 //! Closed slash-command set for the viewer console. No GPU / imgui types.
 
+use shared::protocol::ControlVerb;
 use sim_bevy::{step_once, SimState};
-use sim_core::{
-    summary_markdown, write_report, write_run_checkpoint, AgentId, ExperimentConfig,
-};
+use sim_core::{summary_markdown, write_report, write_run_checkpoint, AgentId, ExperimentConfig};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +119,18 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
     }
 }
 
+pub fn remote_control(cmd: &UiCommand) -> Option<ControlVerb> {
+    match cmd {
+        UiCommand::Pause => Some(ControlVerb::Pause),
+        UiCommand::Play => Some(ControlVerb::Play),
+        UiCommand::Step { n } => Some(ControlVerb::Step(*n)),
+        UiCommand::Save { .. } => Some(ControlVerb::Save),
+        UiCommand::Report { .. } => Some(ControlVerb::Report),
+        UiCommand::Summarize => Some(ControlVerb::Summarize),
+        _ => None,
+    }
+}
+
 pub fn run_command(
     cmd: UiCommand,
     state: &mut SimState,
@@ -128,18 +139,33 @@ pub fn run_command(
 ) -> Vec<String> {
     match cmd {
         UiCommand::Help => vec![help_text().into()],
-        UiCommand::Report { dir } => match write_report_cmd(&state.sim, dir.as_deref()) {
-            Ok(p) => vec![format!("report={}", p.display())],
-            Err(e) => vec![format!("report error: {e}")],
-        },
-        UiCommand::Summarize => match summary_markdown(&state.sim) {
-            Ok(s) => vec![s],
-            Err(e) => vec![format!("summarize error: {e}")],
-        },
-        UiCommand::Save { path } => match save_cmd(&state.sim, path.as_deref()) {
-            Ok(p) => vec![format!("saved {}", p.display())],
-            Err(e) => vec![format!("save error: {e}")],
-        },
+        UiCommand::Report { dir } => {
+            if state.remote {
+                return vec!["report sent".into()];
+            }
+            match write_report_cmd(&state.sim, dir.as_deref()) {
+                Ok(p) => vec![format!("report={}", p.display())],
+                Err(e) => vec![format!("report error: {e}")],
+            }
+        }
+        UiCommand::Summarize => {
+            if state.remote {
+                return vec!["summarize sent".into()];
+            }
+            match summary_markdown(&state.sim) {
+                Ok(s) => vec![s],
+                Err(e) => vec![format!("summarize error: {e}")],
+            }
+        }
+        UiCommand::Save { path } => {
+            if state.remote {
+                return vec!["save sent".into()];
+            }
+            match save_cmd(&state.sim, path.as_deref()) {
+                Ok(p) => vec![format!("saved {}", p.display())],
+                Err(e) => vec![format!("save error: {e}")],
+            }
+        }
         UiCommand::Follow { id: None } => {
             state.follow = None;
             vec!["follow off".into()]
@@ -155,13 +181,24 @@ pub fn run_command(
         }
         UiCommand::Pause => {
             state.paused = true;
-            vec!["paused".into()]
+            if state.remote {
+                vec!["pause sent".into()]
+            } else {
+                vec!["paused".into()]
+            }
         }
         UiCommand::Play => {
             state.paused = false;
-            vec!["playing".into()]
+            if state.remote {
+                vec!["play sent".into()]
+            } else {
+                vec!["playing".into()]
+            }
         }
         UiCommand::Step { n } => {
+            if state.remote {
+                return vec![format!("step {n} sent")];
+            }
             for _ in 0..n {
                 step_once(state);
             }
@@ -210,10 +247,7 @@ fn write_report_cmd(
     Ok(md)
 }
 
-fn save_cmd(
-    sim: &sim_core::Simulation,
-    path: Option<&str>,
-) -> Result<PathBuf, sim_core::SimError> {
+fn save_cmd(sim: &sim_core::Simulation, path: Option<&str>) -> Result<PathBuf, sim_core::SimError> {
     if let Some(p) = path {
         let p = Path::new(p);
         sim.save_checkpoint(p)?;

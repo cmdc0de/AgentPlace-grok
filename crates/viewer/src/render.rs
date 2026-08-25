@@ -1,8 +1,5 @@
 use bevy::{
-    asset::RenderAssetUsages,
-    mesh::Indices,
-    prelude::*,
-    render::render_resource::PrimitiveTopology,
+    asset::RenderAssetUsages, mesh::Indices, prelude::*, render::render_resource::PrimitiveTopology,
 };
 use sim_core::World;
 
@@ -19,7 +16,10 @@ pub fn heightmap_mesh(world: &World) -> Mesh {
         for x in 0..w {
             let y = world.height_at(x as u32, z as u32) as f32;
             positions.push([x as f32, y, z as f32]);
-            uvs.push([x as f32 / (w as f32).max(1.0), z as f32 / (h as f32).max(1.0)]);
+            uvs.push([
+                x as f32 / (w as f32).max(1.0),
+                z as f32 / (h as f32).max(1.0),
+            ]);
             if world.is_water(x as u32, z as u32) {
                 colors.push([0.12, 0.34, 0.62, 1.0]);
             } else {

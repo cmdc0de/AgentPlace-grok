@@ -64,6 +64,13 @@ directory = "checkpoints"
 write_markdown_summaries = true
 write_retries = 3
 
+# Overlay only — not part of ExperimentConfig / state_hash. Prefer CLI --listen.
+[network]
+tcp_listen = ""
+ws_listen = ""
+token = ""
+allow_control = false
+
 [observation]
 base_vision_range = 12.0
 base_hearing_range = 18.0

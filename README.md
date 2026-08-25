@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M6** (`docs/M6-plan.md`).
+Deterministic multi-agent simulation. Current slice: **M7** (`docs/M7-plan.md`).
 
 ## Test
 
@@ -51,6 +51,25 @@ cargo run -p viewer -- --config configs/default.toml
 # /report   writes a report under checkpoints/
 # /follow 0 then O   match that agent's Observation in 3D
 cargo run -p viewer -- --load /tmp/m5/${ID}_tick_80.ckpt
+```
+
+Attachable clients (TCP and WebSocket; read-only attach does not change `state_hash`). Token is LAN auth, not TLS (`wss` is later):
+
+```bash
+# terminal A
+cargo run -p sim-cli -- --config configs/default.toml --ticks 100000 \
+  --listen tcp://127.0.0.1:9000 --listen ws://127.0.0.1:9001 --quiet
+
+# terminal B
+cargo run -p viewer -- --connect tcp://127.0.0.1:9000
+# or: cargo run -p viewer -- --connect ws://127.0.0.1:9001
+```
+
+Opt-in remote pause/step/save/report: add `--allow-control` (and optional `--token SECRET` on both sides).
+
+```bash
+cargo test -p shared
+cargo test -p sim-cli --test net
 ```
 
 Optional live LLM (not required for CI):

@@ -1,6 +1,6 @@
 # M7 — Attachable TCP and WebSocket clients
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (this tree; tag after merge)  
 **Depends on:** M6 complete (`docs/M6-plan.md`, git tag `M6`, commit `46c75e0`)  
 **Specs:** `simulation-architecture-spec.md` §4–5 (attachable clients, TCP **and** WebSocket), `deterministic-seeding-design.md` (hash-identical continuation), `medium-priority-specs.md` §4 (client disconnect: core continues), `00-INDEX-AND-HANDOFF.md` (in-process / TCP / WS)
 

@@ -9,3 +9,7 @@ description = "Headless experiment runner"
 [dependencies]
 sim-core = { workspace = true }
 sim-llm = { workspace = true }
+shared = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

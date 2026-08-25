@@ -1,9 +1,11 @@
 //! Shared protocol and transports.
 //!
-//! M1 only defines versioning and a snapshot DTO. TCP / WebSocket backends
-//! land in a later milestone; the module layout is reserved now.
+//! One postcard codec, two sockets (TCP and WebSocket). Blocking I/O, no tokio.
 
 pub const PROTOCOL_VERSION: u16 = 1;
+
+/// Maximum framed payload (snapshot of a 64×64 world is well under this).
+pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SnapshotHeader {
@@ -14,11 +16,11 @@ pub struct SnapshotHeader {
     pub world_height: u32,
 }
 
-pub mod protocol {
-    pub use super::SnapshotHeader;
-    pub use super::PROTOCOL_VERSION;
-}
+pub mod protocol;
+pub mod transport;
 
-pub mod transport {
-    //! `TcpTransport` and `WebSocketTransport` will implement a shared trait here.
-}
+pub use protocol::{
+    decode_frame, encode_frame, read_frame, write_frame, ClientMessage, ControlVerb, ErrorCode,
+    ServerMessage,
+};
+pub use transport::{parse_listen_url, Connection, Listener, TransportError};

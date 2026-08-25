@@ -1,10 +1,12 @@
 mod commands;
+mod net;
 mod render;
 mod ui;
 
 use bevy::prelude::*;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
-use sim_bevy::{SimPlugin, SimState, step_once};
+use shared::protocol::ClientMessage;
+use sim_bevy::{step_once, SimPlugin, SimState};
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::{AgentId, ExperimentConfig, Simulation};
@@ -33,7 +35,9 @@ struct WorldMarker {
 }
 
 fn main() {
-    let plugin = match parse_args() {
+    let parsed = parse_args();
+    let mut net_link = None;
+    let plugin = match parsed {
         ViewerSource::Config(path) => {
             let config = ExperimentConfig::load_path(&path).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
@@ -46,28 +50,39 @@ fn main() {
             });
             SimPlugin::from_simulation(sim)
         }
+        ViewerSource::Connect { url, token } => {
+            let (sim, link) = net::connect(&url, token).unwrap_or_else(|e| {
+                panic!("failed to connect to {url}: {e}");
+            });
+            net_link = Some(link);
+            SimPlugin::from_remote(sim)
+        }
     };
 
     let _ = std::fs::create_dir_all(ui::ui_layout_dir());
 
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "AgentTown viewer".into(),
-                ..default()
-            }),
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "AgentTown viewer".into(),
             ..default()
-        }))
-        .add_plugins(plugin)
-        .add_plugins(bevy_mod_imgui::ImguiPlugin {
-            ini_filename: Some(ui::imgui_ini_path()),
-            ..Default::default()
-        })
-        .init_resource::<UiState>()
-        .add_systems(Startup, setup_scene)
+        }),
+        ..default()
+    }))
+    .add_plugins(plugin)
+    .add_plugins(bevy_mod_imgui::ImguiPlugin {
+        ini_filename: Some(ui::imgui_ini_path()),
+        ..Default::default()
+    })
+    .init_resource::<UiState>();
+    if let Some(link) = net_link {
+        app.insert_resource(link);
+    }
+    app.add_systems(Startup, setup_scene)
         .add_systems(
             Update,
             (
+                net::apply_remote,
                 handle_input,
                 sync_agent_transforms,
                 update_camera,
@@ -84,6 +99,7 @@ fn main() {
 enum ViewerSource {
     Config(PathBuf),
     Checkpoint(PathBuf),
+    Connect { url: String, token: Option<String> },
 }
 
 fn parse_args() -> ViewerSource {
@@ -91,6 +107,8 @@ fn parse_args() -> ViewerSource {
     let mut i = 0;
     let mut config = None;
     let mut load = None;
+    let mut connect = None;
+    let mut token = None;
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
@@ -107,11 +125,27 @@ fn parse_args() -> ViewerSource {
                     continue;
                 }
             }
+            "--connect" => {
+                if let Some(url) = args.get(i + 1) {
+                    connect = Some(url.clone());
+                    i += 2;
+                    continue;
+                }
+            }
+            "--token" => {
+                if let Some(t) = args.get(i + 1) {
+                    token = Some(t.clone());
+                    i += 2;
+                    continue;
+                }
+            }
             _ => {}
         }
         i += 1;
     }
-    if let Some(path) = load {
+    if let Some(url) = connect {
+        ViewerSource::Connect { url, token }
+    } else if let Some(path) = load {
         ViewerSource::Checkpoint(path)
     } else {
         ViewerSource::Config(config.unwrap_or_else(default_config_path))
@@ -314,6 +348,7 @@ fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
+    net: Option<Res<net::NetLink>>,
     mut exit: MessageWriter<AppExit>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
@@ -331,9 +366,29 @@ fn handle_input(
     }
     if keys.just_pressed(KeyCode::Space) {
         state.paused = !state.paused;
+        if state.remote {
+            let verb = if state.paused {
+                shared::protocol::ControlVerb::Pause
+            } else {
+                shared::protocol::ControlVerb::Play
+            };
+            if let Some(net) = net.as_ref() {
+                let _ = net.tx.send(ClientMessage::Control(verb));
+            }
+        }
     }
     if keys.just_pressed(KeyCode::Period) {
-        step_once(&mut state);
+        if state.remote {
+            if let Some(net) = net.as_ref() {
+                let _ = net
+                    .tx
+                    .send(ClientMessage::Control(shared::protocol::ControlVerb::Step(
+                        1,
+                    )));
+            }
+        } else {
+            step_once(&mut state);
+        }
     }
     if keys.just_pressed(KeyCode::KeyL) {
         ui.windows.legend = !ui.windows.legend;
