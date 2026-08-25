@@ -1,6 +1,6 @@
 # M5 — Hybrid memory, relationships, influence, decision logs, and viewer legend
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (`7de52be`).  
 **Depends on:** M4 complete (`docs/M4-plan.md`, commit `6b4cf93`)  
 **Specs:** `memory-goals-incentives-spec.md` §1, `simulation-and-agents-spec.md` §5.2–5.4 and §6, `medium-priority-specs.md` §1, `decision-observation-llm-economy-metrics-spec.md` §6–7 items 4 and 6
 
@@ -126,7 +126,7 @@ HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line
 
 | Later | What |
 |---|---|
-| **M6** | imgui inspectors, agent-POV fog-of-war matching `Observation` (legend/shapes are **M5**, not deferred) |
+| **M6** | [`M6-plan.md`](M6-plan.md) — imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
 | **M7** | TCP / WebSocket (`shared::transport`) |
 | **M8** | Incentive schedules + load-checkpoint-and-inject (`influence_factor_delta`, `relationship_delta`, …) |
 | Later | Weighted-by-status voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, Transfer/Store, death, meta-rules |

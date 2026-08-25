@@ -20,8 +20,9 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M2** | Done | [`M2-plan.md`](M2-plan.md) | Water/vegetation/mineral layers, land-only spawn, versioned checkpoints + Markdown + JSONL, viewer `--load` |
 | **M3** | Done (tag `M3`) | [`M3-plan.md`](M3-plan.md) | Observation, needs, abilities, toxicity, speech, mock + Ollama/xAI action selection |
 | **M4** | Done (`6b4cf93`) | [`M4-plan.md`](M4-plan.md) | Public board, Propose/Support/Oppose, structured adopted rules, food-economy summary report |
-| **M5** | **Planned — next** | [`M5-plan.md`](M5-plan.md) | Hybrid memory, relationships, influence, decision JSONL, viewer legend + per-kind meshes |
-| M6+ | Not started | listed at the bottom of `M5-plan.md` | imgui/POV, TCP/WebSocket, incentives |
+| **M5** | Done (`7de52be`) | [`M5-plan.md`](M5-plan.md) | Hybrid memory, relationships, influence, decision JSONL, viewer legend + per-kind meshes |
+| **M6** | **Planned — next** | [`M6-plan.md`](M6-plan.md) | imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
+| M7+ | Not started | listed at the bottom of `M6-plan.md` | TCP/WebSocket, incentives |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -40,16 +41,17 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
 | 9 | `M4-plan.md` | Milestone 4 (done): public board, adopted rules, food-economy report |
-| 10 | `M5-plan.md` | Milestone 5 (next): hybrid memory, relationships, influence, decision logs, viewer legend |
+| 10 | `M5-plan.md` | Milestone 5 (done): hybrid memory, relationships, influence, decision logs, viewer legend |
+| 11 | `M6-plan.md` | Milestone 6 (next): imgui UI, agent-POV fog-of-war, viewer commands |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M5-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M6-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M5-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M6-plan.md`. Implement the current milestone; do not expand into items it defers.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -77,15 +79,15 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M4 are done (tag `M3`; M4 commit `6b4cf93`). Next work is M5.
+M1–M5 are done (tag `M3`; M5 commit `7de52be`). Next work is M6.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M5-plan.md.
-Implement M5 as specified there (hybrid memory, relationship summaries, millipoint
-influence, decision JSONL, viewer legend + per-kind meshes).
-Do not add incentives, imgui, vote weighting, or TCP/WebSocket. Do not re-open
-settled design decisions unless M5-plan.md contradicts a spec on timing — in that
-case follow M5-plan.md.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M6-plan.md.
+Implement M6 as specified there (imgui legend/help/inspector/logs/board,
+agent-POV fog-of-war matching Observation, slash-command console with /report).
+Do not add incentives, TCP/WebSocket, timeline scrubbing, or world-mutation
+commands. Do not re-open settled design decisions unless M6-plan.md contradicts
+a spec on timing — in that case follow M6-plan.md.
 ```
 
 ---
