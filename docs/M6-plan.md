@@ -1,6 +1,6 @@
 # M6 — imgui research UI, agent-POV fog-of-war, and viewer commands
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (git tag `M6`, commit `46c75e0`).  
 **Depends on:** M5 complete (`docs/M5-plan.md`, commit `7de52be`)  
 **Specs:** `simulation-architecture-spec.md` § GUI / imgui, `decision-observation-llm-economy-metrics-spec.md` § observation (“what the agent sees” = GUI POV), `medium-priority-specs.md` §7 (richer GUI)
 
@@ -61,9 +61,9 @@ No `/set`, `/give`, `/inject`. Those wait for M8.
 
 | Later | What |
 |---|---|
-| **M7** | TCP / WebSocket (`shared::transport`); remote GUI clients |
+| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`); remote GUI clients |
 | **M8** | Incentive schedule editor / load-checkpoint-and-inject |
-| Later | Timeline scrubber, metrics charts, multiple simultaneous GUI clients, browser imgui, vote weighting, live embeddings, world-mutation console |
+| Later | Timeline scrubber, metrics charts, browser imgui, vote weighting, live embeddings, world-mutation console |
 
 ## Key decisions
 

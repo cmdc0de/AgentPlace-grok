@@ -50,8 +50,8 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 |---|---|
 | **M4** | Done — [`M4-plan.md`](M4-plan.md) (public board, Propose/Support/Oppose, structured adopted rules, food-economy report). |
 | **M5** | Done — [`M5-plan.md`](M5-plan.md) (hybrid memory, relationships, influence, decision JSONL, viewer legend). |
-| **M6** | [`M6-plan.md`](M6-plan.md) — imgui research UI, agent-POV fog-of-war matching `Observation`, slash-command console. |
-| **M7** | TCP / WebSocket (`shared::transport`). |
+| **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war matching `Observation`, slash-command console). |
+| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`). |
 | **M8** | Incentive schedules + load-checkpoint-and-inject A/B harness. |
 | Later still | Attack / Flee / death, seasons, complex crafting, shared stockpiles, Transfer/Store, lie detection, dialects. |
 

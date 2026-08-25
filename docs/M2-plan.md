@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M5 are done (tag `M3`; M5 `7de52be`). **Current next slice:** [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, viewer commands). Later milestones are listed at the bottom of that file.
+M3–M6 are done (tag `M6`, `46c75e0`). **Current next slice:** [`M7-plan.md`](M7-plan.md) (attachable TCP and WebSocket clients). Later milestones are listed at the bottom of that file.
 
 ## PR Plan
 

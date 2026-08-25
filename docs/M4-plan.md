@@ -80,9 +80,9 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 
 | Later | What |
 |---|---|
-| **M5** | [`M5-plan.md`](M5-plan.md) — hybrid memory, relationship summaries, influence, decision JSONL, viewer legend + per-kind meshes |
-| **M6** | [`M6-plan.md`](M6-plan.md) — imgui research UI, agent-POV fog-of-war, slash-command console |
-| **M7** | TCP / WebSocket (`shared::transport`) |
+| **M5** | Done — [`M5-plan.md`](M5-plan.md) (hybrid memory, relationship summaries, influence, decision JSONL, viewer legend + per-kind meshes) |
+| **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, slash-command console) |
+| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`) |
 | **M8** | Incentive schedules + load-checkpoint-and-inject |
 | Later | Transfer/Store, shared stockpiles, meta-rules, Attack/Flee/death, dialects, lie detection, weighted-by-status voting |
 

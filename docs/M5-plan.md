@@ -126,8 +126,8 @@ HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line
 
 | Later | What |
 |---|---|
-| **M6** | [`M6-plan.md`](M6-plan.md) — imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
-| **M7** | TCP / WebSocket (`shared::transport`) |
+| **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, slash-command console (`/report`)) |
+| **M7** | [`M7-plan.md`](M7-plan.md) — TCP / WebSocket (`shared::transport`) |
 | **M8** | Incentive schedules + load-checkpoint-and-inject (`influence_factor_delta`, `relationship_delta`, …) |
 | Later | Weighted-by-status voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, Transfer/Store, death, meta-rules |
 
