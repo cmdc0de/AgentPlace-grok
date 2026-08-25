@@ -1,13 +1,16 @@
+mod commands;
 mod render;
+mod ui;
 
 use bevy::prelude::*;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
-use sim_core::observation::{chebyshev, effective_range};
-use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation};
+use sim_core::observation::{self, chebyshev, effective_range};
+use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::env;
 use std::path::{Path, PathBuf};
+use ui::UiState;
 
 const CAPSULE_RADIUS: f32 = 0.28;
 const CAPSULE_LENGTH: f32 = 0.55;
@@ -21,16 +24,13 @@ struct AgentVisual {
 struct FollowCamera;
 
 #[derive(Component)]
-struct HudText;
-
-#[derive(Component)]
-struct LegendText;
-
-#[derive(Component)]
 struct VisionOverlay;
 
-#[derive(Resource)]
-struct LegendOn(bool);
+#[derive(Component)]
+struct WorldMarker {
+    x: u32,
+    y: u32,
+}
 
 fn main() {
     let plugin = match parse_args() {
@@ -48,6 +48,8 @@ fn main() {
         }
     };
 
+    let _ = std::fs::create_dir_all(ui::ui_layout_dir());
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -57,7 +59,11 @@ fn main() {
             ..default()
         }))
         .add_plugins(plugin)
-        .insert_resource(LegendOn(true))
+        .add_plugins(bevy_mod_imgui::ImguiPlugin {
+            ini_filename: Some(ui::imgui_ini_path()),
+            ..Default::default()
+        })
+        .init_resource::<UiState>()
         .add_systems(Startup, setup_scene)
         .add_systems(
             Update,
@@ -65,11 +71,13 @@ fn main() {
                 handle_input,
                 sync_agent_transforms,
                 update_camera,
-                update_hud,
                 update_vision_overlay,
+                update_fog_visibility,
+                ui::imgui_ui,
             )
                 .chain(),
         )
+        .add_systems(Last, ui::persist_ui_on_exit)
         .run();
 }
 
@@ -154,6 +162,8 @@ fn setup_scene(
                     &mut mesh_cache,
                     spec,
                     resource_world_pos(world, x, y, 0.25),
+                    x,
+                    y,
                 );
             }
             if world.crops.contains_key(&(x, y)) {
@@ -164,6 +174,8 @@ fn setup_scene(
                     &mut mesh_cache,
                     markers::marker_crop(),
                     resource_world_pos(world, x, y, 0.22),
+                    x,
+                    y,
                 );
             }
             if world.animal_count_at(x, y) > 0 {
@@ -174,6 +186,8 @@ fn setup_scene(
                     &mut mesh_cache,
                     markers::marker_hare(),
                     resource_world_pos(world, x, y, 0.35),
+                    x,
+                    y,
                 );
             }
             if world.fish_count_at(x, y) > 0 {
@@ -184,6 +198,8 @@ fn setup_scene(
                     &mut mesh_cache,
                     markers::marker_perch(),
                     resource_world_pos(world, x, y, 0.15),
+                    x,
+                    y,
                 );
             }
             if world.has_mineral(x, y) {
@@ -194,6 +210,8 @@ fn setup_scene(
                     &mut mesh_cache,
                     markers::marker_mineral(),
                     resource_world_pos(world, x, y, 0.18),
+                    x,
+                    y,
                 );
             }
         }
@@ -212,6 +230,7 @@ fn setup_scene(
             })),
             Transform::from_translation(agent_world_pos(world, agent.x, agent.y)),
             AgentVisual { id: agent.id },
+            Visibility::default(),
         ));
     }
 
@@ -231,27 +250,6 @@ fn setup_scene(
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 0.7, -0.9)),
     ));
-
-    commands.spawn((
-        Text::new(""),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(40.0),
-            left: Val::Px(12.0),
-            ..default()
-        },
-        LegendText,
-    ));
-    commands.spawn((
-        Text::new("AgentTown"),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(12.0),
-            ..default()
-        },
-        HudText,
-    ));
 }
 
 fn spawn_marker(
@@ -261,6 +259,8 @@ fn spawn_marker(
     cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
     spec: MarkerSpec,
     pos: Vec3,
+    x: u32,
+    y: u32,
 ) {
     let color = {
         let [r, g, b] = markers::rgb_f32(spec.rgb);
@@ -280,6 +280,8 @@ fn spawn_marker(
         Mesh3d(mesh),
         MeshMaterial3d(mat.clone()),
         Transform::from_translation(pos),
+        WorldMarker { x, y },
+        Visibility::default(),
     ));
     if spec.shape == MarkerShape::Mushroom {
         let stem = cache
@@ -290,6 +292,8 @@ fn spawn_marker(
             Mesh3d(stem),
             MeshMaterial3d(mat),
             Transform::from_translation(pos + Vec3::new(0.0, -0.12, 0.0)),
+            WorldMarker { x, y },
+            Visibility::default(),
         ));
     }
 }
@@ -309,8 +313,22 @@ fn mesh_for_shape(shape: MarkerShape) -> Mesh {
 fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<SimState>,
-    mut legend: ResMut<LegendOn>,
+    mut ui: ResMut<UiState>,
+    mut exit: MessageWriter<AppExit>,
 ) {
+    if keys.just_pressed(KeyCode::Escape) {
+        ui.save_layout();
+        exit.write(AppExit::Success);
+        return;
+    }
+    if ui.want_keyboard {
+        return;
+    }
+    if keys.just_pressed(KeyCode::Slash) || keys.just_pressed(KeyCode::Backquote) {
+        ui.windows.console = true;
+        ui.request_console_focus = true;
+        return;
+    }
     if keys.just_pressed(KeyCode::Space) {
         state.paused = !state.paused;
     }
@@ -318,7 +336,19 @@ fn handle_input(
         step_once(&mut state);
     }
     if keys.just_pressed(KeyCode::KeyL) {
-        legend.0 = !legend.0;
+        ui.windows.legend = !ui.windows.legend;
+    }
+    if keys.just_pressed(KeyCode::KeyH) {
+        ui.windows.help = !ui.windows.help;
+    }
+    if keys.just_pressed(KeyCode::KeyI) {
+        ui.windows.inspector = !ui.windows.inspector;
+    }
+    if keys.just_pressed(KeyCode::KeyB) {
+        ui.windows.board = !ui.windows.board;
+    }
+    if keys.just_pressed(KeyCode::KeyO) {
+        ui.fog = !ui.fog;
     }
     if keys.just_pressed(KeyCode::KeyF) {
         state.follow = match state.follow {
@@ -416,135 +446,45 @@ fn update_vision_overlay(
     }
 }
 
-fn item_label(item: ItemId, species: &sim_core::species::SpeciesTables) -> String {
-    match item {
-        ItemId::Food(100) => "hare".into(),
-        ItemId::Food(101) => "perch".into(),
-        ItemId::Food(tag) => species
-            .veg(tag)
-            .map(|s| s.id.clone())
-            .unwrap_or_else(|| format!("food:{tag}")),
-        ItemId::Wood => "wood".into(),
-        ItemId::Fiber => "fiber".into(),
-        ItemId::Stone => "stone".into(),
-        ItemId::Basket => "basket".into(),
-        ItemId::Spear => "spear".into(),
-        ItemId::FishingRod => "fishing_rod".into(),
-    }
-}
-
-fn update_hud(
+fn update_fog_visibility(
     state: Res<SimState>,
-    legend: Res<LegendOn>,
-    mut hud_q: Query<&mut Text, (With<HudText>, Without<LegendText>)>,
-    mut legend_q: Query<&mut Text, (With<LegendText>, Without<HudText>)>,
+    ui: Res<UiState>,
+    mut markers: Query<(&WorldMarker, &mut Visibility), Without<AgentVisual>>,
+    mut agents: Query<(&AgentVisual, &mut Visibility), Without<WorldMarker>>,
 ) {
-    let follow = match state.follow {
-        Some(id) => format!("follow agent {}", id.0),
-        None => "free camera".into(),
-    };
-    let paused = if state.paused { "paused" } else { "running" };
-    let hash = state.sim.state_hash().to_string();
-    let short = if hash.len() >= 12 { &hash[..12] } else { &hash };
-    let needs = if let Some(id) = state.follow {
-        state.sim.agents.get(&id).map(|a| {
-            let known = a
-                .memory
-                .iter()
-                .filter(|m| m.species_tag != 0)
-                .map(|m| m.species_tag)
-                .collect::<std::collections::BTreeSet<_>>()
-                .len();
-            let goals = a
-                .goals
-                .iter()
-                .map(|g| g.text.as_str())
-                .take(2)
-                .collect::<Vec<_>>()
-                .join(" | ");
-            let mean_trust = if a.relationships.is_empty() {
-                0.0
-            } else {
-                a.relationships.values().map(|r| r.trust as f32 / 100.0).sum::<f32>()
-                    / a.relationships.len() as f32
-            };
-            let inv = a
-                .inventory
-                .iter()
-                .map(|(item, n)| {
-                    format!("{}×{n}", item_label(*item, &state.sim.config.world.species))
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-            let branch = state
-                .sim
-                .last_tick_decisions
-                .iter()
-                .rev()
-                .find(|d| d.agent == a.id.0)
-                .map(|d| d.policy_branch.as_str())
-                .unwrap_or("-");
-            format!(
-                "h:{:.0} t:{:.0} e:{:.0} ill:{} veg:{} an:{} fi:{} tox:{} known:{} rel:{} mean_trust:{:.1} branch:{} inv:{} goals:{}",
-                a.needs.hunger as f32 / 100.0,
-                a.needs.thirst as f32 / 100.0,
-                a.needs.energy as f32 / 100.0,
-                a.illness_ticks,
-                a.consumption.vegetation,
-                a.consumption.animal,
-                a.consumption.fish,
-                a.consumption.toxic_events,
-                known,
-                a.relationships.len(),
-                mean_trust,
-                branch,
-                if inv.is_empty() { "-" } else { &inv },
-                if goals.is_empty() { "-" } else { &goals }
-            )
-        })
+    let fog_obs = if ui.fog {
+        state.follow.map(|id| observation::build(&state.sim, id))
     } else {
         None
     };
-    let open_board = state.sim.board.open().count();
-    let last_line = state
-        .sim
-        .events
-        .events
-        .iter()
-        .rev()
-        .find_map(|e| match &e.kind {
-            sim_core::SimEventKind::Speak { text, .. } => Some(format!("said: {text}")),
-            _ => None,
-        })
-        .unwrap_or_default();
-    let text = format!(
-        "tick {}  {}  {}  hash {}\nwater {}  veg {}  mineral {}  animals {}  fish {}  open proposals {}\n{}\n{}\nSpace pause  . step  F follow  L legend  0-9 follow agent",
-        state.sim.tick,
-        paused,
-        follow,
-        short,
-        state.sim.world.water_count(),
-        state.sim.world.vegetation_count(),
-        state.sim.world.mineral_count(),
-        state.sim.world.animal_total(),
-        state.sim.world.fish_total(),
-        open_board,
-        needs.unwrap_or_else(|| "follow an agent for needs".into()),
-        last_line,
-    );
-    for mut hud in &mut hud_q {
-        *hud = Text::new(text.clone());
+    for (marker, mut vis) in &mut markers {
+        let show = match &fog_obs {
+            None => true,
+            Some(obs) => observation::visible_in_observation(obs, marker.x, marker.y),
+        };
+        *vis = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
-    let legend_txt = if legend.0 {
-        let mut lines = vec!["legend".to_string()];
-        lines.extend(markers::legend_entries().into_iter().map(|(name, shape, _)| {
-            format!("{}  {}", markers::shape_name(shape), name)
-        }));
-        lines.join("\n")
-    } else {
-        "legend off (L)".into()
-    };
-    for mut node in &mut legend_q {
-        *node = Text::new(legend_txt.clone());
+    for (visual, mut vis) in &mut agents {
+        let show = match &fog_obs {
+            None => true,
+            Some(obs) => {
+                let pos = state
+                    .sim
+                    .agents
+                    .get(&visual.id)
+                    .map(|a| (a.x, a.y))
+                    .unwrap_or((0, 0));
+                observation::agent_visible_in_observation(obs, visual.id, pos.0, pos.1)
+            }
+        };
+        *vis = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
 }

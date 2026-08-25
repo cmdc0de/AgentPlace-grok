@@ -10,3 +10,6 @@ description = "In-process Bevy 3D viewer"
 sim-core = { workspace = true }
 sim-bevy = { workspace = true }
 bevy = { workspace = true }
+bevy_mod_imgui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

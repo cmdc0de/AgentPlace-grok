@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M5** (`docs/M5-plan.md`).
+Deterministic multi-agent simulation. Current slice: **M6** (`docs/M6-plan.md`).
 
 ## Test
 
@@ -43,10 +43,13 @@ ID=$(basename /tmp/m5/*_tick_40.ckpt _tick_40.ckpt)
 cargo run -p sim-cli -- --load /tmp/m5/${ID}_tick_40.ckpt --ticks 0 --report --out-dir /tmp/m5-report
 ```
 
-3D viewer (legend down the left, `L` to hide; follow `F` / `0`–`9`):
+3D viewer (imgui: `H` help, `L` legend, `I` inspector, `B` board, `/` console, `O` fog; follow `F` / `0`–`9`; `Esc` quit — window layout saved to `checkpoints/`):
 
 ```bash
+cargo test -p viewer
 cargo run -p viewer -- --config configs/default.toml
+# /report   writes a report under checkpoints/
+# /follow 0 then O   match that agent's Observation in 3D
 cargo run -p viewer -- --load /tmp/m5/${ID}_tick_80.ckpt
 ```
 

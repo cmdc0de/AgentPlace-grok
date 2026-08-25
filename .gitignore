@@ -16,3 +16,6 @@ target
 # IDE
 .idea/
 .vscode/
+
+# Local experiment output and viewer layout
+checkpoints/

@@ -31,3 +31,4 @@ postcard = { version = "1", features = ["use-std", "alloc"] }
 serde_json = "1"
 ureq = { version = "2", features = ["json"] }
 sim-llm = { path = "crates/sim-llm" }
+bevy_mod_imgui = "0.10"

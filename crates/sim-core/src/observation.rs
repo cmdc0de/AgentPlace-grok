@@ -398,6 +398,19 @@ pub fn encode_for_hash(obs: &Observation) -> Vec<u8> {
     postcard::to_allocvec(obs).unwrap_or_default()
 }
 
+/// True if cell `(x, y)` appears in this observation's tile list.
+pub fn visible_in_observation(obs: &Observation, x: u32, y: u32) -> bool {
+    obs.tiles.iter().any(|t| t.x == x && t.y == y)
+}
+
+/// True if `id` is the observer or appears (named or as a silhouette) in `obs.agents`.
+pub fn agent_visible_in_observation(obs: &Observation, id: AgentId, x: u32, y: u32) -> bool {
+    if obs.agent_id == id {
+        return true;
+    }
+    obs.agents.iter().any(|a| a.id == Some(id) || (a.id.is_none() && a.x == x && a.y == y))
+}
+
 /// Legal-list matching. `Propose` in the list is a placeholder with empty text.
 pub fn is_legal_choice(legal: &[PrimaryAction], action: &PrimaryAction) -> bool {
     match action {
