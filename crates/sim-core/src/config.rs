@@ -243,6 +243,10 @@ pub struct AgentParams {
     pub archetypes: Vec<AgentArchetype>,
     #[serde(default)]
     pub goals: GoalParams,
+    #[serde(default)]
+    pub memory: MemoryParams,
+    #[serde(default)]
+    pub social: SocialParams,
 }
 
 impl Default for AgentParams {
@@ -256,6 +260,69 @@ impl Default for AgentParams {
             inventory_capacity: default_inv_cap(),
             archetypes: Vec::new(),
             goals: GoalParams::default(),
+            memory: MemoryParams::default(),
+            social: SocialParams::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EvictionPolicy {
+    #[default]
+    ImportanceAndRecency,
+    Fifo,
+    LowestImportance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryParams {
+    #[serde(default = "default_memory")]
+    pub capacity: u32,
+    #[serde(default)]
+    pub eviction_policy: EvictionPolicy,
+    #[serde(default = "default_social_bonus")]
+    pub social_memory_bonus: f64,
+    #[serde(default = "default_true")]
+    pub persistent_relationships: bool,
+    #[serde(default)]
+    pub enable_embeddings: bool,
+    #[serde(default = "default_retrieval_k")]
+    pub retrieval_k: u32,
+}
+
+impl Default for MemoryParams {
+    fn default() -> Self {
+        Self {
+            capacity: default_memory(),
+            eviction_policy: EvictionPolicy::default(),
+            social_memory_bonus: default_social_bonus(),
+            persistent_relationships: true,
+            enable_embeddings: false,
+            retrieval_k: default_retrieval_k(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialParams {
+    #[serde(default = "default_influence")]
+    pub base_influence_factor: f64,
+    #[serde(default = "default_influence_decay")]
+    pub influence_decay: f64,
+    #[serde(default = "default_true")]
+    pub track_relationships: bool,
+    #[serde(default = "default_trust_thresh")]
+    pub trust_support_threshold: f64,
+}
+
+impl Default for SocialParams {
+    fn default() -> Self {
+        Self {
+            base_influence_factor: default_influence(),
+            influence_decay: default_influence_decay(),
+            track_relationships: true,
+            trust_support_threshold: default_trust_thresh(),
         }
     }
 }
@@ -319,6 +386,8 @@ pub struct MetricsParams {
     pub track_consumption: bool,
     #[serde(default = "default_true")]
     pub track_proposal_stats: bool,
+    #[serde(default = "default_true")]
+    pub track_relationship_graph: bool,
 }
 
 impl Default for MetricsParams {
@@ -328,6 +397,7 @@ impl Default for MetricsParams {
             export_csv: true,
             track_consumption: true,
             track_proposal_stats: true,
+            track_relationship_graph: true,
         }
     }
 }
@@ -612,6 +682,21 @@ fn default_prop_life() -> u64 {
 fn default_metrics_every() -> u64 {
     50
 }
+fn default_social_bonus() -> f64 {
+    1.5
+}
+fn default_retrieval_k() -> u32 {
+    8
+}
+fn default_influence() -> f64 {
+    0.3
+}
+fn default_influence_decay() -> f64 {
+    0.01
+}
+fn default_trust_thresh() -> f64 {
+    20.0
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckpointParams {
@@ -717,5 +802,25 @@ impl ExperimentConfig {
     }
     pub fn shout_energy_milli(&self) -> u32 {
         crate::species::f64_to_milli(self.communication.shout_energy_cost)
+    }
+    pub fn memory_capacity(&self) -> u32 {
+        if self.agents.memory.capacity > 0 {
+            self.agents.memory.capacity
+        } else {
+            self.agents.default_memory_capacity
+        }
+    }
+    pub fn social_bonus_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.agents.memory.social_memory_bonus)
+    }
+    pub fn influence_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.agents.social.base_influence_factor)
+    }
+    pub fn influence_decay_milli(&self) -> u32 {
+        crate::species::f64_to_milli(self.agents.social.influence_decay)
+    }
+    pub fn trust_threshold_milli(&self) -> i16 {
+        let v = (self.agents.social.trust_support_threshold * 100.0).round();
+        v.clamp(-10_000.0, 10_000.0) as i16
     }
 }

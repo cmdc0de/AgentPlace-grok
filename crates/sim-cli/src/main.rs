@@ -1,6 +1,6 @@
 use sim_core::{
-    ExperimentConfig, Simulation, append_events_jsonl, experiment_id, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint,
+    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, experiment_id,
+    report_markdown, summary_markdown, write_report, write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -131,11 +131,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut jsonl_path = None;
+    let mut decisions_path = None;
     let mut last_event = sim.events.events.len();
     if let Some(dir) = &out_dir {
         std::fs::create_dir_all(dir)?;
         let id = experiment_id(&sim.config_hash()?);
         jsonl_path = Some(dir.join(format!("{id}_events.jsonl")));
+        decisions_path = Some(dir.join(format!("{id}_decisions.jsonl")));
         if let Some(path) = &jsonl_path {
             append_events_jsonl(path, &sim.events.events)?;
             last_event = sim.events.events.len();
@@ -157,6 +159,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 append_events_jsonl(path, &events[last_event..])?;
                 last_event = events.len();
             }
+        }
+        if let Some(path) = &decisions_path {
+            append_decisions_jsonl(path, &sim.last_tick_decisions)?;
         }
         if let Some(dir) = &out_dir {
             if interval > 0 && sim.tick % interval == 0 {

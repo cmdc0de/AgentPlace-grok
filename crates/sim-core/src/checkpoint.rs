@@ -5,8 +5,10 @@ use crate::board::{Goal, PublicBoard as RichBoard};
 use crate::config::ExperimentConfig;
 use crate::error::SimError;
 use crate::event_log::{EventLog, SimEvent, SimEventKind};
+use crate::memory::MemoryMeta;
 use crate::seeding::RngBank;
 use crate::simulation::Simulation;
+use crate::social::RelationshipSummary;
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -32,6 +34,14 @@ struct BoardBlob {
     board: RichBoard,
     #[serde(default)]
     goals: BTreeMap<u64, Vec<Goal>>,
+    #[serde(default)]
+    relationships: BTreeMap<u64, BTreeMap<u64, RelationshipSummary>>,
+    #[serde(default)]
+    memory_meta: BTreeMap<u64, Vec<MemoryMeta>>,
+    #[serde(default)]
+    next_memory_id: BTreeMap<u64, u64>,
+    #[serde(default)]
+    influence: BTreeMap<u64, u32>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -41,6 +51,46 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .agents
             .iter()
             .map(|(id, a)| (id.0, a.goals.clone()))
+            .collect(),
+        relationships: sim
+            .agents
+            .iter()
+            .map(|(id, a)| {
+                (
+                    id.0,
+                    a.relationships
+                        .iter()
+                        .map(|(oid, r)| (oid.0, r.clone()))
+                        .collect(),
+                )
+            })
+            .collect(),
+        memory_meta: sim
+            .agents
+            .iter()
+            .map(|(id, a)| {
+                (
+                    id.0,
+                    a.memory
+                        .iter()
+                        .map(|e| MemoryMeta {
+                            id: e.id,
+                            participants: e.participants.clone(),
+                            valence: e.valence,
+                        })
+                        .collect(),
+                )
+            })
+            .collect(),
+        next_memory_id: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.next_memory_id))
+            .collect(),
+        influence: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.influence_factor))
             .collect(),
     };
     match postcard::to_allocvec(&blob) {
@@ -61,12 +111,56 @@ fn board_from_wire(
     let Ok(bytes) = hex::decode(hex_str) else {
         return RichBoard::default();
     };
-    let Ok(blob) = postcard::from_bytes::<BoardBlob>(&bytes) else {
-        return RichBoard::default();
+    let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
+        Ok(b) => b,
+        Err(_) => {
+            #[derive(Deserialize)]
+            struct BoardBlobM4 {
+                #[serde(default)]
+                board: RichBoard,
+                #[serde(default)]
+                goals: BTreeMap<u64, Vec<Goal>>,
+            }
+            match postcard::from_bytes::<BoardBlobM4>(&bytes) {
+                Ok(old) => BoardBlob {
+                    board: old.board,
+                    goals: old.goals,
+                    ..BoardBlob::default()
+                },
+                Err(_) => return RichBoard::default(),
+            }
+        }
     };
     for (id, goals) in blob.goals {
         if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
             agent.goals = goals;
+        }
+    }
+    for (id, rels) in blob.relationships {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.relationships = rels
+                .into_iter()
+                .map(|(oid, r)| (crate::agent::AgentId(oid), r))
+                .collect();
+        }
+    }
+    for (id, meta) in blob.memory_meta {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            for (entry, m) in agent.memory.iter_mut().zip(meta.into_iter()) {
+                entry.id = m.id;
+                entry.participants = m.participants;
+                entry.valence = m.valence;
+            }
+        }
+    }
+    for (id, nid) in blob.next_memory_id {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.next_memory_id = nid.max(1);
+        }
+    }
+    for (id, inf) in blob.influence {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.influence_factor = inf;
         }
     }
     blob.board
@@ -153,6 +247,15 @@ impl Simulation {
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
         let board = board_from_wire(&body.public_board, &mut agents);
+        let inf = config.influence_milli();
+        for a in agents.values_mut() {
+            if a.influence_factor == 0 {
+                a.influence_factor = inf;
+            }
+            if a.next_memory_id == 0 {
+                a.next_memory_id = 1;
+            }
+        }
         Ok(Self {
             config,
             tick: body.tick,
@@ -166,6 +269,7 @@ impl Simulation {
             chooser: crate::llm::Chooser::Mock,
             replay,
             record_path: None,
+            last_tick_decisions: Vec::new(),
         })
     }
 

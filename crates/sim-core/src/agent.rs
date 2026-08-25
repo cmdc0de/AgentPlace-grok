@@ -119,6 +119,12 @@ pub struct Agent {
     pub goals: Vec<crate::board::Goal>,
     #[serde(default, skip)]
     pub gathers_this_tick: u32,
+    #[serde(default, skip)]
+    pub relationships: std::collections::BTreeMap<AgentId, crate::social::RelationshipSummary>,
+    #[serde(default, skip)]
+    pub next_memory_id: u64,
+    #[serde(default, skip)]
+    pub influence_factor: u32,
 }
 
 impl Default for Needs {
@@ -148,7 +154,33 @@ impl Agent {
             last_warn_tick: 0,
             goals: Vec::new(),
             gathers_this_tick: 0,
+            relationships: BTreeMap::new(),
+            next_memory_id: 1,
+            influence_factor: 0,
         }
+    }
+
+    pub fn remember(
+        &mut self,
+        cap: u32,
+        policy: crate::config::EvictionPolicy,
+        social_bonus: u32,
+        persist: bool,
+        mut entry: crate::memory::MemoryEntry,
+    ) {
+        if entry.id == 0 {
+            entry.id = self.next_memory_id;
+            self.next_memory_id = self.next_memory_id.saturating_add(1);
+        }
+        crate::memory::remember_policy(
+            &mut self.memory,
+            cap,
+            policy,
+            social_bonus,
+            persist,
+            &self.relationships,
+            entry,
+        );
     }
 
     pub fn inventory_count(&self) -> u32 {
@@ -230,6 +262,12 @@ impl Agent {
         hasher.update(self.gathers_this_tick.to_le_bytes());
         for g in &self.goals {
             g.hash_into(hasher);
+        }
+        hasher.update(self.next_memory_id.to_le_bytes());
+        hasher.update(self.influence_factor.to_le_bytes());
+        for (id, rel) in &self.relationships {
+            hasher.update(id.0.to_le_bytes());
+            rel.hash_into(hasher);
         }
         for mem in &self.memory {
             mem.hash_into(hasher);

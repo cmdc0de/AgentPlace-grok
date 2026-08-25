@@ -43,6 +43,20 @@ max_personal_goals = 5
 max_public_goals = 3
 can_adopt_public_goals = true
 
+[agents.memory]
+capacity = 128
+eviction_policy = "importance_and_recency"
+social_memory_bonus = 1.5
+persistent_relationships = true
+enable_embeddings = false
+retrieval_k = 8
+
+[agents.social]
+base_influence_factor = 0.3
+influence_decay = 0.01
+track_relationships = true
+trust_support_threshold = 20.0
+
 [checkpoint]
 auto_interval_ticks = 500
 keep_last_n = 20
@@ -98,3 +112,4 @@ compute_every_n_ticks = 50
 export_csv = true
 track_consumption = true
 track_proposal_stats = true
+track_relationship_graph = true

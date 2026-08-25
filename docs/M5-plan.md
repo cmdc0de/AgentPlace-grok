@@ -120,7 +120,7 @@ M5 locks **shape and colour** so a screenshot is readable:
 | agent | capsule | per-id HSL (existing) |
 | vision overlay | yellow ring (existing) | |
 
-HUD **legend** (Bevy `Text`, not imgui): one line per kind (`sphere  berry_bush`, `capsule herb`, …). Always on; `L` toggles. Followed-agent inventory uses the same names.
+HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line** (`sphere  berry_bush`, `capsule  herb`, …). Always on; `L` toggles. Status HUD sits to the right of it. Followed-agent inventory uses the same names.
 
 ## Out of scope (later)
 
@@ -270,17 +270,38 @@ Live LLM and embeddings are not CI requirements. Full GPU screenshot tests are n
 ## Verification (when M5 is implemented)
 
 ```bash
+# Tests (mock LLM; no network)
 cargo test -p sim-core
+cargo test -p sim-core --test social
+cargo test -p sim-core --test governance
+
+# 80-tick mock run: checkpoints, report, events, decisions
+rm -rf /tmp/m5
 cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
-  --out-dir /tmp/m5 --checkpoint-every 40 --report
-# {id}_events.jsonl and {id}_decisions.jsonl both exist;
-# decisions lines == agents * ticks
-cargo run -p sim-cli -- --load /tmp/m5/<id>_tick_40.ckpt --ticks 40 --llm mock
-# final_hash matches a continuous 80-tick mock run
-cargo run -p sim-cli -- --load /tmp/m5/<id>_tick_40.ckpt --ticks 0 --report
+  --out-dir /tmp/m5 --checkpoint-every 40 --report --llm mock --quiet
+# note final_hash from this run
+
+ID=$(basename /tmp/m5/*_tick_80.ckpt _tick_80.ckpt)
+# 16 agents × 80 ticks = 1280 decision lines with default.toml
+test "$(wc -l < /tmp/m5/${ID}_decisions.jsonl)" -eq 1280
+test -f /tmp/m5/${ID}_events.jsonl
+test -f /tmp/m5/${ID}_tick_80_report.md
+grep -q "relationships:" /tmp/m5/${ID}_tick_80_report.md
+
+# Continuation: load tick 40, run 40 more — same final_hash as a continuous 80-tick run
+cargo run -p sim-cli -- --load /tmp/m5/${ID}_tick_40.ckpt --ticks 40 --llm mock --quiet
+cargo run -p sim-cli -- --config configs/default.toml --ticks 80 --llm mock --quiet
+
+# Report from checkpoint with no extra ticks
+cargo run -p sim-cli -- --load /tmp/m5/${ID}_tick_40.ckpt --ticks 0 \
+  --report --out-dir /tmp/m5-report
+
+# Viewer: L toggles legend, F / 0-9 follow an agent
+cargo run -p viewer -- --config configs/default.toml
+cargo run -p viewer -- --load /tmp/m5/${ID}_tick_80.ckpt
 ```
 
-Report per-agent section lists relationship counts. Viewer follow shows `rel` + `mean_trust` + legend. Same seed ⇒ same hash with relationships on.
+Report per-agent section lists relationship counts. Viewer follow shows `rel` + `mean_trust` + legend. Same seed ⇒ same hash with relationships on. Live LLM (`--llm ollama` / `--llm openai_compatible`) is optional and not a CI requirement.
 
 ## Risks
 

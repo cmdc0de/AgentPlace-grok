@@ -259,6 +259,7 @@ fn mock_proposes_ban_after_toxic_memory() {
                 importance: 95,
                 last_accessed: 0,
                 species_tag: mushroom,
+                ..Default::default()
             });
             a.needs.thirst = sim.config.thirst_max_milli();
             a.needs.hunger = sim.config.hunger_max_milli();

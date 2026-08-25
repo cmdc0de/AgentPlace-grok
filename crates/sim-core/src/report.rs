@@ -48,6 +48,8 @@ pub struct WorldReport {
     pub rejected: u32,
     pub expired: u32,
     pub adopted: Vec<String>,
+    pub mean_trust: f64,
+    pub relationship_pairs: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +68,9 @@ pub struct AgentReport {
     pub authored: Vec<u64>,
     pub supports: Vec<u64>,
     pub opposes: Vec<u64>,
+    pub rel_count: u32,
+    pub mean_trust: f64,
+    pub top_trust: Vec<(u64, i16)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -168,6 +173,24 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
             .filter(|p| p.opposers.contains(&agent.id))
             .map(|p| p.id)
             .collect();
+        let rel_count = agent.relationships.len() as u32;
+        let mean_trust = if agent.relationships.is_empty() {
+            0.0
+        } else {
+            agent
+                .relationships
+                .values()
+                .map(|r| r.trust as f64 / 100.0)
+                .sum::<f64>()
+                / f64::from(rel_count)
+        };
+        let mut top_trust: Vec<(u64, i16)> = agent
+            .relationships
+            .iter()
+            .map(|(oid, r)| (oid.0, r.trust))
+            .collect();
+        top_trust.sort_by_key(|(_, t)| -i32::from(t.abs()));
+        top_trust.truncate(3);
         agents.push(AgentReport {
             id: agent.id.0,
             consumed_vegetation: agent.consumption.vegetation,
@@ -183,6 +206,9 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
             authored,
             supports,
             opposes,
+            rel_count,
+            mean_trust,
+            top_trust,
         });
     }
 
@@ -212,6 +238,16 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
         accepted: sim.board.accepted_count,
         rejected: sim.board.rejected_count,
         expired: sim.board.expired_count,
+        mean_trust: if agents.is_empty() {
+            0.0
+        } else {
+            agents.iter().map(|a| a.mean_trust).sum::<f64>() / agents.len() as f64
+        },
+        relationship_pairs: sim
+            .agents
+            .values()
+            .map(|a| a.relationships.len() as u32)
+            .sum(),
         adopted: sim
             .board
             .adopted
@@ -364,7 +400,8 @@ pub fn report_markdown(report: &SummaryReport) -> String {
          - available animals: {}\n\
          - available fish: {}\n\
          - unharvested crops: {}\n\
-         - board: open {} accepted {} rejected {} expired {}\n",
+         - board: open {} accepted {} rejected {} expired {}\n\
+         - relationships: pairs {} mean trust {:.1}\n",
         report.experiment_id,
         report.tick,
         w.consumed_vegetation,
@@ -384,6 +421,8 @@ pub fn report_markdown(report: &SummaryReport) -> String {
         w.accepted,
         w.rejected,
         w.expired,
+        w.relationship_pairs,
+        w.mean_trust,
     );
     out.push_str("\n### Edible vegetation (objective)\n\n");
     if w.veg.is_empty() {
@@ -426,7 +465,8 @@ pub fn report_markdown(report: &SummaryReport) -> String {
              - goals: {}\n\
              - authored: {}\n\
              - supports: {}\n\
-             - opposes: {}\n",
+             - opposes: {}\n\
+             - relationships: {} mean trust {:.1} top: {}\n",
             a.id,
             a.consumed_vegetation,
             a.consumed_animal,
@@ -464,6 +504,17 @@ pub fn report_markdown(report: &SummaryReport) -> String {
             fmt_ids(&a.authored),
             fmt_ids(&a.supports),
             fmt_ids(&a.opposes),
+            a.rel_count,
+            a.mean_trust,
+            if a.top_trust.is_empty() {
+                "(none)".into()
+            } else {
+                a.top_trust
+                    .iter()
+                    .map(|(id, t)| format!("#{id} {:.1}", *t as f64 / 100.0))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            },
         ));
     }
     out

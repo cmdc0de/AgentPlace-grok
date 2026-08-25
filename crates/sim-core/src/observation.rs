@@ -48,6 +48,8 @@ pub struct Observation {
     pub board: Vec<ProposalView>,
     #[serde(default)]
     pub goals: Vec<crate::board::Goal>,
+    #[serde(default)]
+    pub relationships: Vec<crate::social::RelationView>,
     pub legal: Vec<PrimaryAction>,
 }
 
@@ -140,6 +142,20 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
     let heard = heard_last_tick(sim, agent, hear, ident);
     let legal = legal_actions(sim, agent);
     let board = board_view(sim, ident, agent);
+    let relationships = agents
+        .iter()
+        .filter_map(|v| {
+            let oid = v.id?;
+            let row = agent.relationships.get(&oid)?;
+            Some(crate::social::RelationView {
+                id: oid,
+                trust: row.trust,
+                affinity: row.affinity,
+                respect: row.respect,
+                fear: row.fear,
+            })
+        })
+        .collect();
     Observation {
         agent_id: id,
         x: agent.x,
@@ -152,6 +168,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         heard,
         board,
         goals: agent.goals.clone(),
+        relationships,
         legal,
     }
 }

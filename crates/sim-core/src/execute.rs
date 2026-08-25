@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{MemoryEntry, MemoryKind, knows_toxin, remember};
+use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
 use crate::observation::neighbors4;
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -297,7 +297,10 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         return;
     };
     let hunger_max = sim.config.hunger_max_milli();
-    let cap = sim.config.agents.default_memory_capacity;
+    let cap = sim.config.memory_capacity();
+    let policy = sim.config.agents.memory.eviction_policy;
+    let bonus = sim.config.social_bonus_milli();
+    let persist = sim.config.agents.memory.persistent_relationships;
     let tick = sim.tick;
 
     let (nutr, toxic, allergic, name, is_veg, is_animal, is_fish) = if tag == 100 {
@@ -367,9 +370,11 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         agent.illness_ticks = agent.illness_ticks.max(ILLNESS_TICKS);
         agent.consumption.toxic_events += 1;
         agent.needs.energy = agent.needs.energy.saturating_sub(800);
-        remember(
-            &mut agent.memory,
+        agent.remember(
             cap,
+            policy,
+            bonus,
+            persist,
             MemoryEntry {
                 tick,
                 kind: MemoryKind::Sickness,
@@ -377,11 +382,16 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
                 importance: 90,
                 last_accessed: tick,
                 species_tag: tag,
+                id: 0,
+                participants: Vec::new(),
+                valence: -80,
             },
         );
-        remember(
-            &mut agent.memory,
+        agent.remember(
             cap,
+            policy,
+            bonus,
+            persist,
             MemoryEntry {
                 tick,
                 kind: MemoryKind::ToxinFact,
@@ -389,6 +399,9 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
                 importance: 95,
                 last_accessed: tick,
                 species_tag: tag,
+                id: 0,
+                participants: Vec::new(),
+                valence: -90,
             },
         );
     }
@@ -621,26 +634,32 @@ fn propose(
         opposers: std::collections::BTreeSet::new(),
         status: crate::board::ProposalStatus::Open,
     });
-    let mem_cap = sim.config.agents.default_memory_capacity;
     let tick = sim.tick;
-    if let Some(a) = sim.agents.get_mut(&id) {
-        remember(
-            &mut a.memory,
-            mem_cap,
-            MemoryEntry {
-                tick,
-                kind: MemoryKind::Proposal,
-                text: format!("proposed #{pid}: {text}"),
-                importance: 70,
-                last_accessed: tick,
-                species_tag: 0,
-            },
-        );
-    }
+    remember_agent(
+        sim,
+        id,
+        MemoryEntry {
+            tick,
+            kind: MemoryKind::Proposal,
+            text: format!("proposed #{pid}: {text}"),
+            importance: 70,
+            last_accessed: tick,
+            species_tag: 0,
+            id: 0,
+            participants: Vec::new(),
+            valence: 0,
+        },
+    );
     push(sim, id, SimEventKind::Propose { proposal_id: pid });
 }
 
 fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
+    let author = sim
+        .board
+        .proposals
+        .iter()
+        .find(|p| p.id == proposal_id && p.status == crate::board::ProposalStatus::Open)
+        .map(|p| p.author);
     let ok = if let Some(p) = sim
         .board
         .proposals
@@ -662,24 +681,82 @@ fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let mem_cap = sim.config.agents.default_memory_capacity;
     let tick = sim.tick;
-    if let Some(a) = sim.agents.get_mut(&id) {
-        remember(
-            &mut a.memory,
-            mem_cap,
-            MemoryEntry {
-                tick,
-                kind: MemoryKind::Proposal,
-                text: format!(
-                    "{} #{proposal_id}",
-                    if support { "supported" } else { "opposed" }
-                ),
-                importance: 60,
-                last_accessed: tick,
-                species_tag: 0,
-            },
-        );
+    let mut mid = 0u64;
+    remember_agent(
+        sim,
+        id,
+        MemoryEntry {
+            tick,
+            kind: MemoryKind::Interaction,
+            text: format!(
+                "{} #{proposal_id}",
+                if support { "supported" } else { "opposed" }
+            ),
+            importance: 60,
+            last_accessed: tick,
+            species_tag: 0,
+            id: 0,
+            participants: author.into_iter().collect(),
+            valence: if support { 50 } else { -50 },
+        },
+    );
+    if let Some(a) = sim.agents.get(&id) {
+        mid = a.memory.last().map(|e| e.id).unwrap_or(0);
+    }
+    if sim.config.agents.social.track_relationships {
+        if let Some(author) = author {
+            if author != id {
+                let (fwd, back) = if support {
+                    (crate::social::SUPPORT, crate::social::SUPPORT_BACK)
+                } else {
+                    (crate::social::OPPOSE, crate::social::OPPOSE_BACK)
+                };
+                if let Some(a) = sim.agents.get_mut(&id) {
+                    crate::social::apply_delta(
+                        &mut a.relationships,
+                        author,
+                        tick,
+                        fwd.0,
+                        fwd.1,
+                        fwd.2,
+                        fwd.3,
+                        Some(mid).filter(|x| *x != 0),
+                    );
+                }
+                remember_agent(
+                    sim,
+                    author,
+                    MemoryEntry {
+                        tick,
+                        kind: MemoryKind::Interaction,
+                        text: format!(
+                            "was {} on #{proposal_id} by {}",
+                            if support { "supported" } else { "opposed" },
+                            id.0
+                        ),
+                        importance: 55,
+                        last_accessed: tick,
+                        species_tag: 0,
+                        id: 0,
+                        participants: vec![id],
+                        valence: if support { 40 } else { -40 },
+                    },
+                );
+                if let Some(a) = sim.agents.get_mut(&author) {
+                    crate::social::apply_delta(
+                        &mut a.relationships,
+                        id,
+                        tick,
+                        back.0,
+                        back.1,
+                        back.2,
+                        back.3,
+                        None,
+                    );
+                }
+            }
+        }
     }
     if support {
         push(sim, id, SimEventKind::Support { proposal_id });
@@ -689,21 +766,31 @@ fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
 }
 
 fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) {
-    let cap = sim.config.agents.default_memory_capacity;
     let tick = sim.tick;
+    remember_agent(
+        sim,
+        id,
+        MemoryEntry {
+            tick,
+            kind: MemoryKind::Observation,
+            text: format!("saw species {species} at ({x},{y})"),
+            importance: 40,
+            last_accessed: tick,
+            species_tag: species,
+            id: 0,
+            participants: Vec::new(),
+            valence: 0,
+        },
+    );
+}
+
+pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, entry: MemoryEntry) {
+    let cap = sim.config.memory_capacity();
+    let policy = sim.config.agents.memory.eviction_policy;
+    let bonus = sim.config.social_bonus_milli();
+    let persist = sim.config.agents.memory.persistent_relationships;
     if let Some(a) = sim.agents.get_mut(&id) {
-        remember(
-            &mut a.memory,
-            cap,
-            MemoryEntry {
-                tick,
-                kind: MemoryKind::Observation,
-                text: format!("saw species {species} at ({x},{y})"),
-                importance: 40,
-                last_accessed: tick,
-                species_tag: species,
-            },
-        );
+        a.remember(cap, policy, bonus, persist, entry);
     }
 }
 
@@ -712,41 +799,87 @@ pub fn apply_heard_memories(
     id: AgentId,
     heard: &[crate::observation::HeardSpeech],
 ) {
-    let cap = sim.config.agents.default_memory_capacity;
     let tick = sim.tick;
     let species = sim.config.world.species.clone();
-    if let Some(a) = sim.agents.get_mut(&id) {
-        for h in heard {
-            remember(
-                &mut a.memory,
-                cap,
-                MemoryEntry {
-                    tick,
-                    kind: MemoryKind::Utterance,
-                    text: h.text.clone(),
-                    importance: 50,
-                    last_accessed: tick,
-                    species_tag: 0,
-                },
-            );
-            for (i, spec) in species.vegetation.iter().enumerate() {
+    let track = sim.config.agents.social.track_relationships;
+    for h in heard {
+        let parts: Vec<AgentId> = h.speaker.into_iter().collect();
+        let already_knew: Vec<u8> = species
+            .vegetation
+            .iter()
+            .enumerate()
+            .filter_map(|(i, spec)| {
                 let tag = (i + 1) as u8;
                 if h.text.contains(&spec.id)
                     && (h.text.contains("toxic") || h.text.contains("sick"))
-                    && !knows_toxin(&a.memory, tag)
+                    && sim
+                        .agents
+                        .get(&id)
+                        .is_some_and(|a| knows_toxin(&a.memory, tag))
                 {
-                    remember(
-                        &mut a.memory,
-                        cap,
-                        MemoryEntry {
+                    Some(tag)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        remember_agent(
+            sim,
+            id,
+            MemoryEntry {
+                tick,
+                kind: MemoryKind::Utterance,
+                text: h.text.clone(),
+                importance: 50,
+                last_accessed: tick,
+                species_tag: 0,
+                id: 0,
+                participants: parts.clone(),
+                valence: 0,
+            },
+        );
+        for (i, spec) in species.vegetation.iter().enumerate() {
+            let tag = (i + 1) as u8;
+            if h.text.contains(&spec.id)
+                && (h.text.contains("toxic") || h.text.contains("sick"))
+                && sim
+                    .agents
+                    .get(&id)
+                    .is_some_and(|a| !knows_toxin(&a.memory, tag))
+            {
+                remember_agent(
+                    sim,
+                    id,
+                    MemoryEntry {
+                        tick,
+                        kind: MemoryKind::ToxinFact,
+                        text: format!("{} is toxic", spec.id),
+                        importance: 90,
+                        last_accessed: tick,
+                        species_tag: tag,
+                        id: 0,
+                        participants: parts.clone(),
+                        valence: -40,
+                    },
+                );
+            }
+        }
+        if track {
+            if let Some(speaker) = h.speaker {
+                if already_knew.iter().any(|_| true) {
+                    if let Some(a) = sim.agents.get_mut(&id) {
+                        let d = crate::social::TOXIN_CONFIRM;
+                        crate::social::apply_delta(
+                            &mut a.relationships,
+                            speaker,
                             tick,
-                            kind: MemoryKind::ToxinFact,
-                            text: format!("{} is toxic", spec.id),
-                            importance: 90,
-                            last_accessed: tick,
-                            species_tag: tag,
-                        },
-                    );
+                            d.0,
+                            d.1,
+                            d.2,
+                            d.3,
+                            None,
+                        );
+                    }
                 }
             }
         }

@@ -1,7 +1,7 @@
 use sim_core::event_log::SimEventKind;
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::species::Toxicity;
-use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation, CHECKPOINT_FORMAT_VERSION};
+use sim_core::{AgentId, CHECKPOINT_FORMAT_VERSION, ExperimentConfig, ItemId, Simulation};
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -39,9 +39,11 @@ fn drink_raises_thirst() {
         "thirst should recover after drink, got {}",
         a.needs.thirst
     );
-    assert!(sim.events.events.iter().any(|e| {
-        e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait)
-    }));
+    assert!(
+        sim.events.events.iter().any(|e| {
+            e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait)
+        })
+    );
 }
 
 #[test]
@@ -160,6 +162,7 @@ fn overlong_speech_is_truncated() {
             importance: 90,
             last_accessed: 0,
             species_tag: 3,
+            ..Default::default()
         });
         a.last_warn_tick = 0;
     }
@@ -214,16 +217,18 @@ fn wait_chooser_does_not_speak() {
     let mut sim = Simulation::new(tiny_config(15)).unwrap();
     sim.chooser = sim_core::Chooser::Wait;
     sim.run_ticks(8);
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .all(|e| !matches!(e.kind, SimEventKind::Speak { .. })));
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .any(|e| matches!(e.kind, SimEventKind::LlmWait)));
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .all(|e| !matches!(e.kind, SimEventKind::Speak { .. }))
+    );
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .any(|e| matches!(e.kind, SimEventKind::LlmWait))
+    );
 }
 
 #[test]
@@ -253,8 +258,20 @@ fn craft_failure_keeps_ingredients() {
         sim.events.events.last().map(|e| &e.kind),
         Some(SimEventKind::Craft { success: false, .. })
     ) {
-        assert_eq!(a.inventory.get(&sim_core::ItemId::Wood).copied().unwrap_or(0), 1);
-        assert_eq!(a.inventory.get(&sim_core::ItemId::Stone).copied().unwrap_or(0), 1);
+        assert_eq!(
+            a.inventory
+                .get(&sim_core::ItemId::Wood)
+                .copied()
+                .unwrap_or(0),
+            1
+        );
+        assert_eq!(
+            a.inventory
+                .get(&sim_core::ItemId::Stone)
+                .copied()
+                .unwrap_or(0),
+            1
+        );
     }
 }
 

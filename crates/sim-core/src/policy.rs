@@ -1,11 +1,13 @@
 use crate::action::{ChosenAction, PrimaryAction, Speak, SpeakTarget};
-use crate::agent::ItemId;
+use crate::agent::{AgentId, ItemId};
 use crate::memory::knows_toxin;
 use crate::observation::Observation;
+use crate::social::RelationshipSummary;
 use crate::species::SpeciesTables;
 use rand::Rng;
 use rand::seq::IndexedRandom;
 use rand_chacha::ChaCha20Rng;
+use std::collections::BTreeMap;
 
 pub fn mock_choose(
     obs: &Observation,
@@ -22,8 +24,20 @@ pub fn mock_choose(
     warn_cooldown: u64,
     species: &SpeciesTables,
     identified_others: bool,
-) -> ChosenAction {
-    if let Some(gov) = choose_governance(obs, memory, species) {
+    relationships: &BTreeMap<AgentId, RelationshipSummary>,
+    influence: u32,
+    trust_threshold: i16,
+    agreeableness: u8,
+) -> (ChosenAction, &'static str) {
+    if let Some((gov, branch)) = choose_governance(
+        obs,
+        memory,
+        species,
+        relationships,
+        influence,
+        trust_threshold,
+        agreeableness,
+    ) {
         let speak = maybe_warn(
             obs,
             memory,
@@ -33,12 +47,15 @@ pub fn mock_choose(
             species,
             identified_others,
         );
-        return ChosenAction {
-            primary: gov,
-            speak,
-        };
+        return (
+            ChosenAction {
+                primary: gov,
+                speak,
+            },
+            branch,
+        );
     }
-    let primary = choose_primary(
+    let (primary, branch) = choose_primary(
         obs, rng, thirst, hunger, energy, thirst_max, hunger_max, energy_max,
     );
     let speak = maybe_warn(
@@ -50,14 +67,18 @@ pub fn mock_choose(
         species,
         identified_others,
     );
-    ChosenAction { primary, speak }
+    (ChosenAction { primary, speak }, branch)
 }
 
 fn choose_governance(
     obs: &Observation,
     memory: &[crate::memory::MemoryEntry],
     species: &SpeciesTables,
-) -> Option<PrimaryAction> {
+    relationships: &BTreeMap<AgentId, RelationshipSummary>,
+    influence: u32,
+    trust_threshold: i16,
+    agreeableness: u8,
+) -> Option<(PrimaryAction, &'static str)> {
     use crate::board::{ProposalStatus, StructuredRule};
     for (i, spec) in species.vegetation.iter().enumerate() {
         let tag = (i + 1) as u8;
@@ -69,7 +90,10 @@ fn choose_governance(
                 && matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
                 && !p.you_support
         }) {
-            return Some(PrimaryAction::Support { proposal_id: p.id });
+            return Some((
+                PrimaryAction::Support { proposal_id: p.id },
+                "toxin_support",
+            ));
         }
         let already = obs.board.iter().any(|p| {
             matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
@@ -82,10 +106,37 @@ fn choose_governance(
                 .iter()
                 .any(|a| matches!(a, PrimaryAction::Propose { .. }))
         {
-            return Some(PrimaryAction::Propose {
-                text: format!("do not eat {}", spec.id),
-                rule: Some(StructuredRule::BanEatSpecies { species: tag }),
-            });
+            return Some((
+                PrimaryAction::Propose {
+                    text: format!("do not eat {}", spec.id),
+                    rule: Some(StructuredRule::BanEatSpecies { species: tag }),
+                },
+                "toxin_propose",
+            ));
+        }
+    }
+    if influence > 0 && agreeableness >= 20 {
+        for p in &obs.board {
+            if p.status != ProposalStatus::Open || p.you_support {
+                continue;
+            }
+            if !matches!(p.rule, Some(StructuredRule::BanEatSpecies { .. })) {
+                continue;
+            }
+            let Some(author) = p.author else {
+                continue;
+            };
+            let trust = relationships.get(&author).map(|r| r.trust).unwrap_or(0);
+            if trust >= trust_threshold
+                && obs.legal.iter().any(
+                    |a| matches!(a, PrimaryAction::Support { proposal_id } if *proposal_id == p.id),
+                )
+            {
+                return Some((
+                    PrimaryAction::Support { proposal_id: p.id },
+                    "trust_support",
+                ));
+            }
         }
     }
     None
@@ -100,48 +151,48 @@ fn choose_primary(
     thirst_max: u32,
     hunger_max: u32,
     energy_max: u32,
-) -> PrimaryAction {
+) -> (PrimaryAction, &'static str) {
     let thirsty = thirst < thirst_max / 2;
     let hungry = hunger < hunger_max / 2;
     let tired = energy < energy_max / 3;
 
     if thirsty {
         if obs.legal.iter().any(|a| matches!(a, PrimaryAction::Drink)) {
-            return PrimaryAction::Drink;
+            return (PrimaryAction::Drink, "drink");
         }
         if let Some(mv) = move_toward(obs, rng, |t| t.water) {
-            return mv;
+            return (mv, "move");
         }
     }
     if hungry {
         for a in &obs.legal {
             if matches!(a, PrimaryAction::Eat { .. }) {
-                return a.clone();
+                return (a.clone(), "eat");
             }
         }
         for a in &obs.legal {
             if matches!(a, PrimaryAction::Gather { species } if *species != 0) {
-                return a.clone();
+                return (a.clone(), "gather");
             }
         }
         if let Some(PrimaryAction::Hunt) =
             obs.legal.iter().find(|a| matches!(a, PrimaryAction::Hunt))
         {
-            return PrimaryAction::Hunt;
+            return (PrimaryAction::Hunt, "hunt");
         }
         if let Some(PrimaryAction::Fish) =
             obs.legal.iter().find(|a| matches!(a, PrimaryAction::Fish))
         {
-            return PrimaryAction::Fish;
+            return (PrimaryAction::Fish, "fish");
         }
         if let Some(mv) = move_toward(obs, rng, |t| {
             t.vegetation != 0 || t.animals > 0 || t.fish > 0
         }) {
-            return mv;
+            return (mv, "move");
         }
     }
     if tired && obs.legal.iter().any(|a| matches!(a, PrimaryAction::Rest)) {
-        return PrimaryAction::Rest;
+        return (PrimaryAction::Rest, "rest");
     }
     let moves: Vec<_> = obs
         .legal
@@ -150,9 +201,9 @@ fn choose_primary(
         .cloned()
         .collect();
     if !moves.is_empty() && rng.random_bool(0.6) {
-        return moves.choose(rng).unwrap().clone();
+        return (moves.choose(rng).unwrap().clone(), "move");
     }
-    PrimaryAction::Wait
+    (PrimaryAction::Wait, "wait")
 }
 
 fn move_toward(

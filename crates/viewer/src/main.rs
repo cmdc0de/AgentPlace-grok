@@ -3,8 +3,9 @@ mod render;
 use bevy::prelude::*;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use sim_bevy::{SimPlugin, SimState, step_once};
+use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{chebyshev, effective_range};
-use sim_core::{AgentId, ExperimentConfig, Simulation};
+use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -23,7 +24,13 @@ struct FollowCamera;
 struct HudText;
 
 #[derive(Component)]
+struct LegendText;
+
+#[derive(Component)]
 struct VisionOverlay;
+
+#[derive(Resource)]
+struct LegendOn(bool);
 
 fn main() {
     let plugin = match parse_args() {
@@ -50,6 +57,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(plugin)
+        .insert_resource(LegendOn(true))
         .add_systems(Startup, setup_scene)
         .add_systems(
             Update,
@@ -133,65 +141,60 @@ fn setup_scene(
         })),
     ));
 
-    let veg_mesh = meshes.add(Cuboid::new(0.35, 0.45, 0.35));
-    let animal_mesh = meshes.add(Cuboid::new(0.22, 0.22, 0.38));
-    let fish_mesh = meshes.add(Cuboid::new(0.18, 0.12, 0.28));
-    let animal_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.72, 0.55, 0.32),
-        perceptual_roughness: 0.7,
-        ..default()
-    });
-    let fish_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.25, 0.45, 0.75),
-        perceptual_roughness: 0.4,
-        ..default()
-    });
-    let mineral_mesh = meshes.add(Cuboid::new(0.32, 0.28, 0.32));
-    let mineral_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.55, 0.52, 0.48),
-        perceptual_roughness: 0.6,
-        ..default()
-    });
+    let mut mesh_cache: std::collections::HashMap<u8, Handle<Mesh>> =
+        std::collections::HashMap::new();
     for y in 0..world.height {
         for x in 0..world.width {
             if world.has_vegetation(x, y) {
-                let tag = world.vegetation_species(x, y);
-                let color = match tag {
-                    3 => Color::srgb(0.75, 0.22, 0.18), // mushroom toxic
-                    4 => Color::srgb(0.45, 0.15, 0.55), // nightshade
-                    5 => Color::srgb(0.32, 0.22, 0.12), // tree
-                    _ => Color::srgb(0.18, 0.62, 0.22),
-                };
-                commands.spawn((
-                    Mesh3d(veg_mesh.clone()),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: color,
-                        perceptual_roughness: 0.8,
-                        ..default()
-                    })),
-                    Transform::from_translation(resource_world_pos(world, x, y, 0.25)),
-                ));
+                let spec = markers::marker_for_veg(world.vegetation_species(x, y));
+                spawn_marker(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    spec,
+                    resource_world_pos(world, x, y, 0.25),
+                );
+            }
+            if world.crops.contains_key(&(x, y)) {
+                spawn_marker(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    markers::marker_crop(),
+                    resource_world_pos(world, x, y, 0.22),
+                );
             }
             if world.animal_count_at(x, y) > 0 {
-                commands.spawn((
-                    Mesh3d(animal_mesh.clone()),
-                    MeshMaterial3d(animal_mat.clone()),
-                    Transform::from_translation(resource_world_pos(world, x, y, 0.35)),
-                ));
+                spawn_marker(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    markers::marker_hare(),
+                    resource_world_pos(world, x, y, 0.35),
+                );
             }
             if world.fish_count_at(x, y) > 0 {
-                commands.spawn((
-                    Mesh3d(fish_mesh.clone()),
-                    MeshMaterial3d(fish_mat.clone()),
-                    Transform::from_translation(resource_world_pos(world, x, y, 0.15)),
-                ));
+                spawn_marker(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    markers::marker_perch(),
+                    resource_world_pos(world, x, y, 0.15),
+                );
             }
             if world.has_mineral(x, y) {
-                commands.spawn((
-                    Mesh3d(mineral_mesh.clone()),
-                    MeshMaterial3d(mineral_mat.clone()),
-                    Transform::from_translation(resource_world_pos(world, x, y, 0.18)),
-                ));
+                spawn_marker(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    markers::marker_mineral(),
+                    resource_world_pos(world, x, y, 0.18),
+                );
             }
         }
     }
@@ -230,6 +233,16 @@ fn setup_scene(
     ));
 
     commands.spawn((
+        Text::new(""),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(40.0),
+            left: Val::Px(12.0),
+            ..default()
+        },
+        LegendText,
+    ));
+    commands.spawn((
         Text::new("AgentTown"),
         Node {
             position_type: PositionType::Absolute,
@@ -241,12 +254,71 @@ fn setup_scene(
     ));
 }
 
-fn handle_input(keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<SimState>) {
+fn spawn_marker(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
+    spec: MarkerSpec,
+    pos: Vec3,
+) {
+    let color = {
+        let [r, g, b] = markers::rgb_f32(spec.rgb);
+        Color::srgb(r, g, b)
+    };
+    let mat = materials.add(StandardMaterial {
+        base_color: color,
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    let key = spec.shape as u8;
+    let mesh = cache
+        .entry(key)
+        .or_insert_with(|| meshes.add(mesh_for_shape(spec.shape)))
+        .clone();
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(mat.clone()),
+        Transform::from_translation(pos),
+    ));
+    if spec.shape == MarkerShape::Mushroom {
+        let stem = cache
+            .entry(200)
+            .or_insert_with(|| meshes.add(Cylinder::new(0.06, 0.22)))
+            .clone();
+        commands.spawn((
+            Mesh3d(stem),
+            MeshMaterial3d(mat),
+            Transform::from_translation(pos + Vec3::new(0.0, -0.12, 0.0)),
+        ));
+    }
+}
+
+fn mesh_for_shape(shape: MarkerShape) -> Mesh {
+    match shape {
+        MarkerShape::Sphere => Sphere::new(0.22).into(),
+        MarkerShape::Capsule => Capsule3d::new(0.08, 0.32).into(),
+        MarkerShape::Cylinder => Cylinder::new(0.12, 0.7).into(),
+        MarkerShape::Cube => Cuboid::new(0.32, 0.28, 0.32).into(),
+        MarkerShape::LongCuboid => Cuboid::new(0.22, 0.22, 0.38).into(),
+        MarkerShape::FlatCuboid => Cuboid::new(0.18, 0.12, 0.28).into(),
+        MarkerShape::Mushroom => Sphere::new(0.2).into(),
+    }
+}
+
+fn handle_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<SimState>,
+    mut legend: ResMut<LegendOn>,
+) {
     if keys.just_pressed(KeyCode::Space) {
         state.paused = !state.paused;
     }
     if keys.just_pressed(KeyCode::Period) {
         step_once(&mut state);
+    }
+    if keys.just_pressed(KeyCode::KeyL) {
+        legend.0 = !legend.0;
     }
     if keys.just_pressed(KeyCode::KeyF) {
         state.follow = match state.follow {
@@ -344,7 +416,29 @@ fn update_vision_overlay(
     }
 }
 
-fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) {
+fn item_label(item: ItemId, species: &sim_core::species::SpeciesTables) -> String {
+    match item {
+        ItemId::Food(100) => "hare".into(),
+        ItemId::Food(101) => "perch".into(),
+        ItemId::Food(tag) => species
+            .veg(tag)
+            .map(|s| s.id.clone())
+            .unwrap_or_else(|| format!("food:{tag}")),
+        ItemId::Wood => "wood".into(),
+        ItemId::Fiber => "fiber".into(),
+        ItemId::Stone => "stone".into(),
+        ItemId::Basket => "basket".into(),
+        ItemId::Spear => "spear".into(),
+        ItemId::FishingRod => "fishing_rod".into(),
+    }
+}
+
+fn update_hud(
+    state: Res<SimState>,
+    legend: Res<LegendOn>,
+    mut hud_q: Query<&mut Text, (With<HudText>, Without<LegendText>)>,
+    mut legend_q: Query<&mut Text, (With<LegendText>, Without<HudText>)>,
+) {
     let follow = match state.follow {
         Some(id) => format!("follow agent {}", id.0),
         None => "free camera".into(),
@@ -368,8 +462,30 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
                 .take(2)
                 .collect::<Vec<_>>()
                 .join(" | ");
+            let mean_trust = if a.relationships.is_empty() {
+                0.0
+            } else {
+                a.relationships.values().map(|r| r.trust as f32 / 100.0).sum::<f32>()
+                    / a.relationships.len() as f32
+            };
+            let inv = a
+                .inventory
+                .iter()
+                .map(|(item, n)| {
+                    format!("{}×{n}", item_label(*item, &state.sim.config.world.species))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            let branch = state
+                .sim
+                .last_tick_decisions
+                .iter()
+                .rev()
+                .find(|d| d.agent == a.id.0)
+                .map(|d| d.policy_branch.as_str())
+                .unwrap_or("-");
             format!(
-                "h:{:.0} t:{:.0} e:{:.0} ill:{} veg:{} an:{} fi:{} tox:{} known:{} goals:{}",
+                "h:{:.0} t:{:.0} e:{:.0} ill:{} veg:{} an:{} fi:{} tox:{} known:{} rel:{} mean_trust:{:.1} branch:{} inv:{} goals:{}",
                 a.needs.hunger as f32 / 100.0,
                 a.needs.thirst as f32 / 100.0,
                 a.needs.energy as f32 / 100.0,
@@ -379,6 +495,10 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
                 a.consumption.fish,
                 a.consumption.toxic_events,
                 known,
+                a.relationships.len(),
+                mean_trust,
+                branch,
+                if inv.is_empty() { "-" } else { &inv },
                 if goals.is_empty() { "-" } else { &goals }
             )
         })
@@ -398,7 +518,7 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
         })
         .unwrap_or_default();
     let text = format!(
-        "tick {}  {}  {}  hash {}\nwater {}  veg {}  mineral {}  animals {}  fish {}  open proposals {}\n{}\n{}\nSpace pause  . step  F follow  0-9 follow agent",
+        "tick {}  {}  {}  hash {}\nwater {}  veg {}  mineral {}  animals {}  fish {}  open proposals {}\n{}\n{}\nSpace pause  . step  F follow  L legend  0-9 follow agent",
         state.sim.tick,
         paused,
         follow,
@@ -412,7 +532,19 @@ fn update_hud(state: Res<SimState>, mut query: Query<&mut Text, With<HudText>>) 
         needs.unwrap_or_else(|| "follow an agent for needs".into()),
         last_line,
     );
-    for mut hud in &mut query {
+    for mut hud in &mut hud_q {
         *hud = Text::new(text.clone());
+    }
+    let legend_txt = if legend.0 {
+        let mut lines = vec!["legend".to_string()];
+        lines.extend(markers::legend_entries().into_iter().map(|(name, shape, _)| {
+            format!("{}  {}", markers::shape_name(shape), name)
+        }));
+        lines.join("\n")
+    } else {
+        "legend off (L)".into()
+    };
+    for mut node in &mut legend_q {
+        *node = Text::new(legend_txt.clone());
     }
 }

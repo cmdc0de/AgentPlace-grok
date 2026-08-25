@@ -2,13 +2,14 @@ use crate::action::{ChosenAction, Speak, SpeakTarget};
 use crate::agent::{Abilities, Agent, AgentId, Needs, Personality};
 use crate::board::{Goal, PublicBoard};
 use crate::config::{ExperimentConfig, SpawnMode};
+use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
 use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
 use crate::execute::{apply_heard_memories, execute_primary};
 use crate::llm::{
     ChooseError, Chooser, ReplayRecord, ReplayTable, chosen_to_json, parse_choice_json, prompt_hash,
 };
-use crate::memory::{MemoryEntry, MemoryKind, remember};
+use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
 use crate::seeding::{RngBank, derive_seed, resolve_seed};
@@ -48,6 +49,7 @@ pub struct Simulation {
     pub chooser: Chooser,
     pub replay: Option<ReplayTable>,
     pub record_path: Option<PathBuf>,
+    pub last_tick_decisions: Vec<DecisionRecord>,
 }
 
 impl Simulation {
@@ -91,6 +93,7 @@ impl Simulation {
             chooser,
             replay,
             record_path,
+            last_tick_decisions: Vec::new(),
         })
     }
 
@@ -103,8 +106,15 @@ impl Simulation {
             return false;
         }
         self.tick += 1;
+        self.last_tick_decisions.clear();
         for a in self.agents.values_mut() {
             a.gathers_this_tick = 0;
+        }
+        if self.config.agents.social.track_relationships {
+            let step = self.config.influence_decay_milli();
+            for a in self.agents.values_mut() {
+                crate::social::decay_map(&mut a.relationships, step);
+            }
         }
         self.world_step();
         let pop = self.agents.len() as u32;
@@ -184,17 +194,37 @@ impl Simulation {
         );
         let hash = prompt_hash(&obs);
         let mut allow_speak = true;
+        let mut chooser_name = "mock";
+        let mut policy_branch;
+        let retrieved_ids: Vec<u64> = {
+            let bonus = self.config.social_bonus_milli();
+            let k = self.config.agents.memory.retrieval_k as usize;
+            self.agents
+                .get(&id)
+                .map(|a| {
+                    crate::memory::retrieve(&a.memory, k, bonus)
+                        .into_iter()
+                        .map(|e| e.id)
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let relation_ids: Vec<u64> = obs.relationships.iter().map(|r| r.id.0).collect();
 
         let mut chosen = if let Some(raw) = self
             .replay
             .as_ref()
             .and_then(|t| t.get(self.tick, id.0).map(|s| s.to_string()))
         {
+            chooser_name = "replay";
+            policy_branch = "replay";
             parse_choice_json(&raw, &obs.legal, &self.config.world.species)
                 .unwrap_or_else(|_| ChosenAction::wait())
         } else {
             match &self.chooser {
                 Chooser::Wait => {
+                    chooser_name = "wait";
+                    policy_branch = "wait";
                     allow_speak = false;
                     self.events.push(SimEvent {
                         tick: self.tick,
@@ -203,27 +233,35 @@ impl Simulation {
                     });
                     ChosenAction::wait()
                 }
-                Chooser::Custom(chooser) => match chooser.choose(call_seed, &obs) {
-                    Ok(c) => c,
-                    Err(ChooseError::Timeout) => {
-                        allow_speak = false;
-                        self.events.push(SimEvent {
-                            tick: self.tick,
-                            agent: id,
-                            kind: SimEventKind::LlmWait,
-                        });
-                        ChosenAction::wait()
+                Chooser::Custom(chooser) => {
+                    chooser_name = "llm";
+                    match chooser.choose(call_seed, &obs) {
+                        Ok(c) => {
+                            policy_branch = "llm";
+                            c
+                        }
+                        Err(ChooseError::Timeout) => {
+                            policy_branch = "llm_wait";
+                            allow_speak = false;
+                            self.events.push(SimEvent {
+                                tick: self.tick,
+                                agent: id,
+                                kind: SimEventKind::LlmWait,
+                            });
+                            ChosenAction::wait()
+                        }
+                        Err(_) => {
+                            policy_branch = "llm_wait";
+                            allow_speak = false;
+                            self.events.push(SimEvent {
+                                tick: self.tick,
+                                agent: id,
+                                kind: SimEventKind::LlmWait,
+                            });
+                            ChosenAction::wait()
+                        }
                     }
-                    Err(_) => {
-                        allow_speak = false;
-                        self.events.push(SimEvent {
-                            tick: self.tick,
-                            agent: id,
-                            kind: SimEventKind::LlmWait,
-                        });
-                        ChosenAction::wait()
-                    }
-                },
+                }
                 Chooser::Mock => {
                     let Some(agent) = self.agents.get(&id) else {
                         return;
@@ -235,8 +273,12 @@ impl Simulation {
                     let energy = agent.needs.energy;
                     let memory = agent.memory.clone();
                     let last_warn = agent.last_warn_tick;
+                    let influence = agent.influence_factor;
+                    let agree = agent.personality.agreeableness;
+                    let rels = agent.relationships.clone();
+                    let thresh = self.config.trust_threshold_milli();
                     let rng = self.rngs.agent_stream(id);
-                    mock_choose(
+                    let (action, branch) = mock_choose(
                         &filtered,
                         rng,
                         thirst,
@@ -251,17 +293,40 @@ impl Simulation {
                         self.config.communication.warn_cooldown_ticks,
                         &self.config.world.species,
                         identified,
-                    )
+                        &rels,
+                        influence,
+                        thresh,
+                        agree,
+                    );
+                    policy_branch = branch;
+                    action
                 }
             }
         };
 
         if !observation::is_legal_choice(&obs.legal, &chosen.primary) {
             chosen.primary = crate::action::PrimaryAction::Wait;
+            if policy_branch != "llm_wait" && chooser_name != "wait" {
+                policy_branch = "wait";
+            }
         }
         if !allow_speak {
             chosen.speak = None;
         }
+
+        self.last_tick_decisions.push(decision_log::record(
+            self.tick,
+            id,
+            chooser_name,
+            policy_branch,
+            call_seed,
+            hash.clone(),
+            retrieved_ids,
+            relation_ids,
+            &obs.legal,
+            &chosen,
+            None,
+        ));
 
         if let Some(path) = &self.record_path {
             let rec = ReplayRecord {
@@ -311,23 +376,25 @@ impl Simulation {
                 a.needs.energy -= cost;
             }
         }
-        let cap = self.config.agents.default_memory_capacity;
         let tick = self.tick;
         if let Some(a) = self.agents.get_mut(&id) {
             a.last_warn_tick = tick;
-            remember(
-                &mut a.memory,
-                cap,
-                MemoryEntry {
-                    tick,
-                    kind: MemoryKind::Utterance,
-                    text: format!("said: {}", speak.text),
-                    importance: 40,
-                    last_accessed: tick,
-                    species_tag: 0,
-                },
-            );
         }
+        crate::execute::remember_agent(
+            self,
+            id,
+            MemoryEntry {
+                tick,
+                kind: MemoryKind::Utterance,
+                text: format!("said: {}", speak.text),
+                importance: 40,
+                last_accessed: tick,
+                species_tag: 0,
+                id: 0,
+                participants: Vec::new(),
+                valence: 0,
+            },
+        );
         let (broadcast, targets) = match speak.to {
             SpeakTarget::Broadcast => (true, Vec::new()),
             SpeakTarget::Directed(ids) => {
@@ -346,6 +413,63 @@ impl Simulation {
                 (false, valid)
             }
         };
+        if self.config.agents.social.track_relationships {
+            let partners: Vec<AgentId> = if broadcast {
+                let hear = crate::observation::effective_range(
+                    self.config
+                        .communication
+                        .base_speech_range
+                        .max(self.config.observation.base_hearing_range),
+                    speaker.personality.perceptiveness,
+                );
+                self.agents
+                    .values()
+                    .filter(|t| t.id != id)
+                    .filter(|t| {
+                        let dist = crate::observation::chebyshev(speaker.x, speaker.y, t.x, t.y);
+                        let ident = crate::observation::effective_range(
+                            self.config.observation.base_agent_identity_range,
+                            t.personality.perceptiveness,
+                        );
+                        dist <= hear && dist <= ident
+                    })
+                    .map(|t| t.id)
+                    .collect()
+            } else {
+                targets.clone()
+            };
+            let (fwd, back) = if shout {
+                (crate::social::SHOUT, crate::social::SHOUT_BACK)
+            } else {
+                (crate::social::SPEAK, crate::social::SPEAK_BACK)
+            };
+            for pid in &partners {
+                if let Some(a) = self.agents.get_mut(&id) {
+                    crate::social::apply_delta(
+                        &mut a.relationships,
+                        *pid,
+                        tick,
+                        fwd.0,
+                        fwd.1,
+                        fwd.2,
+                        fwd.3,
+                        None,
+                    );
+                }
+                if let Some(a) = self.agents.get_mut(pid) {
+                    crate::social::apply_delta(
+                        &mut a.relationships,
+                        id,
+                        tick,
+                        back.0,
+                        back.1,
+                        back.2,
+                        back.3,
+                        None,
+                    );
+                }
+            }
+        }
         self.events.push(SimEvent {
             tick: self.tick,
             agent: id,
@@ -356,6 +480,10 @@ impl Simulation {
                 targets,
             },
         });
+    }
+
+    pub fn apply_speak(&mut self, id: AgentId, speak: Speak) {
+        self.execute_speak(id, speak);
     }
 
     pub fn world_hash(&self) -> StateHash {
@@ -447,6 +575,7 @@ fn spawn_agents(
             );
         }
         sample_body(&mut agent, config, rng);
+        agent.influence_factor = config.influence_milli();
         if config.agents.start_with_basic_needs {
             let mut goals = default_goals();
             let cap = config.agents.goals.max_personal_goals as usize;

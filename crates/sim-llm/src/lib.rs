@@ -163,9 +163,24 @@ fn build_prompt(obs: &Observation) -> String {
             )
         })
         .collect();
+    let rels: Vec<String> = obs
+        .relationships
+        .iter()
+        .map(|r| {
+            format!(
+                "#{} trust={:.1} aff={:.1} resp={:.1} fear={:.1}",
+                r.id.0,
+                r.trust as f64 / 100.0,
+                r.affinity as f64 / 100.0,
+                r.respect as f64 / 100.0,
+                r.fear as f64 / 100.0
+            )
+        })
+        .collect();
     format!(
         "Agent {} at ({}, {}). Vision {}. Goals: [{}]\n\
          Board: [{}]\n\
+         Relationships: [{}]\n\
          Heard: [{}]\n\
          Legal primary actions (you MUST pick one of these):\n{}\n\
          Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose\",\"target\":\"species or item\",\"dx\":0,\"dy\":0,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
@@ -176,6 +191,7 @@ fn build_prompt(obs: &Observation) -> String {
         obs.vision,
         goals.join(" | "),
         board.join(" ; "),
+        rels.join(" ; "),
         heard.join(" | "),
         legal.join("\n"),
     )
