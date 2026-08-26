@@ -85,6 +85,14 @@ pub fn marker_mineral() -> MarkerSpec {
     }
 }
 
+pub fn marker_stockpile() -> MarkerSpec {
+    MarkerSpec {
+        shape: MarkerShape::Cube,
+        rgb: [140, 97, 46],
+        name: "stockpile",
+    }
+}
+
 pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
     vec![
         ("land", MarkerShape::Cube, [56, 107, 41]),
@@ -98,6 +106,7 @@ pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
         ("hare", MarkerShape::LongCuboid, [184, 140, 82]),
         ("perch", MarkerShape::FlatCuboid, [64, 115, 191]),
         ("mineral", MarkerShape::Cube, [140, 133, 122]),
+        ("stockpile", MarkerShape::Cube, [140, 97, 46]),
         ("agent", MarkerShape::Capsule, [180, 80, 160]),
     ]
 }

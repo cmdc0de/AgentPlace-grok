@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M9 are done (tag `M9`). **Current next slice:** [`M10-plan.md`](M10-plan.md) (LLM parse/replay reliability + Transfer/Store containers). Later work is listed at the bottom of that file.
+M3–M10 are done (tag `M10`). Later work is listed at the bottom of [`M10-plan.md`](M10-plan.md).
 
 ## PR Plan
 

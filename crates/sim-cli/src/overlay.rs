@@ -9,6 +9,15 @@ pub struct OverlayFile {
     pub incentives: IncentivesOverlay,
     #[serde(default)]
     pub metrics: MetricsOverlay,
+    #[serde(default)]
+    pub storage: StorageOverlay,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct StorageOverlay {
+    pub slot_cap: Option<u32>,
+    pub weight_cap: Option<f64>,
+    pub haul: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

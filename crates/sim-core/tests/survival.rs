@@ -276,6 +276,24 @@ fn craft_failure_keeps_ingredients() {
 }
 
 #[test]
+fn parse_think_wrapped_json() {
+    let sim = Simulation::new(tiny_config(19)).unwrap();
+    let obs = sim_core::observation::build(&sim, AgentId(0));
+    let choice = sim_core::parse_choice_json(
+        "<think>I should drink</think>\n```json\n{\"action\":\"Wait\"}\n```",
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    assert!(matches!(
+        choice.primary,
+        sim_core::action::PrimaryAction::Wait
+    ));
+    let extracted = sim_core::extract_json_payload("Sure.\n{\"action\":\"Rest\"}");
+    assert!(extracted.contains("Rest"), "{extracted}");
+}
+
+#[test]
 fn parse_illegal_json_waits() {
     let sim = Simulation::new(tiny_config(19)).unwrap();
     let obs = sim_core::observation::build(&sim, AgentId(0));

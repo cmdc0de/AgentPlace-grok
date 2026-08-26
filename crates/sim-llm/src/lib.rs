@@ -5,7 +5,7 @@
 
 use serde::Deserialize;
 use sim_core::action::ChosenAction;
-use sim_core::llm::{ActionChooser, ChooseError, parse_choice_json};
+use sim_core::llm::{ActionChooser, ChooseError, extract_json_payload, parse_choice_json};
 use sim_core::observation::Observation;
 use std::time::Duration;
 
@@ -70,6 +70,10 @@ impl OpenAiCompatClient {
             ],
             "seed": seed,
         });
+        // Nemotron-class thinking models: skip the reasoning channel when the server honors it.
+        if !self.model.contains("grok") {
+            body["think"] = serde_json::json!(false);
+        }
         if self.model.contains("grok") {
             body["response_format"] = serde_json::json!({"type": "json_object"});
         }
@@ -85,12 +89,13 @@ impl OpenAiCompatClient {
             _ => ChooseError::Unreachable,
         })?;
         let parsed: ChatResponse = resp.into_json().map_err(|_| ChooseError::Malformed)?;
-        parsed
+        let msg = parsed
             .choices
             .into_iter()
             .next()
-            .and_then(|c| c.message.content)
-            .ok_or(ChooseError::Malformed)
+            .map(|c| c.message)
+            .ok_or(ChooseError::Malformed)?;
+        payload_from_message(&msg)
     }
 }
 
@@ -107,10 +112,29 @@ struct Choice {
 #[derive(Deserialize, Default)]
 struct Msg {
     content: Option<String>,
+    #[serde(default)]
+    reasoning: Option<String>,
+}
+
+fn payload_from_message(msg: &Msg) -> Result<String, ChooseError> {
+    for candidate in [msg.content.as_deref(), msg.reasoning.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        let extracted = extract_json_payload(candidate);
+        if extracted.starts_with('{') {
+            return Ok(extracted);
+        }
+    }
+    Err(ChooseError::Malformed)
 }
 
 impl ActionChooser for OpenAiCompatClient {
-    fn choose(&self, call_seed: u64, obs: &Observation) -> Result<ChosenAction, ChooseError> {
+    fn choose(
+        &self,
+        call_seed: u64,
+        obs: &Observation,
+    ) -> Result<(ChosenAction, String), ChooseError> {
         let prompt = build_prompt(obs, &self.species);
         let mut temp = self.temperature;
         let mut last = ChooseError::Malformed;
@@ -118,7 +142,9 @@ impl ActionChooser for OpenAiCompatClient {
         for i in 0..attempts {
             match self.post_once(call_seed, &prompt, temp) {
                 Ok(text) => {
-                    return parse_choice_json(&text, &obs.legal, &self.species);
+                    let payload = extract_json_payload(&text);
+                    let choice = parse_choice_json(&payload, &obs.legal, &self.species)?;
+                    return Ok((choice, payload));
                 }
                 Err(ChooseError::Timeout) => return Err(ChooseError::Timeout),
                 Err(e) => {
@@ -222,8 +248,8 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
          Relationships: [{}]\n\
          Heard: [{}]\n\
          Legal primary actions (you MUST pick one of these):\n{}\n\
-         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose\",\"target\":\"species or item\",\"dx\":0,\"dy\":0,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
-         Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent. Drink if thirsty and water is legal; Eat if hungry and food is legal.",
+         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose|Transfer|Store|Retrieve\",\"target\":\"species, item, or agent id\",\"dx\":0,\"dy\":0,\"qty\":1,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
+         Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent. Drink if thirsty and water is legal; Eat if hungry and food is legal. Store surplus food; Retrieve from a stockpile when hungry.",
         obs.agent_id.0,
         obs.x,
         obs.y,
@@ -333,5 +359,20 @@ count = 2
         assert!(p.contains("coop_food"), "{p}");
         assert!(p.contains("Drink"), "{p}");
         assert!(p.contains("berry_bush"), "{p}");
+    }
+
+    #[test]
+    fn extract_think_and_reasoning_json() {
+        let wrapped = "<think>planning</think>\n```json\n{\"action\":\"Drink\"}\n```";
+        let p = extract_json_payload(wrapped);
+        assert!(p.contains("Drink"), "{p}");
+        let from_reason = extract_json_payload("Sure.\n{\"action\":\"Wait\"}");
+        assert_eq!(from_reason, "{\"action\":\"Wait\"}");
+        let msg = Msg {
+            content: Some("<think>x</think>".into()),
+            reasoning: Some("{\"action\":\"Rest\"}".into()),
+        };
+        let got = payload_from_message(&msg).unwrap();
+        assert!(got.contains("Rest"), "{got}");
     }
 }

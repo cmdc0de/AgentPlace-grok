@@ -50,3 +50,47 @@ fn replay_fixture_twice_same_hash() {
     assert_eq!(a.state_hash(), b.state_hash());
     let _ = std::fs::remove_file(&rec);
 }
+
+#[test]
+fn wait_sentinel_recording_matches_replay() {
+    use sim_core::Chooser;
+    use sim_core::event_log::SimEventKind;
+
+    let rec = std::env::temp_dir().join(format!(
+        "agentplace-wait-replay-{}-{}.jsonl",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_file(&rec);
+    let mut cfg = tiny(0x92);
+    cfg.llm.replay_file = rec.to_string_lossy().into();
+
+    let mut writer = Simulation::new(cfg.clone()).unwrap();
+    writer.chooser = Chooser::Wait;
+    writer.run_ticks(4);
+    let hash = writer.state_hash();
+    let waits = writer
+        .events
+        .events
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::LlmWait))
+        .count();
+    let text = std::fs::read_to_string(&rec).unwrap();
+    assert!(text.contains("__llm_wait__"), "{text}");
+
+    let mut replayed = Simulation::new(cfg).unwrap();
+    replayed.chooser = Chooser::Mock;
+    replayed.run_ticks(4);
+    assert_eq!(replayed.state_hash(), hash);
+    let waits2 = replayed
+        .events
+        .events
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::LlmWait))
+        .count();
+    assert_eq!(waits2, waits);
+    let _ = std::fs::remove_file(&rec);
+}

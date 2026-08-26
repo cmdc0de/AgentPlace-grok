@@ -34,6 +34,19 @@ pub enum PrimaryAction {
     Oppose {
         proposal_id: u64,
     },
+    Transfer {
+        item: ItemId,
+        qty: u32,
+        to: AgentId,
+    },
+    Store {
+        item: ItemId,
+        qty: u32,
+    },
+    Retrieve {
+        item: ItemId,
+        qty: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

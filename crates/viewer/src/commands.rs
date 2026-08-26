@@ -22,6 +22,7 @@ pub enum UiCommand {
     ToggleLog,
     Tick,
     Inject { path: Option<String> },
+    Give { id: u64, item: String, qty: u32 },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -69,7 +70,8 @@ commands:
   /fog on|off
   /legend  /inspector  /board  /log
   /tick
-  /inject PATH     load incentive TOML (needs --allow-control when remote)"
+  /inject PATH     load incentive TOML (needs --allow-control when remote)
+  /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)"
 }
 
 pub fn parse_command(line: &str) -> Result<UiCommand, String> {
@@ -120,6 +122,20 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
         "inject" => Ok(UiCommand::Inject {
             path: arg.map(|s| s.to_string()),
         }),
+        "give" => {
+            let id_s = arg.ok_or("give requires agent id")?;
+            let id: u64 = id_s.parse().map_err(|_| format!("bad agent id: {id_s}"))?;
+            let item = parts.next().ok_or("give requires item name")?.to_string();
+            let qty = match parts.next() {
+                None => 1,
+                Some(s) => s.parse().map_err(|_| format!("bad qty: {s}"))?,
+            };
+            Ok(UiCommand::Give {
+                id,
+                item,
+                qty: qty.max(1),
+            })
+        }
         other => Err(format!("unknown: /{other}  (try /help)")),
     }
 }
@@ -256,6 +272,18 @@ pub fn run_command(
                 Err(e) => vec![format!("inject read error: {e}")],
             }
         }
+        UiCommand::Give { id, item, qty } => {
+            if state.remote {
+                return vec!["give is in-process only (not on the attach wire)".into()];
+            }
+            let Some(item_id) = sim_core::parse_item(&item, &state.sim.config.world.species) else {
+                return vec![format!("unknown item {item}")];
+            };
+            match state.sim.give_item(sim_core::AgentId(id), item_id, qty) {
+                Ok(n) => vec![format!("gave {n} {item} to agent {id}")],
+                Err(e) => vec![format!("give error: {e}")],
+            }
+        }
     }
 }
 
@@ -309,6 +337,20 @@ mod tests {
         assert!(text.contains("/report"));
         assert!(text.contains("/follow"));
         assert!(text.contains("/inject"));
+        assert!(text.contains("/give"));
+    }
+
+    #[test]
+    fn parse_give() {
+        let cmd = parse_command("/give 0 berry_bush 2").unwrap();
+        assert_eq!(
+            cmd,
+            UiCommand::Give {
+                id: 0,
+                item: "berry_bush".into(),
+                qty: 2
+            }
+        );
     }
 
     #[test]

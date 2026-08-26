@@ -1,4 +1,6 @@
+use crate::agent::ItemId;
 use crate::config::WorldParams;
+use crate::haul::{self, StorageParams};
 use crate::species::Crop;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -6,6 +8,41 @@ use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+
+/// One shared container on a land cell. Empty containers are omitted from the map.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Container {
+    #[serde(default)]
+    pub items: BTreeMap<ItemId, u32>,
+}
+
+impl Container {
+    pub fn slot_count(&self) -> u32 {
+        self.items.values().copied().sum()
+    }
+
+    pub fn weight_milli(&self) -> u32 {
+        self.items
+            .iter()
+            .map(|(item, qty)| haul::item_weight_milli(*item).saturating_mul(*qty))
+            .sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.values().all(|&q| q == 0)
+    }
+
+    pub fn can_add(&self, item: ItemId, qty: u32, params: &StorageParams) -> bool {
+        if qty == 0 {
+            return false;
+        }
+        let slots = self.slot_count().saturating_add(qty);
+        let weight = self
+            .weight_milli()
+            .saturating_add(haul::item_weight_milli(item).saturating_mul(qty));
+        slots <= params.slot_cap && weight <= params.weight_cap_milli
+    }
+}
 
 /// Expected resource cells per 1000 map cells at density 1.0.
 const VEG_PER_MILLE: u32 = 50;
@@ -32,6 +69,9 @@ pub struct World {
     pub fish: Vec<u8>,
     #[serde(default)]
     pub crops: BTreeMap<(u32, u32), Crop>,
+    /// Land-cell shared containers. `#[serde(default)]` so M9 checkpoints load.
+    #[serde(default)]
+    pub stockpiles: BTreeMap<(u32, u32), Container>,
 }
 
 impl World {
@@ -86,6 +126,7 @@ impl World {
             animals,
             fish,
             crops: BTreeMap::new(),
+            stockpiles: BTreeMap::new(),
         }
     }
 
@@ -205,7 +246,65 @@ impl World {
             hasher.update([crop.species_tag]);
             hasher.update(crop.planted_tick.to_le_bytes());
         }
+        for ((x, y), c) in &self.stockpiles {
+            hasher.update(x.to_le_bytes());
+            hasher.update(y.to_le_bytes());
+            for (item, qty) in &c.items {
+                hasher.update(format!("{item:?}").as_bytes());
+                hasher.update(qty.to_le_bytes());
+            }
+        }
         hasher.finalize().into()
+    }
+
+    pub fn has_stockpile(&self, x: u32, y: u32) -> bool {
+        self.stockpiles.get(&(x, y)).is_some_and(|c| !c.is_empty())
+    }
+
+    pub fn stockpile_at(&self, x: u32, y: u32) -> Option<&Container> {
+        self.stockpiles.get(&(x, y)).filter(|c| !c.is_empty())
+    }
+
+    pub fn try_store(
+        &mut self,
+        x: u32,
+        y: u32,
+        item: ItemId,
+        qty: u32,
+        params: &StorageParams,
+    ) -> bool {
+        if qty == 0 || !self.is_land(x, y) {
+            return false;
+        }
+        let entry = self.stockpiles.entry((x, y)).or_default();
+        if !entry.can_add(item, qty, params) {
+            if entry.is_empty() {
+                self.stockpiles.remove(&(x, y));
+            }
+            return false;
+        }
+        *entry.items.entry(item).or_insert(0) += qty;
+        true
+    }
+
+    pub fn try_retrieve(&mut self, x: u32, y: u32, item: ItemId, qty: u32) -> bool {
+        let Some(entry) = self.stockpiles.get_mut(&(x, y)) else {
+            return false;
+        };
+        let Some(have) = entry.items.get_mut(&item) else {
+            return false;
+        };
+        if *have < qty {
+            return false;
+        }
+        *have -= qty;
+        if *have == 0 {
+            entry.items.remove(&item);
+        }
+        if entry.is_empty() {
+            self.stockpiles.remove(&(x, y));
+        }
+        true
     }
 }
 

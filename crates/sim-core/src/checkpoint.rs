@@ -292,6 +292,7 @@ impl Simulation {
             incentive_toml,
             incentive_active,
             last_tick_timing: None,
+            storage: crate::haul::StorageParams::default(),
         })
     }
 
@@ -547,6 +548,12 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         } => format!(
             "{{\"type\":\"died\",\"hunger_zero\":{hunger_zero},\"thirst_zero\":{thirst_zero}}}"
         ),
+        SimEventKind::Transfer { qty, to, .. } => {
+            format!("{{\"type\":\"transfer\",\"qty\":{qty},\"to\":{}}}", to.0)
+        }
+        SimEventKind::Store { qty, .. } => format!("{{\"type\":\"store\",\"qty\":{qty}}}"),
+        SimEventKind::Retrieve { qty, .. } => format!("{{\"type\":\"retrieve\",\"qty\":{qty}}}"),
+        SimEventKind::Give { qty, .. } => format!("{{\"type\":\"give\",\"qty\":{qty}}}"),
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

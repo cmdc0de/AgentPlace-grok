@@ -6,9 +6,11 @@ use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
 use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
 use crate::execute::{apply_heard_memories, execute_primary};
+use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    ChooseError, Chooser, ReplayRecord, ReplayTable, chosen_to_json, parse_choice_json, prompt_hash,
+    Chooser, LLM_WAIT_SENTINEL, ReplayRecord, ReplayTable, chosen_to_json, is_llm_wait_response,
+    parse_choice_json, prompt_hash,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
@@ -58,6 +60,8 @@ pub struct Simulation {
     pub incentive_active: BTreeSet<String>,
     /// Wall-clock of the last tick. Not hashed.
     pub last_tick_timing: Option<TickTiming>,
+    /// Overlay/constants. Not in ExperimentConfig postcard.
+    pub storage: StorageParams,
 }
 
 impl Simulation {
@@ -106,7 +110,29 @@ impl Simulation {
             incentive_toml: String::new(),
             incentive_active: BTreeSet::new(),
             last_tick_timing: None,
+            storage: StorageParams::default(),
         })
+    }
+
+    pub fn give_item(
+        &mut self,
+        id: crate::agent::AgentId,
+        item: crate::agent::ItemId,
+        qty: u32,
+    ) -> Result<u32, SimError> {
+        if qty == 0 {
+            return Err(SimError::Config("give qty must be > 0".into()));
+        }
+        let Some(agent) = self.agents.get_mut(&id) else {
+            return Err(SimError::Config(format!("no agent {}", id.0)));
+        };
+        let added = agent.try_add_item(item, qty);
+        self.events.push(SimEvent {
+            tick: self.tick,
+            agent: id,
+            kind: SimEventKind::Give { item, qty: added },
+        });
+        Ok(added)
     }
 
     pub fn inject_schedule_toml(&mut self, toml: &str) -> Result<(), SimError> {
@@ -283,21 +309,34 @@ impl Simulation {
         let relation_ids: Vec<u64> = obs.relationships.iter().map(|r| r.id.0).collect();
 
         let s0 = Instant::now();
+        let mut record_raw: Option<String> = None;
         let mut chosen = if let Some(raw) = self
             .replay
             .as_ref()
             .and_then(|t| t.get(self.tick, id.0).map(|s| s.to_string()))
         {
             chooser_name = "replay";
-            policy_branch = "replay";
-            parse_choice_json(&raw, &obs.legal, &self.config.world.species)
-                .unwrap_or_else(|_| ChosenAction::wait())
+            if is_llm_wait_response(&raw) {
+                policy_branch = "llm_wait";
+                allow_speak = false;
+                self.events.push(SimEvent {
+                    tick: self.tick,
+                    agent: id,
+                    kind: SimEventKind::LlmWait,
+                });
+                ChosenAction::wait()
+            } else {
+                policy_branch = "replay";
+                parse_choice_json(&raw, &obs.legal, &self.config.world.species)
+                    .unwrap_or_else(|_| ChosenAction::wait())
+            }
         } else {
             match &self.chooser {
                 Chooser::Wait => {
                     chooser_name = "wait";
                     policy_branch = "wait";
                     allow_speak = false;
+                    record_raw = Some(LLM_WAIT_SENTINEL.into());
                     self.events.push(SimEvent {
                         tick: self.tick,
                         agent: id,
@@ -308,23 +347,15 @@ impl Simulation {
                 Chooser::Custom(chooser) => {
                     chooser_name = "llm";
                     match chooser.choose(call_seed, &obs) {
-                        Ok(c) => {
+                        Ok((c, raw)) => {
                             policy_branch = "llm";
+                            record_raw = Some(raw);
                             c
-                        }
-                        Err(ChooseError::Timeout) => {
-                            policy_branch = "llm_wait";
-                            allow_speak = false;
-                            self.events.push(SimEvent {
-                                tick: self.tick,
-                                agent: id,
-                                kind: SimEventKind::LlmWait,
-                            });
-                            ChosenAction::wait()
                         }
                         Err(_) => {
                             policy_branch = "llm_wait";
                             allow_speak = false;
+                            record_raw = Some(LLM_WAIT_SENTINEL.into());
                             self.events.push(SimEvent {
                                 tick: self.tick,
                                 agent: id,
@@ -407,7 +438,7 @@ impl Simulation {
                 agent: id.0,
                 call_seed,
                 prompt_hash: hash,
-                response: chosen_to_json(&chosen),
+                response: record_raw.unwrap_or_else(|| chosen_to_json(&chosen)),
             };
             if let Ok(line) = serde_json::to_string(&rec) {
                 let _ = std::fs::OpenOptions::new()

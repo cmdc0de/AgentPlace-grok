@@ -376,6 +376,25 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 }
             }
             ui.separator();
+            if let Some(c) = state.sim.world.stockpile_at(a.x, a.y) {
+                let params = state.sim.storage;
+                ui.text(format!(
+                    "stockpile slots {}/{}  weight {:.1}/{}",
+                    c.slot_count(),
+                    params.slot_cap,
+                    c.weight_milli() as f32 / 100.0,
+                    params.weight_cap_milli / 100
+                ));
+                for (item, n) in &c.items {
+                    ui.text(format!(
+                        "  {} x{n}",
+                        item_label(*item, &state.sim.config.world.species)
+                    ));
+                }
+            } else {
+                ui.text("stockpile: (none on this cell)");
+            }
+            ui.separator();
             ui.text(format!("relationships ({})", a.relationships.len()));
             for (oid, r) in &a.relationships {
                 ui.text(format!(
@@ -626,6 +645,10 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::IncentiveApplied { .. } => "incentive_applied",
         SimEventKind::IncentiveEnded { .. } => "incentive_ended",
         SimEventKind::Died { .. } => "died",
+        SimEventKind::Transfer { .. } => "transfer",
+        SimEventKind::Store { .. } => "store",
+        SimEventKind::Retrieve { .. } => "retrieve",
+        SimEventKind::Give { .. } => "give",
     }
 }
 

@@ -16,10 +16,50 @@ pub enum ChooseError {
     Unreachable,
 }
 
+/// Sentinel stored when a live call becomes `LlmWait`. Replay re-emits the event.
+pub const LLM_WAIT_SENTINEL: &str = r#"{"__llm_wait__":true}"#;
+
+pub fn is_llm_wait_response(raw: &str) -> bool {
+    extract_json_payload(raw).contains("__llm_wait__")
+}
+
+/// Pull a JSON object out of fences, `<think>` wrappers, or leading prose.
+pub fn extract_json_payload(s: &str) -> String {
+    let mut t = s.to_string();
+    loop {
+        let lower = t.to_ascii_lowercase();
+        let Some(start) = lower.find("<think>") else {
+            break;
+        };
+        let after = start + "<think>".len();
+        let rest_lower = lower[after..].to_string();
+        if let Some(end_rel) = rest_lower.find("</think>") {
+            t.replace_range(start..after + end_rel + "</think>".len(), " ");
+        } else {
+            t.replace_range(start..after, " ");
+            break;
+        }
+    }
+    let trimmed = strip_fences(t.trim()).to_string();
+    if let Some(i) = trimmed.find('{') {
+        if let Some(j) = trimmed.rfind('}') {
+            if j >= i {
+                return trimmed[i..=j].to_string();
+            }
+        }
+    }
+    trimmed
+}
+
 /// Pluggable chooser used by live / replay backends. Mock stays inside `Simulation`
 /// so it can use the agent RNG stream (required for bit-identical hashes).
 pub trait ActionChooser: Send + Sync {
-    fn choose(&self, call_seed: u64, obs: &Observation) -> Result<ChosenAction, ChooseError>;
+    /// Returns the chosen action and the **raw** model text (for replay JSONL).
+    fn choose(
+        &self,
+        call_seed: u64,
+        obs: &Observation,
+    ) -> Result<(ChosenAction, String), ChooseError>;
 }
 
 #[derive(Clone)]
@@ -108,6 +148,8 @@ struct LlmJson {
     proposal_id: Option<u64>,
     #[serde(default)]
     rule: Option<RuleJson>,
+    #[serde(default)]
+    qty: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,8 +180,11 @@ pub fn parse_choice_json(
     legal: &[PrimaryAction],
     species: &SpeciesTables,
 ) -> Result<ChosenAction, ChooseError> {
-    let trimmed = strip_fences(raw);
-    let parsed: LlmJson = serde_json::from_str(trimmed).map_err(|_| ChooseError::Malformed)?;
+    let trimmed = extract_json_payload(raw);
+    if trimmed.contains("__llm_wait__") {
+        return Ok(ChosenAction::wait());
+    }
+    let parsed: LlmJson = serde_json::from_str(&trimmed).map_err(|_| ChooseError::Malformed)?;
     let name = parsed.action.unwrap_or_else(|| "Wait".into());
     let primary = match name.to_ascii_lowercase().as_str() {
         "wait" => PrimaryAction::Wait,
@@ -200,6 +245,49 @@ pub fn parse_choice_json(
         "oppose" => PrimaryAction::Oppose {
             proposal_id: parsed.proposal_id.unwrap_or(0),
         },
+        "transfer" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Food(1));
+            let to = parsed
+                .target
+                .as_ref()
+                .and_then(|v| v.as_u64())
+                .or(parsed.proposal_id)
+                .unwrap_or(0);
+            PrimaryAction::Transfer {
+                item,
+                qty: parsed.qty.unwrap_or(1).max(1),
+                to: AgentId(to),
+            }
+        }
+        "store" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Food(1));
+            PrimaryAction::Store {
+                item,
+                qty: parsed.qty.unwrap_or(1).max(1),
+            }
+        }
+        "retrieve" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Food(1));
+            PrimaryAction::Retrieve {
+                item,
+                qty: parsed.qty.unwrap_or(1).max(1),
+            }
+        }
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {
@@ -262,7 +350,7 @@ fn resolve_species_target(v: Option<&serde_json::Value>, species: &SpeciesTables
     None
 }
 
-fn parse_item(s: &str, species: &SpeciesTables) -> Option<ItemId> {
+pub fn parse_item(s: &str, species: &SpeciesTables) -> Option<ItemId> {
     if let Some(rest) = s.strip_prefix("food:") {
         let tag: u8 = rest.parse().ok()?;
         return Some(ItemId::Food(tag));

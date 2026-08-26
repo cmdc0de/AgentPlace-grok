@@ -19,6 +19,8 @@ pub struct TileView {
     pub animals: u8,
     pub fish: u8,
     pub crop: bool,
+    #[serde(default)]
+    pub stockpile: Vec<InventoryView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +185,20 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
                     animals: sim.world.animal_count_at(x, y),
                     fish: sim.world.fish_count_at(x, y),
                     crop: sim.world.crops.contains_key(&(x, y)),
+                    stockpile: sim
+                        .world
+                        .stockpile_at(x, y)
+                        .map(|c| {
+                            c.items
+                                .iter()
+                                .filter(|(_, q)| **q > 0)
+                                .map(|(item, qty)| InventoryView {
+                                    item: item_display_name(*item, &sim.config.world.species),
+                                    qty: *qty,
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 });
             }
         }
@@ -485,6 +501,77 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         legal.push(PrimaryAction::Support { proposal_id: p.id });
         legal.push(PrimaryAction::Oppose { proposal_id: p.id });
     }
+    let params = sim.storage;
+    let energy = agent.needs.energy;
+    if sim.world.is_land(agent.x, agent.y) {
+        let cell = sim
+            .world
+            .stockpiles
+            .get(&(agent.x, agent.y))
+            .cloned()
+            .unwrap_or_default();
+        for (item, have) in &agent.inventory {
+            if *have == 0 {
+                continue;
+            }
+            let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
+            if energy >= cost && cell.can_add(*item, 1, &params) {
+                legal.push(PrimaryAction::Store {
+                    item: *item,
+                    qty: 1,
+                });
+            }
+        }
+        for (item, have) in &cell.items {
+            if *have == 0 {
+                continue;
+            }
+            let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
+            if energy >= cost && agent.inventory_count() < agent.inventory_cap {
+                legal.push(PrimaryAction::Retrieve {
+                    item: *item,
+                    qty: 1,
+                });
+            }
+        }
+    }
+    let ident = if sim.config.observation.full_information {
+        sim.world.width.max(sim.world.height)
+    } else {
+        effective_range(
+            sim.config.observation.base_agent_identity_range,
+            agent.personality.perceptiveness,
+        )
+    };
+    for other in sim.agents.values() {
+        if other.id == agent.id {
+            continue;
+        }
+        let dist = chebyshev(agent.x, agent.y, other.x, other.y);
+        if dist > 1 {
+            continue;
+        }
+        if dist > ident {
+            continue;
+        }
+        let room = other.inventory_cap.saturating_sub(other.inventory_count());
+        if room == 0 {
+            continue;
+        }
+        for (item, have) in &agent.inventory {
+            if *have == 0 {
+                continue;
+            }
+            let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
+            if energy >= cost {
+                legal.push(PrimaryAction::Transfer {
+                    item: *item,
+                    qty: 1,
+                    to: other.id,
+                });
+            }
+        }
+    }
     legal
 }
 
@@ -591,6 +678,20 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         }
         PrimaryAction::Support { proposal_id } => format!("Support #{proposal_id}"),
         PrimaryAction::Oppose { proposal_id } => format!("Oppose #{proposal_id}"),
+        PrimaryAction::Transfer { item, qty, to } => {
+            format!(
+                "Transfer {}×{} to #{}",
+                item_display_name(*item, species),
+                qty,
+                to.0
+            )
+        }
+        PrimaryAction::Store { item, qty } => {
+            format!("Store {}×{}", item_display_name(*item, species), qty)
+        }
+        PrimaryAction::Retrieve { item, qty } => {
+            format!("Retrieve {}×{}", item_display_name(*item, species), qty)
+        }
     }
 }
 
@@ -639,6 +740,17 @@ pub fn visible_summary(obs: &Observation, species: &SpeciesTables, cap: usize) -
         }
         if t.crop {
             parts.push(format!("crop@{dx},{dy}"));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if !t.stockpile.is_empty() {
+            let inside: Vec<_> = t
+                .stockpile
+                .iter()
+                .map(|i| format!("{}×{}", i.item, i.qty))
+                .collect();
+            parts.push(format!("stockpile@{dx},{dy}: {}", inside.join(",")));
         }
     }
     parts.join("; ")

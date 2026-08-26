@@ -33,6 +33,9 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Propose { text, rule } => propose(sim, id, text, *rule),
         PrimaryAction::Support { proposal_id } => vote(sim, id, *proposal_id, true),
         PrimaryAction::Oppose { proposal_id } => vote(sim, id, *proposal_id, false),
+        PrimaryAction::Transfer { item, qty, to } => transfer(sim, id, *item, *qty, *to),
+        PrimaryAction::Store { item, qty } => store(sim, id, *item, *qty),
+        PrimaryAction::Retrieve { item, qty } => retrieve(sim, id, *item, *qty),
     }
 }
 
@@ -75,6 +78,132 @@ fn is_legal(sim: &Simulation, id: AgentId, action: &PrimaryAction) -> bool {
             .iter()
             .any(|a| a == other),
     }
+}
+
+fn pay_haul(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) -> bool {
+    let cost = crate::haul::haul_cost_milli(item, qty, sim.storage.haul_milli);
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return false;
+    };
+    if a.needs.energy < cost {
+        return false;
+    }
+    a.needs.energy -= cost;
+    true
+}
+
+fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: AgentId) {
+    let Some(sender) = sim.agents.get(&id) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let Some(recv) = sim.agents.get(&to) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let room = recv.inventory_cap.saturating_sub(recv.inventory_count());
+    let moved = qty.min(room);
+    if moved == 0 || sender.inventory.get(&item).copied().unwrap_or(0) < moved {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if !pay_haul(sim, id, item, moved) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if !sim
+        .agents
+        .get_mut(&id)
+        .is_some_and(|a| a.take_item(item, moved))
+    {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let added = sim
+        .agents
+        .get_mut(&to)
+        .map(|a| a.try_add_item(item, moved))
+        .unwrap_or(0);
+    if added < moved {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            a.try_add_item(item, moved - added);
+        }
+    }
+    if added == 0 {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(
+        sim,
+        id,
+        SimEventKind::Transfer {
+            item,
+            qty: added,
+            to,
+        },
+    );
+}
+
+fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
+    let Some(agent) = sim.agents.get(&id) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let (x, y) = (agent.x, agent.y);
+    if agent.inventory.get(&item).copied().unwrap_or(0) < qty {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let params = sim.storage;
+    if !sim.world.try_store(x, y, item, qty, &params) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if !pay_haul(sim, id, item, qty) {
+        sim.world.try_retrieve(x, y, item, qty);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if !sim
+        .agents
+        .get_mut(&id)
+        .is_some_and(|a| a.take_item(item, qty))
+    {
+        sim.world.try_retrieve(x, y, item, qty);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(sim, id, SimEventKind::Store { item, qty });
+}
+
+fn retrieve(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
+    let Some(agent) = sim.agents.get(&id) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let (x, y) = (agent.x, agent.y);
+    if !sim.world.try_retrieve(x, y, item, qty) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if !pay_haul(sim, id, item, qty) {
+        sim.world.try_store(x, y, item, qty, &sim.storage);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let added = sim
+        .agents
+        .get_mut(&id)
+        .map(|a| a.try_add_item(item, qty))
+        .unwrap_or(0);
+    if added < qty {
+        sim.world.try_store(x, y, item, qty - added, &sim.storage);
+    }
+    if added == 0 {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(sim, id, SimEventKind::Retrieve { item, qty: added });
 }
 
 fn push(sim: &mut Simulation, id: AgentId, kind: SimEventKind) {

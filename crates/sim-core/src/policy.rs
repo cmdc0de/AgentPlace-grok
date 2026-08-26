@@ -56,7 +56,15 @@ pub fn mock_choose(
         );
     }
     let (primary, branch) = choose_primary(
-        obs, rng, thirst, hunger, energy, thirst_max, hunger_max, energy_max,
+        obs,
+        rng,
+        thirst,
+        hunger,
+        energy,
+        thirst_max,
+        hunger_max,
+        energy_max,
+        agreeableness,
     );
     let speak = maybe_warn(
         obs,
@@ -151,6 +159,7 @@ fn choose_primary(
     thirst_max: u32,
     hunger_max: u32,
     energy_max: u32,
+    agreeableness: u8,
 ) -> (PrimaryAction, &'static str) {
     // Seek water/food from 75% remaining so default decay drinks before tick-400 death.
     let thirsty = thirst_max > 0 && thirst < thirst_max * 3 / 4;
@@ -172,6 +181,11 @@ fn choose_primary(
             }
         }
         for a in &obs.legal {
+            if matches!(a, PrimaryAction::Retrieve { .. }) {
+                return (a.clone(), "retrieve");
+            }
+        }
+        for a in &obs.legal {
             if matches!(a, PrimaryAction::Gather { species } if *species != 0) {
                 return (a.clone(), "gather");
             }
@@ -187,9 +201,40 @@ fn choose_primary(
             return (PrimaryAction::Fish, "fish");
         }
         if let Some(mv) = move_toward(obs, rng, |t| {
-            t.vegetation != 0 || t.animals > 0 || t.fish > 0
+            t.vegetation != 0 || t.animals > 0 || t.fish > 0 || !t.stockpile.is_empty()
         }) {
             return (mv, "move");
+        }
+    }
+    let surplus = hunger_max > 0 && hunger >= hunger_max * 3 / 4;
+    let wants_storage = obs
+        .goals
+        .iter()
+        .any(|g| g.text.to_ascii_lowercase().contains("storage"));
+    if surplus && wants_storage {
+        for a in &obs.legal {
+            if matches!(
+                a,
+                PrimaryAction::Store {
+                    item: ItemId::Food(_),
+                    ..
+                }
+            ) {
+                return (a.clone(), "store");
+            }
+        }
+    }
+    if surplus && agreeableness >= 40 {
+        for a in &obs.legal {
+            if matches!(
+                a,
+                PrimaryAction::Transfer {
+                    item: ItemId::Food(_),
+                    ..
+                }
+            ) {
+                return (a.clone(), "transfer");
+            }
         }
     }
     if tired && obs.legal.iter().any(|a| matches!(a, PrimaryAction::Rest)) {

@@ -34,6 +34,12 @@ struct WorldMarker {
     y: u32,
 }
 
+#[derive(Component)]
+struct StockpileVisual {
+    x: u32,
+    y: u32,
+}
+
 fn main() {
     let parsed = parse_args();
     let mut net_link = None;
@@ -85,6 +91,7 @@ fn main() {
                 net::apply_remote,
                 handle_input,
                 sync_agent_transforms,
+                sync_stockpile_markers,
                 update_camera,
                 update_vision_overlay,
                 update_fog_visibility,
@@ -236,6 +243,17 @@ fn setup_scene(
                     y,
                 );
             }
+            if world.has_stockpile(x, y) {
+                spawn_stockpile(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &mut mesh_cache,
+                    world,
+                    x,
+                    y,
+                );
+            }
             if world.has_mineral(x, y) {
                 spawn_marker(
                     &mut commands,
@@ -284,6 +302,80 @@ fn setup_scene(
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 0.7, -0.9)),
     ));
+}
+
+fn spawn_stockpile(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
+    world: &sim_core::World,
+    x: u32,
+    y: u32,
+) {
+    let spec = markers::marker_stockpile();
+    let pos = resource_world_pos(world, x, y, 0.28);
+    let color = {
+        let [r, g, b] = markers::rgb_f32(spec.rgb);
+        Color::srgb(r, g, b)
+    };
+    let mat = materials.add(StandardMaterial {
+        base_color: color,
+        perceptual_roughness: 0.75,
+        ..default()
+    });
+    let key = 210u8;
+    let mesh = cache
+        .entry(key)
+        .or_insert_with(|| meshes.add(mesh_for_shape(spec.shape)))
+        .clone();
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(mat),
+        Transform::from_translation(pos),
+        WorldMarker { x, y },
+        StockpileVisual { x, y },
+        Visibility::default(),
+    ));
+}
+
+fn sync_stockpile_markers(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    state: Res<SimState>,
+    existing: Query<(Entity, &StockpileVisual)>,
+) {
+    let live: std::collections::BTreeSet<(u32, u32)> = state
+        .sim
+        .world
+        .stockpiles
+        .iter()
+        .filter(|(_, c)| !c.is_empty())
+        .map(|(k, _)| *k)
+        .collect();
+    let have: std::collections::BTreeSet<(u32, u32)> =
+        existing.iter().map(|(_, v)| (v.x, v.y)).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&(v.x, v.y)) {
+            commands.entity(e).despawn();
+        }
+    }
+    let mut cache = std::collections::HashMap::new();
+    for (x, y) in live {
+        if have.contains(&(x, y)) {
+            continue;
+        }
+        spawn_stockpile(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut cache,
+            &state.sim.world,
+            x,
+            y,
+        );
+    }
 }
 
 fn spawn_marker(

@@ -69,6 +69,23 @@ pub enum SimEventKind {
         hunger_zero: bool,
         thirst_zero: bool,
     },
+    Transfer {
+        item: ItemId,
+        qty: u32,
+        to: AgentId,
+    },
+    Store {
+        item: ItemId,
+        qty: u32,
+    },
+    Retrieve {
+        item: ItemId,
+        qty: u32,
+    },
+    Give {
+        item: ItemId,
+        qty: u32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,6 +201,41 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update([18u8]);
             hasher.update([u8::from(*hunger_zero), u8::from(*thirst_zero)]);
         }
+        SimEventKind::Transfer { item, qty, to } => {
+            hasher.update([19u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+            hasher.update(to.0.to_le_bytes());
+        }
+        SimEventKind::Store { item, qty } => {
+            hasher.update([20u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+        }
+        SimEventKind::Retrieve { item, qty } => {
+            hasher.update([21u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+        }
+        SimEventKind::Give { item, qty } => {
+            hasher.update([22u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+        }
+    }
+}
+
+fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
+    match item {
+        ItemId::Food(tag) => {
+            hasher.update([0u8, tag]);
+        }
+        ItemId::Wood => hasher.update([1u8]),
+        ItemId::Fiber => hasher.update([2u8]),
+        ItemId::Stone => hasher.update([3u8]),
+        ItemId::Basket => hasher.update([4u8]),
+        ItemId::Spear => hasher.update([5u8]),
+        ItemId::FishingRod => hasher.update([6u8]),
     }
 }
 
@@ -208,5 +260,9 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::IncentiveApplied { .. } => "IncentiveApplied",
         SimEventKind::IncentiveEnded { .. } => "IncentiveEnded",
         SimEventKind::Died { .. } => "Died",
+        SimEventKind::Transfer { .. } => "Transfer",
+        SimEventKind::Store { .. } => "Store",
+        SimEventKind::Retrieve { .. } => "Retrieve",
+        SimEventKind::Give { .. } => "Give",
     }
 }

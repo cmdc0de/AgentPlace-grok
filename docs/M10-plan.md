@@ -1,6 +1,6 @@
 # M10 — Live LLM reliability + Transfer/Store
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (git tag `M10`).  
 **Depends on:** M9 complete (`docs/M9-plan.md`, git tag `M9`, commit `d7da253`)  
 **Specs:** `decision-observation-llm-economy-metrics-spec.md` §1/§3 (action vocabulary, LLM contract), `needs-and-survival.md`, `deterministic-seeding-design.md` (replay)
 
@@ -184,6 +184,8 @@ cargo test -p sim-llm
 cargo test -p sim-cli --test ab
 cargo test -p viewer
 ```
+
+Step-by-step walkthrough (mock + optional live): [`M10-test-plan.md`](M10-test-plan.md).
 
 CI must pass without Spark. Live Wait-rate should drop vs M9’s ~52% on a 2×3 smoke (document the number; do not gate CI on it).
 

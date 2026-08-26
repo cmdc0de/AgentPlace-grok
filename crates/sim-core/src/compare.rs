@@ -29,6 +29,8 @@ pub struct RunSnapshot {
     pub goal_occupancy: BTreeMap<String, u32>,
     pub active_incentives: BTreeSet<String>,
     pub event_histogram: BTreeMap<String, u32>,
+    pub stockpile_cells: u32,
+    pub stockpile_qty: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -110,6 +112,8 @@ pub fn snapshot_sim(sim: &Simulation, path: impl Into<String>) -> RunSnapshot {
         goal_occupancy,
         active_incentives: sim.incentive_active.clone(),
         event_histogram,
+        stockpile_cells: sim.world.stockpiles.len() as u32,
+        stockpile_qty: sim.world.stockpiles.values().map(|c| c.slot_count()).sum(),
     }
 }
 
@@ -211,7 +215,9 @@ pub fn compare_markdown(report: &CompareReport) -> String {
          | toxic events | {} | {} | {} |\n\
          | hunger mean | {:.1} | {:.1} | {:.1} |\n\
          | thirst mean | {:.1} | {:.1} | {:.1} |\n\
-         | energy mean | {:.1} | {:.1} | {:.1} |\n",
+         | energy mean | {:.1} | {:.1} | {:.1} |\n\
+         | stockpile cells | {} | {} | {} |\n\
+         | stockpile qty | {} | {} | {} |\n",
         a.path,
         a.tick,
         b.path,
@@ -260,6 +266,12 @@ pub fn compare_markdown(report: &CompareReport) -> String {
         a.energy_mean,
         b.energy_mean,
         b.energy_mean - a.energy_mean,
+        a.stockpile_cells,
+        b.stockpile_cells,
+        i64::from(b.stockpile_cells) - i64::from(a.stockpile_cells),
+        a.stockpile_qty,
+        b.stockpile_qty,
+        i64::from(b.stockpile_qty) - i64::from(a.stockpile_qty),
     );
     out.push_str("\n## Active incentives\n\n");
     let ids: BTreeSet<_> = a

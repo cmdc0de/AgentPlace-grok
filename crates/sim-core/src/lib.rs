@@ -10,6 +10,7 @@ pub mod decision_log;
 pub mod error;
 pub mod event_log;
 pub mod execute;
+pub mod haul;
 pub mod incentive;
 pub mod llm;
 pub mod markers;
@@ -38,8 +39,12 @@ pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, S
 pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;
 pub use event_log::{SimEvent, SimEventKind};
+pub use haul::StorageParams;
 pub use incentive::{Incentive, IncentiveSchedule};
-pub use llm::{ActionChooser, ChooseError, Chooser, ReplayTable, parse_choice_json};
+pub use llm::{
+    ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, ReplayTable, extract_json_payload,
+    is_llm_wait_response, parse_choice_json, parse_item,
+};
 pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};
 pub use seeding::{RngBank, derive_seed};

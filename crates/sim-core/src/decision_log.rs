@@ -46,6 +46,9 @@ pub fn legal_names(legal: &[PrimaryAction]) -> Vec<String> {
             PrimaryAction::Propose { .. } => "Propose".into(),
             PrimaryAction::Support { .. } => "Support".into(),
             PrimaryAction::Oppose { .. } => "Oppose".into(),
+            PrimaryAction::Transfer { .. } => "Transfer".into(),
+            PrimaryAction::Store { .. } => "Store".into(),
+            PrimaryAction::Retrieve { .. } => "Retrieve".into(),
         })
         .collect()
 }
@@ -100,6 +103,9 @@ pub fn mock_branch_for(primary: &PrimaryAction) -> &'static str {
         PrimaryAction::Support { .. } => "toxin_support",
         PrimaryAction::Oppose { .. } => "wait",
         PrimaryAction::Wait => "wait",
+        PrimaryAction::Transfer { .. } => "transfer",
+        PrimaryAction::Store { .. } => "store",
+        PrimaryAction::Retrieve { .. } => "retrieve",
     }
 }
 

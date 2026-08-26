@@ -25,7 +25,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M7** | Done (tag `M7`, `789fc81`) | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
 | **M8** | Done (tag `M8`, `b0b9d14`) | [`M8-plan.md`](M8-plan.md) | Incentive A/B inject + processing (wall-clock) metrics; death |
 | **M9** | Done (tag `M9`) | [`M9-plan.md`](M9-plan.md), walkthrough [`M9-test-plan.md`](M9-test-plan.md) | LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
-| **M10** | **Planned — next** | [`M10-plan.md`](M10-plan.md) | Live LLM parse/replay reliability; Transfer/Store containers (weight, energy, 3D marker) |
+| **M10** | Done (tag `M10`) | [`M10-plan.md`](M10-plan.md), walkthrough [`M10-test-plan.md`](M10-test-plan.md) | Live LLM parse/replay reliability; Transfer/Store containers (weight, energy, 3D marker) |
 | After M10 | Not started | listed at the bottom of `M10-plan.md` | Protobuf/TLS, timeline scrubber, `visibility_modifier`, vote weighting |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -52,7 +52,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 12 | `M7-plan.md` | Milestone 7 (done): TCP + WebSocket attachable clients |
 | 13 | `M8-plan.md` | Milestone 8 (done): incentive A/B inject + processing metrics |
 | 14 | `M9-plan.md` | Milestone 9 (done, tag `M9`): LLM-in-the-loop prompts, replay, `--compare` |
-| 15 | `M10-plan.md` | Milestone 10 (next): thinking-model parse + honest replay; Transfer/Store containers |
+| 15 | `M10-plan.md` | Milestone 10 (done, tag `M10`): thinking-model parse + honest replay; Transfer/Store containers |
 
 ---
 
@@ -89,14 +89,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M9 are done (tag `M9`). Next work is M10.
+M1–M10 are done (tag `M10`). Later work is listed at the bottom of `M10-plan.md`.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M10-plan.md.
-Implement M10 (thinking-model LLM parse + raw replay so LlmWait round-trips;
-Transfer/Store/Retrieve on a slot+weight limited land-cell container; energy
-∝ weight; 3D stockpile marker; in-process /give). Do not switch to protobuf,
-add TLS, visibility_modifier, vote weighting, or wire Give.
+M10 is implemented: thinking-model parse + raw replay (LlmWait round-trips),
+Transfer/Store/Retrieve on limited land-cell containers, energy ∝ weight,
+3D stockpile marker, in-process /give. Do not switch to protobuf, add TLS,
+visibility_modifier, vote weighting, or wire Give.
 CI stays provider=mock with no network.
 ```
 

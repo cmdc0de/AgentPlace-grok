@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M9** (`docs/M9-plan.md`).
+Deterministic multi-agent simulation. Current slice: **M10** (`docs/M10-plan.md`).
 
 Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md).
 
@@ -95,7 +95,9 @@ cargo test -p sim-cli --test net
 cargo test -p sim-cli --test ab
 ```
 
-Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Set `replay_file` to record JSONL (missing path) or replay an existing file. Researcher walkthrough: [`docs/M9-test-plan.md`](docs/M9-test-plan.md).
+Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Replay JSONL stores raw model text; `{"__llm_wait__":true}` re-emits `LlmWait`. Researcher walkthrough: [`docs/M9-test-plan.md`](docs/M9-test-plan.md). Plan: [`docs/M10-plan.md`](docs/M10-plan.md).
+
+Shared land-cell **containers** (slot 16, weight 80): `Store` / `Retrieve` / `Transfer` cost energy ∝ item weight. Viewer: brown crate mesh when non-empty; `/give ID ITEM QTY` in-process only (hash-sensitive).
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 20 --llm ollama

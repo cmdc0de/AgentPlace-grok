@@ -59,6 +59,9 @@ Reports: `hunger: … (below half: N)` counts agents with display hunger **< 50*
 | **Rest** | Energy += 0.4 per tick (clamped to max). |
 | Toxic / allergenic Eat | Also illness (`illness_ticks`), extra energy drain (−8.0 on that eat), toxic_events++. |
 | **Shout** | Energy −5.0 if they can pay it; otherwise the utterance is not a shout. |
+| **Store / Retrieve / Transfer** | Energy `qty × unit_weight × 0.4` (display). Unaffordable ⇒ not legal. Stone 3.0, wood 1.5, food 0.5, tools 2.0, fiber 0.4. |
+
+Shared **land-cell containers** (one per cell): slot cap 16 and weight cap 80.0. Empty containers despawn. Viewer shows a brown crate mesh. `/give ID ITEM QTY` in the in-process viewer is a hash-sensitive cheat (no energy).
 
 `resource_multiplier` (incentives) scales **food gather qty** and **eat nutrition** only. It does not change decay.
 
