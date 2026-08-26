@@ -4,8 +4,8 @@ use crate::memory::knows_toxin;
 use crate::observation::Observation;
 use crate::social::RelationshipSummary;
 use crate::species::SpeciesTables;
-use rand::seq::IndexedRandom;
 use rand::Rng;
+use rand::seq::IndexedRandom;
 use rand_chacha::ChaCha20Rng;
 use std::collections::BTreeMap;
 
@@ -152,9 +152,10 @@ fn choose_primary(
     hunger_max: u32,
     energy_max: u32,
 ) -> (PrimaryAction, &'static str) {
-    let thirsty = thirst < thirst_max / 2;
-    let hungry = hunger < hunger_max / 2;
-    let tired = energy < energy_max / 3;
+    // Seek water/food from 75% remaining so default decay drinks before tick-400 death.
+    let thirsty = thirst_max > 0 && thirst < thirst_max * 3 / 4;
+    let hungry = hunger_max > 0 && hunger < hunger_max * 3 / 4;
+    let tired = energy_max > 0 && energy < energy_max / 3;
 
     if thirsty {
         if obs.legal.iter().any(|a| matches!(a, PrimaryAction::Drink)) {

@@ -2,8 +2,10 @@ use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::board::ProposalView;
 use crate::event_log::SimEventKind;
+use crate::incentive;
+use crate::memory::MemoryKind;
 use crate::simulation::Simulation;
-use crate::species::VegYield;
+use crate::species::{SpeciesTables, VegYield};
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +35,21 @@ pub struct HeardSpeech {
     pub shout: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct InventoryView {
+    pub item: String,
+    pub qty: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct IncentiveView {
+    pub id: String,
+    #[serde(default)]
+    pub description: String,
+    pub start_tick: u64,
+    pub end_tick: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
     pub agent_id: AgentId,
@@ -51,6 +68,53 @@ pub struct Observation {
     #[serde(default)]
     pub relationships: Vec<crate::social::RelationView>,
     pub legal: Vec<PrimaryAction>,
+    /// Hunger on the 0–100 display scale (millipoints / 100).
+    #[serde(default)]
+    pub hunger: u32,
+    #[serde(default)]
+    pub thirst: u32,
+    #[serde(default)]
+    pub energy: u32,
+    #[serde(default)]
+    pub illness_ticks: u32,
+    #[serde(default)]
+    pub inventory: Vec<InventoryView>,
+    #[serde(default)]
+    pub allergies: Vec<String>,
+    /// Named toxin facts from memory (species ids).
+    #[serde(default)]
+    pub toxins: Vec<String>,
+    /// Active incentives that `applies_to` this agent. Public this slice.
+    #[serde(default)]
+    pub incentives: Vec<IncentiveView>,
+}
+
+impl Default for Observation {
+    fn default() -> Self {
+        Self {
+            agent_id: AgentId(0),
+            x: 0,
+            y: 0,
+            vision: 0,
+            hearing: 0,
+            identity: 0,
+            tiles: Vec::new(),
+            agents: Vec::new(),
+            heard: Vec::new(),
+            board: Vec::new(),
+            goals: Vec::new(),
+            relationships: Vec::new(),
+            legal: Vec::new(),
+            hunger: 0,
+            thirst: 0,
+            energy: 0,
+            illness_ticks: 0,
+            inventory: Vec::new(),
+            allergies: Vec::new(),
+            toxins: Vec::new(),
+            incentives: Vec::new(),
+        }
+    }
 }
 
 pub fn chebyshev(ax: u32, ay: u32, bx: u32, by: u32) -> u32 {
@@ -156,6 +220,42 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
             })
         })
         .collect();
+    let species = &sim.config.world.species;
+    let inventory = agent
+        .inventory
+        .iter()
+        .filter(|(_, qty)| **qty > 0)
+        .map(|(item, qty)| InventoryView {
+            item: item_display_name(*item, species),
+            qty: *qty,
+        })
+        .collect();
+    let mut toxins = Vec::new();
+    for mem in &agent.memory {
+        if mem.kind != MemoryKind::ToxinFact {
+            continue;
+        }
+        let name = species
+            .veg(mem.species_tag)
+            .map(|s| s.id.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| mem.text.clone());
+        if !name.is_empty() && !toxins.contains(&name) {
+            toxins.push(name);
+        }
+    }
+    let incentives = sim
+        .incentives
+        .incentives
+        .iter()
+        .filter(|inc| sim.incentive_active.contains(&inc.id) && incentive::in_scope(sim, inc, id))
+        .map(|inc| IncentiveView {
+            id: inc.id.clone(),
+            description: inc.description.clone(),
+            start_tick: inc.start_tick,
+            end_tick: inc.end_tick,
+        })
+        .collect();
     Observation {
         agent_id: id,
         x: agent.x,
@@ -170,6 +270,14 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         goals: agent.goals.clone(),
         relationships,
         legal,
+        hunger: agent.needs.hunger / 100,
+        thirst: agent.needs.thirst / 100,
+        energy: agent.needs.energy / 100,
+        illness_ticks: agent.illness_ticks,
+        inventory,
+        allergies: agent.personality.allergy_tags.clone(),
+        toxins,
+        incentives,
     }
 }
 
@@ -430,4 +538,108 @@ pub fn is_legal_choice(legal: &[PrimaryAction], action: &PrimaryAction) -> bool 
             .any(|a| matches!(a, PrimaryAction::Oppose { proposal_id: id } if id == proposal_id)),
         other => legal.iter().any(|a| a == other),
     }
+}
+
+pub fn item_display_name(item: ItemId, species: &SpeciesTables) -> String {
+    match item {
+        ItemId::Food(100) => "hare".into(),
+        ItemId::Food(101) => "perch".into(),
+        ItemId::Food(tag) => species
+            .veg(tag)
+            .map(|s| s.id.clone())
+            .unwrap_or_else(|| format!("food:{tag}")),
+        ItemId::Wood => "wood".into(),
+        ItemId::Fiber => "fiber".into(),
+        ItemId::Stone => "stone".into(),
+        ItemId::Basket => "basket".into(),
+        ItemId::Spear => "spear".into(),
+        ItemId::FishingRod => "fishing_rod".into(),
+    }
+}
+
+/// Species names (not Debug tags) so an LLM can pick Gather/Eat without raw u8s.
+pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String {
+    match action {
+        PrimaryAction::Wait => "Wait".into(),
+        PrimaryAction::Rest => "Rest".into(),
+        PrimaryAction::Drink => "Drink".into(),
+        PrimaryAction::Hunt => "Hunt".into(),
+        PrimaryAction::Fish => "Fish".into(),
+        PrimaryAction::MoveRelative { dx, dy } => format!("MoveRelative dx={dx} dy={dy}"),
+        PrimaryAction::Gather { species: 0 } => "Gather stone".into(),
+        PrimaryAction::Gather { species: tag } => {
+            format!("Gather {}", item_display_name(ItemId::Food(*tag), species))
+        }
+        PrimaryAction::Farm { species: tag } => {
+            format!("Farm {}", item_display_name(ItemId::Food(*tag), species))
+        }
+        PrimaryAction::Eat { item } => format!("Eat {}", item_display_name(*item, species)),
+        PrimaryAction::Craft { recipe } => {
+            let name = match recipe {
+                Recipe::Basket => "basket",
+                Recipe::Spear => "spear",
+                Recipe::FishingRod => "fishing_rod",
+            };
+            format!("Craft {name}")
+        }
+        PrimaryAction::Propose { text, rule } => {
+            if text.is_empty() {
+                "Propose".into()
+            } else {
+                format!("Propose {text:?} rule={rule:?}")
+            }
+        }
+        PrimaryAction::Support { proposal_id } => format!("Support #{proposal_id}"),
+        PrimaryAction::Oppose { proposal_id } => format!("Oppose #{proposal_id}"),
+    }
+}
+
+/// Compact visible-resource list for prompts. Caps length; skips empty cells.
+pub fn visible_summary(obs: &Observation, species: &SpeciesTables, cap: usize) -> String {
+    let mut parts = Vec::new();
+    for t in &obs.tiles {
+        if parts.len() >= cap {
+            break;
+        }
+        let dx = t.x as i32 - obs.x as i32;
+        let dy = t.y as i32 - obs.y as i32;
+        if t.water {
+            parts.push(format!("water@{dx},{dy}"));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if t.vegetation != 0 {
+            let name = species
+                .veg(t.vegetation)
+                .map(|s| s.id.as_str())
+                .unwrap_or("veg");
+            parts.push(format!("{name}@{dx},{dy}"));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if t.mineral {
+            parts.push(format!("stone@{dx},{dy}"));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if t.animals > 0 {
+            parts.push(format!("hare×{}@{dx},{dy}", t.animals));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if t.fish > 0 {
+            parts.push(format!("perch×{}@{dx},{dy}", t.fish));
+            if parts.len() >= cap {
+                break;
+            }
+        }
+        if t.crop {
+            parts.push(format!("crop@{dx},{dy}"));
+        }
+    }
+    parts.join("; ")
 }

@@ -595,13 +595,10 @@ pub fn checkpoint_stem(sim: &Simulation) -> Result<String, SimError> {
     ))
 }
 
-pub fn prune_old_checkpoints(dir: impl AsRef<Path>, keep_last_n: u32) -> Result<(), SimError> {
-    if keep_last_n == 0 {
-        return Ok(());
-    }
+pub fn list_checkpoints(dir: impl AsRef<Path>) -> Result<Vec<(u64, std::path::PathBuf)>, SimError> {
     let dir = dir.as_ref();
     if !dir.exists() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let mut ckpts: Vec<(u64, std::path::PathBuf)> = Vec::new();
     for entry in fs::read_dir(dir)? {
@@ -619,6 +616,18 @@ pub fn prune_old_checkpoints(dir: impl AsRef<Path>, keep_last_n: u32) -> Result<
         }
     }
     ckpts.sort_by_key(|(tick, _)| *tick);
+    Ok(ckpts)
+}
+
+pub fn prune_old_checkpoints(dir: impl AsRef<Path>, keep_last_n: u32) -> Result<(), SimError> {
+    if keep_last_n == 0 {
+        return Ok(());
+    }
+    let dir = dir.as_ref();
+    if !dir.exists() {
+        return Ok(());
+    }
+    let ckpts = list_checkpoints(dir)?;
     let keep = keep_last_n as usize;
     if ckpts.len() <= keep {
         return Ok(());

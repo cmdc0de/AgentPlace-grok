@@ -6,7 +6,7 @@ mod ui;
 use bevy::prelude::*;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
-use sim_bevy::{step_once, SimPlugin, SimState};
+use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::{AgentId, ExperimentConfig, Simulation};

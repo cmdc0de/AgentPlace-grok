@@ -24,8 +24,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M6** | Done (tag `M6`, `46c75e0`) | [`M6-plan.md`](M6-plan.md) | imgui research UI, agent-POV fog-of-war, slash-command console (`/report`) |
 | **M7** | Done (tag `M7`, `789fc81`) | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
 | **M8** | Done (tag `M8`, `b0b9d14`) | [`M8-plan.md`](M8-plan.md) | Incentive A/B inject + processing (wall-clock) metrics; death |
-| **M9** | **Planned — next** | [`M9-plan.md`](M9-plan.md) | LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
-| M10+ | Not started | listed at the bottom of `M9-plan.md` | Protobuf/TLS, timeline scrubber, Transfer/Store |
+| **M9** | Done (tag `M9`) | [`M9-plan.md`](M9-plan.md), walkthrough [`M9-test-plan.md`](M9-test-plan.md) | LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
+| After M9 | Not started | listed at the bottom of `M9-plan.md` | Protobuf/TLS, timeline scrubber, Transfer/Store |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -50,7 +50,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 11 | `M6-plan.md` | Milestone 6 (done): imgui UI, agent-POV fog-of-war, viewer commands |
 | 12 | `M7-plan.md` | Milestone 7 (done): TCP + WebSocket attachable clients |
 | 13 | `M8-plan.md` | Milestone 8 (done): incentive A/B inject + processing metrics |
-| 14 | `M9-plan.md` | Milestone 9 (next): LLM-in-the-loop prompts, replay, `--compare` |
+| 14 | `M9-plan.md` | Milestone 9 (done, tag `M9`): LLM-in-the-loop prompts, replay, `--compare` |
 
 ---
 
@@ -87,13 +87,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M8 are done (tag `M8`, `b0b9d14`). Next work is M9.
+M1–M9 are done (tag `M9`). Later work is listed at the bottom of `M9-plan.md` (protobuf/TLS, timeline, Transfer/Store).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M9-plan.md.
-Implement M9 (complete LLM prompts with needs+incentives, empty URL⇒mock,
+M9 is implemented: LLM prompts include needs+incentives, empty URL⇒mock,
 default Ollama http://spark-bcce.hlab:11434, replay, --compare, mock drink
-before thirst-death). Do not switch to protobuf, add TLS, or Transfer/Store.
+before thirst-death. Do not switch to protobuf, add TLS, or Transfer/Store.
 CI stays provider=mock with no network.
 ```
 

@@ -1,6 +1,6 @@
 # M9 — LLM-in-the-loop experiments and readable A/B
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented (git tag `M9`).  
 **Depends on:** M8 complete (`docs/M8-plan.md`, git tag `M8`, commit `b0b9d14`)  
 **Specs:** `decision-observation-llm-economy-metrics-spec.md` §2–3 (observation contents, LLM contract), `needs-and-survival.md`, `incentive-schedule-format.md`, `deterministic-seeding-design.md` (seeded LLM calls + replay)
 
@@ -169,9 +169,12 @@ cargo run -p sim-cli -- --compare /tmp/base /tmp/coop
 
 ```bash
 cargo test -p sim-core
+cargo test -p sim-llm
 cargo test -p sim-cli --test ab
 cargo run -p sim-cli -- --compare /tmp/base /tmp/coop
 ```
+
+Step-by-step researcher walkthrough (mock + live Nemotron on Spark): [`M9-test-plan.md`](M9-test-plan.md).
 
 Live Ollama only if spark-bcce is reachable; CI must pass without it.
 

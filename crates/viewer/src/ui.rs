@@ -1,12 +1,12 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
-use crate::commands::{help_text, parse_command, remote_control, run_command, WindowFlags};
+use crate::commands::{WindowFlags, help_text, parse_command, remote_control, run_command};
 use crate::net::NetLink;
 use bevy::prelude::*;
 use bevy_mod_imgui::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared::protocol::ClientMessage;
-use sim_bevy::{step_once, SimState};
+use sim_bevy::{SimState, step_once};
 use sim_core::event_log::SimEventKind;
 use sim_core::markers;
 use sim_core::{AgentId, ItemId};

@@ -30,9 +30,9 @@ At the **start of every tick** (`world_step`), before agents act:
 | Thirst | −0.25 | 100 / 0.25 = **400 ticks** |
 | Energy | −0.08 (−0.16 if `illness_ticks > 0`) | 100 / 0.08 = **1250 ticks** (healthy) |
 
-If they never Eat / Drink / Rest, at **tick 200** hunger is **70**, thirst **50**, energy **84**. That matches the default-config A/B reports (`hunger: mean 70.0`).
+If they never Eat / Drink / Rest, at **tick 200** hunger is **70**, thirst **50**, energy **84**. That matches the default-config A/B reports (`hunger: mean 70.0`) when nobody refills.
 
-Thirst hits the mock “thirsty” line first (see below). Hunger hits it around tick **334** (50.0). Until then the mock often does **not** Gather/Eat, so veg consumed can stay 0.
+Thirst hits the mock “thirsty” line first (see below) around tick **100**. Hunger hits it around tick **167**. With M9 cutoffs the mock should `Drink` well before tick-400 death if water is in range.
 
 ## When an agent is treated as hungry / thirsty / tired
 
@@ -40,11 +40,13 @@ These thresholds are what the **mock policy** uses (`policy.rs`). The LLM prompt
 
 | Label | Condition (display scale) | Millipoints |
 |---|---|---|
-| **Thirsty** | thirst **< 50** (`thirst_max / 2`) | < 5000 |
-| **Hungry** | hunger **< 50** (`hunger_max / 2`) | < 5000 |
+| **Thirsty** | thirst **< 75** (`thirst_max * 3 / 4`) | < 7500 |
+| **Hungry** | hunger **< 75** (`hunger_max * 3 / 4`) | < 7500 |
 | **Tired** | energy **< 33.3** (`energy_max / 3`) | < 3333 |
 
 Priority: **thirst → hunger → tired**. Thirsty agents `Drink` if adjacent to water, else move toward it. Hungry agents `Eat` if they have food, else Gather/Hunt/Fish/move toward food. Tired agents `Rest`.
+
+M9 moved the hunger/thirst cutoffs from 50% to 75% so default-decay mock agents `Drink` before tick-400 thirst-death (thirsty from tick ~100). Same-seed hashes still match.
 
 Reports: `hunger: … (below half: N)` counts agents with display hunger **< 50**.
 

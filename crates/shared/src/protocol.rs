@@ -1,7 +1,7 @@
 //! Length-prefixed postcard frames (`u32` LE length + payload).
 
 use crate::{MAX_FRAME_BYTES, PROTOCOL_VERSION};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

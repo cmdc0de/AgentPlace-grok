@@ -2,12 +2,12 @@
 
 use crate::ui::UiState;
 use bevy::prelude::*;
-use shared::protocol::{hello, ClientMessage, ServerMessage};
+use shared::protocol::{ClientMessage, ServerMessage, hello};
 use shared::transport::Connection;
 use sim_bevy::SimState;
 use sim_core::{Simulation, TickTiming};
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 

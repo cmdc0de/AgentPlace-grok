@@ -1,12 +1,12 @@
 //! Hash-neutral attachable server. Connection logs go to stderr, never `SimEvent`.
 
 use crate::network::NetworkParams;
+use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
-use shared::PROTOCOL_VERSION;
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, experiment_id,
-    summary_markdown, write_report, write_run_checkpoint, SimEvent, Simulation,
+    SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
+    experiment_id, summary_markdown, write_report, write_run_checkpoint,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;

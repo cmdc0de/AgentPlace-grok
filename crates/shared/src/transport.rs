@@ -1,12 +1,12 @@
 //! Blocking TCP and WebSocket transports. Same postcard codec on both.
 
 use crate::protocol::{self, CodecError};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 use tungstenite::protocol::WebSocket;
-use tungstenite::{accept as ws_accept, client::client_with_config, Message};
+use tungstenite::{Message, accept as ws_accept, client::client_with_config};
 
 #[derive(Debug)]
 pub enum TransportError {
@@ -263,8 +263,8 @@ fn ws_err(e: tungstenite::Error) -> TransportError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{hello, ClientMessage, ServerMessage};
     use crate::PROTOCOL_VERSION;
+    use crate::protocol::{ClientMessage, ServerMessage, hello};
     use std::thread;
 
     fn loopback(scheme: Scheme) {

@@ -104,13 +104,13 @@ allow_overhearing = true
 warn_cooldown_ticks = 10
 
 [llm]
-provider = "mock"
-base_url = "http://localhost:11434"
+provider = "mock"                              # CI default; empty provider also mocks
+base_url = "http://spark-bcce.hlab:11434"      # used when --llm ollama (empty URL ⇒ mock)
 api_key_env = "XAI_API_KEY"
-model = ""
+model = "nemotron3:33b"                        # Spark default; ignored while provider=mock
 action_temperature = 0.2
 max_retries = 2
-timeout_ms = 12000
+timeout_ms = 120000                            # 33B needs ~45s+ per call; 12s would Wait every tick
 replay_file = ""
 
 [proposals]

@@ -1,8 +1,8 @@
 //! Closed slash-command set for the viewer console. No GPU / imgui types.
 
 use shared::protocol::ControlVerb;
-use sim_bevy::{step_once, SimState};
-use sim_core::{summary_markdown, write_report, write_run_checkpoint, AgentId, ExperimentConfig};
+use sim_bevy::{SimState, step_once};
+use sim_core::{AgentId, ExperimentConfig, summary_markdown, write_report, write_run_checkpoint};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

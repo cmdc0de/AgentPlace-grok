@@ -5,7 +5,7 @@ use sim_core::event_log::SimEventKind;
 use sim_core::markers::{self, MarkerShape};
 use sim_core::memory::{self, MemoryEntry, MemoryKind};
 use sim_core::social::RelationshipSummary;
-use sim_core::{append_decisions_jsonl, AgentId, ExperimentConfig, Simulation};
+use sim_core::{AgentId, ExperimentConfig, Simulation, append_decisions_jsonl};
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -417,10 +417,11 @@ fn toxin_memory_logs_propose_or_support() {
         }
     }
     sim.tick();
-    assert!(sim
-        .last_tick_decisions
-        .iter()
-        .any(|d| { d.policy_branch == "toxin_propose" || d.policy_branch == "toxin_support" }));
+    assert!(
+        sim.last_tick_decisions
+            .iter()
+            .any(|d| { d.policy_branch == "toxin_propose" || d.policy_branch == "toxin_support" })
+    );
     assert!(sim.events.events.iter().any(|e| matches!(
         e.kind,
         SimEventKind::Propose { .. } | SimEventKind::Support { .. } | SimEventKind::Wait

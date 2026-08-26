@@ -3,9 +3,9 @@ mod overlay;
 mod server;
 
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, experiment_id,
-    report_markdown, summary_markdown, write_report, write_run_checkpoint, ExperimentConfig,
-    Simulation,
+    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
+    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -37,6 +37,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut token: Option<String> = None;
     let mut incentives_path: Option<PathBuf> = None;
     let mut inject_path: Option<PathBuf> = None;
+    let mut compare: Vec<PathBuf> = Vec::new();
+    let mut csv = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -101,6 +103,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.get(i).ok_or("--inject requires a path")?,
                 ));
             }
+            "--compare" => {
+                i += 1;
+                let a = args.get(i).ok_or("--compare requires two paths")?;
+                i += 1;
+                let b = args.get(i).ok_or("--compare requires two paths")?;
+                compare = vec![PathBuf::from(a), PathBuf::from(b)];
+            }
+            "--csv" => csv = true,
             "--help" | "-h" => {
                 print_help();
                 return Ok(());
@@ -108,6 +118,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             other => return Err(format!("unknown argument: {other}").into()),
         }
         i += 1;
+    }
+
+    if compare.len() == 2 {
+        return run_compare(&compare[0], &compare[1], csv);
     }
 
     let mut sim = if let Some(path) = &load_path {
@@ -300,6 +314,7 @@ Usage:
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--allow-control] [--token SECRET]
           [--incentives PATH] [--inject PATH]
+          [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
 Options:
   -c, --config PATH         Experiment TOML (default: configs/default.toml)
@@ -310,14 +325,26 @@ Options:
       --load PATH           Restore a .ckpt and continue
       --summarize           Print the Markdown world summary
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir
-      --llm PROVIDER        mock | wait | ollama | openai_compatible (xAI)
+      --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
       --allow-control       Accept pause/play/step/save/report/summarize from clients
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
       --incentives PATH     Apply incentive TOML from tick 0
       --inject PATH         Replace schedule (typical with --load)
+      --compare A B         Diff two --out-dir folders or .ckpt files (markdown)
+      --csv                 With --compare, also print CSV
   -h, --help                Show this help"
     );
+}
+
+fn run_compare(a: &Path, b: &Path, csv: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let (sa, sb) = load_compare_pair(a, b)?;
+    let report = compare_runs(&sa, &a.display().to_string(), &sb, &b.display().to_string());
+    print!("{}", compare_markdown(&report));
+    if csv {
+        print!("{}", compare_csv(&report));
+    }
+    Ok(())
 }
 
 fn emit_report(sim: &Simulation, out_dir: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {

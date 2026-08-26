@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{knows_toxin, MemoryEntry, MemoryKind};
+use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
 use crate::observation::neighbors4;
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};

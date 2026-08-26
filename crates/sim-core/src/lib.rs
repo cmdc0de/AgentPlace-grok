@@ -4,6 +4,7 @@ pub mod action;
 pub mod agent;
 pub mod board;
 pub mod checkpoint;
+pub mod compare;
 pub mod config;
 pub mod decision_log;
 pub mod error;
@@ -28,18 +29,21 @@ pub use board::{
     AdoptedRule, Goal, Proposal, ProposalStatus, ProposalView, PublicBoard, StructuredRule,
 };
 pub use checkpoint::{
-    agents_markdown, append_events_jsonl, decode_checkpoint, encode_checkpoint, experiment_id,
-    summary_markdown, write_run_checkpoint, CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC,
+    CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, agents_markdown, append_events_jsonl,
+    decode_checkpoint, encode_checkpoint, experiment_id, list_checkpoints, summary_markdown,
+    write_run_checkpoint,
 };
+pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};
-pub use decision_log::{append_decisions_jsonl, DecisionRecord};
+pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;
 pub use event_log::{SimEvent, SimEventKind};
 pub use incentive::{Incentive, IncentiveSchedule};
-pub use llm::{parse_choice_json, ActionChooser, ChooseError, Chooser, ReplayTable};
+pub use llm::{ActionChooser, ChooseError, Chooser, ReplayTable, parse_choice_json};
+pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};
-pub use seeding::{derive_seed, RngBank};
+pub use seeding::{RngBank, derive_seed};
 pub use simulation::{Simulation, StateHash};
 pub use social::{RelationView, RelationshipSummary};
-pub use timing::{append_timing_jsonl, AgentTiming, TickTiming};
+pub use timing::{AgentTiming, TickTiming, append_timing_jsonl};
 pub use world::World;

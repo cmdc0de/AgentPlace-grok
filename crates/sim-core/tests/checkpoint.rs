@@ -1,6 +1,6 @@
 use sim_core::{
-    decode_checkpoint, encode_checkpoint, write_run_checkpoint, ExperimentConfig, Simulation,
-    CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC,
+    CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, ExperimentConfig, Simulation, decode_checkpoint,
+    encode_checkpoint, write_run_checkpoint,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {

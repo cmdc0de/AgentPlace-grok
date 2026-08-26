@@ -20,7 +20,7 @@ pub mod protocol;
 pub mod transport;
 
 pub use protocol::{
-    decode_frame, encode_frame, read_frame, write_frame, ClientMessage, ControlVerb, ErrorCode,
-    ServerMessage,
+    ClientMessage, ControlVerb, ErrorCode, ServerMessage, decode_frame, encode_frame, read_frame,
+    write_frame,
 };
-pub use transport::{parse_listen_url, Connection, Listener, TransportError};
+pub use transport::{Connection, Listener, TransportError, parse_listen_url};

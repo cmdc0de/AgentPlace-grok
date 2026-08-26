@@ -186,3 +186,27 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
         }
     }
 }
+
+pub fn kind_label(kind: &SimEventKind) -> &'static str {
+    match kind {
+        SimEventKind::Wait => "Wait",
+        SimEventKind::Rest => "Rest",
+        SimEventKind::Move { .. } => "Move",
+        SimEventKind::Gather { .. } => "Gather",
+        SimEventKind::Drink => "Drink",
+        SimEventKind::Eat { .. } => "Eat",
+        SimEventKind::Hunt { .. } => "Hunt",
+        SimEventKind::Fish { .. } => "Fish",
+        SimEventKind::Farm { .. } => "Farm",
+        SimEventKind::Craft { .. } => "Craft",
+        SimEventKind::Speak { .. } => "Speak",
+        SimEventKind::LlmWait => "LlmWait",
+        SimEventKind::Propose { .. } => "Propose",
+        SimEventKind::Support { .. } => "Support",
+        SimEventKind::Oppose { .. } => "Oppose",
+        SimEventKind::RuleBlocked { .. } => "RuleBlocked",
+        SimEventKind::IncentiveApplied { .. } => "IncentiveApplied",
+        SimEventKind::IncentiveEnded { .. } => "IncentiveEnded",
+        SimEventKind::Died { .. } => "Died",
+    }
+}

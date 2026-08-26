@@ -1,7 +1,7 @@
 use sim_core::event_log::SimEventKind;
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::species::Toxicity;
-use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation, CHECKPOINT_FORMAT_VERSION};
+use sim_core::{AgentId, CHECKPOINT_FORMAT_VERSION, ExperimentConfig, ItemId, Simulation};
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -39,11 +39,11 @@ fn drink_raises_thirst() {
         "thirst should recover after drink, got {}",
         a.needs.thirst
     );
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .any(|e| { e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait) }));
+    assert!(
+        sim.events.events.iter().any(|e| {
+            e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait)
+        })
+    );
 }
 
 #[test]
@@ -217,16 +217,18 @@ fn wait_chooser_does_not_speak() {
     let mut sim = Simulation::new(tiny_config(15)).unwrap();
     sim.chooser = sim_core::Chooser::Wait;
     sim.run_ticks(8);
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .all(|e| !matches!(e.kind, SimEventKind::Speak { .. })));
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .any(|e| matches!(e.kind, SimEventKind::LlmWait)));
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .all(|e| !matches!(e.kind, SimEventKind::Speak { .. }))
+    );
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .any(|e| matches!(e.kind, SimEventKind::LlmWait))
+    );
 }
 
 #[test]
@@ -350,11 +352,12 @@ fn death_disabled_keeps_zero_thirst_agent() {
     sim.tick();
     assert_eq!(sim.agents.len(), n);
     assert!(sim.agents.values().any(|a| a.needs.thirst == 0));
-    assert!(sim
-        .events
-        .events
-        .iter()
-        .all(|e| !matches!(e.kind, SimEventKind::Died { .. })));
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .all(|e| !matches!(e.kind, SimEventKind::Died { .. }))
+    );
 }
 
 #[test]
@@ -369,9 +372,73 @@ fn death_enabled_removes_agent_at_zero_thirst() {
         .events
         .events
         .iter()
-        .filter(|e| matches!(e.kind, SimEventKind::Died { thirst_zero: true, .. }))
+        .filter(|e| {
+            matches!(
+                e.kind,
+                SimEventKind::Died {
+                    thirst_zero: true,
+                    ..
+                }
+            )
+        })
         .count();
     assert_eq!(deaths, n);
+}
+
+#[test]
+fn observation_includes_needs_and_incentives() {
+    let mut sim = Simulation::new(tiny_config(31)).unwrap();
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "coop_food"
+description = "test bonus"
+start_tick = 0
+applies_to = "all"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "share food"
+scope = "personal"
+priority = 0.5
+"#,
+    )
+    .unwrap();
+    sim.tick();
+    let obs = observation::build(&sim, AgentId(0));
+    assert!(obs.hunger > 0 && obs.hunger <= 100, "hunger={}", obs.hunger);
+    assert!(obs.thirst > 0 && obs.thirst <= 100, "thirst={}", obs.thirst);
+    assert!(
+        obs.incentives.iter().any(|i| i.id == "coop_food"),
+        "{:?}",
+        obs.incentives
+    );
+}
+
+#[test]
+fn mock_drinks_before_half_thirst() {
+    let mut sim = Simulation::new(tiny_config(7)).unwrap();
+    sim.config.needs.death_enabled = true;
+    let id = AgentId(0);
+    let water = find_land_next_to_water(&sim).expect("water edge");
+    let half = sim.config.thirst_max_milli() / 2;
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.x = water.0;
+        a.y = water.1;
+        // Above the old max/2 cutoff, below M9's 75% seek line.
+        a.needs.thirst = half + 100;
+        a.needs.hunger = sim.config.hunger_max_milli();
+        a.needs.energy = sim.config.energy_max_milli();
+    }
+    sim.tick();
+    assert!(
+        sim.events
+            .events
+            .iter()
+            .any(|e| e.agent == id && matches!(e.kind, SimEventKind::Drink)),
+        "should Drink while still above half thirst; events={:?}",
+        sim.events.events
+    );
+    assert!(sim.agents.contains_key(&id));
 }
 
 fn find_land_next_to_water(sim: &Simulation) -> Option<(u32, u32)> {

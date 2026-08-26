@@ -4,20 +4,20 @@ use crate::board::{Goal, PublicBoard};
 use crate::config::{ExperimentConfig, SpawnMode};
 use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
-use crate::event_log::{hash_kind, EventLog, SimEvent, SimEventKind};
+use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
 use crate::execute::{apply_heard_memories, execute_primary};
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    chosen_to_json, parse_choice_json, prompt_hash, ChooseError, Chooser, ReplayRecord, ReplayTable,
+    ChooseError, Chooser, ReplayRecord, ReplayTable, chosen_to_json, parse_choice_json, prompt_hash,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
-use crate::seeding::{derive_seed, resolve_seed, RngBank};
+use crate::seeding::{RngBank, derive_seed, resolve_seed};
 use crate::timing::{self, AgentTiming, TickTiming};
 use crate::world::World;
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

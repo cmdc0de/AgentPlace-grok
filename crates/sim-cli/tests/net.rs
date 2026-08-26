@@ -1,8 +1,8 @@
 //! M7 attach tests. Spawn `sim-cli --listen` so we do not put sockets in sim-core.
 
-use shared::protocol::{hello, ClientMessage, ControlVerb, ErrorCode, ServerMessage};
-use shared::transport::Connection;
 use shared::PROTOCOL_VERSION;
+use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage, hello};
+use shared::transport::Connection;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};

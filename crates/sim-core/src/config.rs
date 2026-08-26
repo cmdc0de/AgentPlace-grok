@@ -1,5 +1,5 @@
 use crate::error::SimError;
-use crate::species::{default_species_tables, SpeciesTables};
+use crate::species::{SpeciesTables, default_species_tables};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
@@ -650,7 +650,7 @@ fn default_llm_provider() -> String {
     "mock".into()
 }
 fn default_llm_url() -> String {
-    "http://localhost:11434".into()
+    "http://spark-bcce.hlab:11434".into()
 }
 fn default_api_key_env() -> String {
     "XAI_API_KEY".into()

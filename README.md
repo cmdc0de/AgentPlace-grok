@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M8** (`docs/M8-plan.md`).
+Deterministic multi-agent simulation. Current slice: **M9** (`docs/M9-plan.md`).
 
 Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md).
 
@@ -95,9 +95,19 @@ cargo test -p sim-cli --test net
 cargo test -p sim-cli --test ab
 ```
 
-Optional live LLM (not required for CI):
+Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Set `replay_file` to record JSONL (missing path) or replay an existing file. Researcher walkthrough: [`docs/M9-test-plan.md`](docs/M9-test-plan.md).
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 20 --llm ollama
 cargo run -p sim-cli -- --config configs/default.toml --ticks 20 --llm openai_compatible
+```
+
+`--compare` two `--out-dir`s or `.ckpt` files (hash, deaths, board, consumption, needs, goals, incentives, event histogram):
+
+```bash
+cargo run -p sim-cli -- --config configs/default.toml --ticks 80 --llm mock \
+  --out-dir /tmp/base --quiet
+cargo run -p sim-cli -- --config configs/default.toml --ticks 80 --llm mock \
+  --incentives configs/incentives/coop.toml --out-dir /tmp/coop --quiet
+cargo run -p sim-cli -- --compare /tmp/base /tmp/coop
 ```
