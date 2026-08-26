@@ -87,7 +87,8 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 
 | Later | What |
 |---|---|
-| After M9 | Protobuf / JSON envelope; TLS/`wss`; timeline scrubber; `visibility_modifier`; vote weighting; Transfer/Store; `/set` `/give`; reflection-on-evict; embeddings |
+| **M10** | [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers (weight, energy, 3D marker); in-process `/give` |
+| After M10 | Protobuf / JSON envelope; TLS/`wss`; timeline scrubber; `visibility_modifier`; vote weighting; `/set`; wire Give; reflection-on-evict; embeddings |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions

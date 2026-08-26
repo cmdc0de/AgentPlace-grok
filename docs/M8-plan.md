@@ -91,8 +91,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 
 | Later | What |
 |---|---|
-| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
-| After M9 | Protobuf or JSON-envelope rewrite; TLS / `wss`; timeline scrubber; `visibility_modifier`; vote weighting; `/set` `/give`; LLM reflection-on-evict |
+| **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
+| **M10** | [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers |
+| After M10 | Protobuf or JSON-envelope rewrite; TLS / `wss`; timeline scrubber; `visibility_modifier`; vote weighting; `/set`; wire Give; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

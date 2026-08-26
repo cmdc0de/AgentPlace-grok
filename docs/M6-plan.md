@@ -63,8 +63,9 @@ No `/set`, `/give`, `/inject`. Those wait for M8.
 |---|---|
 | **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket; remote GUI clients) |
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death) |
-| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
-| Later | Timeline scrubber, metrics charts, browser imgui, vote weighting, live embeddings, world-mutation console |
+| **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
+| **M10** | [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers; in-process `/give` |
+| Later | Timeline scrubber, metrics charts, browser imgui, vote weighting, live embeddings, `/set` |
 
 ## Key decisions
 

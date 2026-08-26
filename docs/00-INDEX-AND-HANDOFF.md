@@ -25,7 +25,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M7** | Done (tag `M7`, `789fc81`) | [`M7-plan.md`](M7-plan.md) | Attachable TCP and WebSocket clients (hash-neutral read-only attach) |
 | **M8** | Done (tag `M8`, `b0b9d14`) | [`M8-plan.md`](M8-plan.md) | Incentive A/B inject + processing (wall-clock) metrics; death |
 | **M9** | Done (tag `M9`) | [`M9-plan.md`](M9-plan.md), walkthrough [`M9-test-plan.md`](M9-test-plan.md) | LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
-| After M9 | Not started | listed at the bottom of `M9-plan.md` | Protobuf/TLS, timeline scrubber, Transfer/Store |
+| **M10** | **Planned — next** | [`M10-plan.md`](M10-plan.md) | Live LLM parse/replay reliability; Transfer/Store containers (weight, energy, 3D marker) |
+| After M10 | Not started | listed at the bottom of `M10-plan.md` | Protobuf/TLS, timeline scrubber, `visibility_modifier`, vote weighting |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -51,15 +52,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 12 | `M7-plan.md` | Milestone 7 (done): TCP + WebSocket attachable clients |
 | 13 | `M8-plan.md` | Milestone 8 (done): incentive A/B inject + processing metrics |
 | 14 | `M9-plan.md` | Milestone 9 (done, tag `M9`): LLM-in-the-loop prompts, replay, `--compare` |
+| 15 | `M10-plan.md` | Milestone 10 (next): thinking-model parse + honest replay; Transfer/Store containers |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M9-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M10-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M9-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M10-plan.md`. Implement the current milestone; do not expand into items it defers.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -87,13 +89,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M9 are done (tag `M9`). Later work is listed at the bottom of `M9-plan.md` (protobuf/TLS, timeline, Transfer/Store).
+M1–M9 are done (tag `M9`). Next work is M10.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M9-plan.md.
-M9 is implemented: LLM prompts include needs+incentives, empty URL⇒mock,
-default Ollama http://spark-bcce.hlab:11434, replay, --compare, mock drink
-before thirst-death. Do not switch to protobuf, add TLS, or Transfer/Store.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M10-plan.md.
+Implement M10 (thinking-model LLM parse + raw replay so LlmWait round-trips;
+Transfer/Store/Retrieve on a slot+weight limited land-cell container; energy
+∝ weight; 3D stockpile marker; in-process /give). Do not switch to protobuf,
+add TLS, visibility_modifier, vote weighting, or wire Give.
 CI stays provider=mock with no network.
 ```
 

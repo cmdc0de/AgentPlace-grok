@@ -53,8 +53,9 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 | **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war matching `Observation`, slash-command console). |
 | **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach). |
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death). |
-| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare`, mock drink-before-death. |
-| Later still | Attack / Flee / death, seasons, complex crafting, shared stockpiles, Transfer/Store, lie detection, dialects. |
+| **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare`, mock drink-before-death. |
+| **M10** | [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers (weight, energy, 3D marker). |
+| Later still | Attack / Flee, seasons, Basket-as-backpack, lie detection, dialects. |
 
 ## Key decisions
 

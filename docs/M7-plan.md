@@ -65,8 +65,9 @@ Server → Client:
 | Later | What |
 |---|---|
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive TOML, `/inject`, processing metrics, death) |
-| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
-| Later | TLS / `wss`, Unix sockets, multiple exclusive writers, jump-to-tick without a file, delta compression, browser client, vote weighting, world-mutation `/set` `/give` |
+| **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
+| **M10** | [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store; in-process `/give` (not on the wire) |
+| Later | TLS / `wss`, Unix sockets, multiple exclusive writers, jump-to-tick without a file, delta compression, browser client, vote weighting, `/set`, wire Give |
 
 Do **not** implement payoff/influence stubs that would change hashes.
 

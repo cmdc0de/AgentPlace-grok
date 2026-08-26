@@ -84,8 +84,9 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 | **M6** | Done — [`M6-plan.md`](M6-plan.md) (imgui research UI, agent-POV fog-of-war, slash-command console) |
 | **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach) |
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death) |
-| **M9** | [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
-| Later | Transfer/Store, shared stockpiles, meta-rules, Attack/Flee/death, dialects, lie detection, weighted-by-status voting |
+| **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
+| **M10** | [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers |
+| Later | Meta-rules, Attack/Flee, dialects, lie detection, weighted-by-status voting |
 
 Do not pull incentives into M4. The A/B loop needs a working board and a readable food report first.
 
