@@ -130,7 +130,8 @@ HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line
 | **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach) |
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death) |
 | **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
-| **M10** | [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers |
+| **M10** | Done — [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers |
+| **M11** | [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
 | Later | Weighted-by-status voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, meta-rules |
 
 Do **not** pull incentives into M5. Relationships have to exist before an incentive can target them.

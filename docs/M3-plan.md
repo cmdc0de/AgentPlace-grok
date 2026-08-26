@@ -54,8 +54,9 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 | **M7** | Done — [`M7-plan.md`](M7-plan.md) (TCP / WebSocket, hash-neutral attach). |
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death). |
 | **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare`, mock drink-before-death. |
-| **M10** | [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers (weight, energy, 3D marker). |
-| Later still | Attack / Flee, seasons, Basket-as-backpack, lie detection, dialects. |
+| **M10** | Done — [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers. |
+| **M11** | [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack. |
+| Later still | Attack / Flee, seasons, `visibility_modifier`, lie detection, dialects. |
 
 ## Key decisions
 
