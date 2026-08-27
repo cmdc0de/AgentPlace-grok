@@ -8,6 +8,7 @@ pub enum VoteWeight {
     #[default]
     Equal,
     Influence,
+    Respect,
 }
 
 impl VoteWeight {
@@ -15,8 +16,9 @@ impl VoteWeight {
         match s.trim().to_ascii_lowercase().as_str() {
             "" | "equal" => Ok(Self::Equal),
             "influence" => Ok(Self::Influence),
+            "respect" => Ok(Self::Respect),
             other => Err(SimError::Config(format!(
-                "unknown voting weight {other:?} (use equal or influence)"
+                "unknown voting weight {other:?} (use equal, influence, or respect)"
             ))),
         }
     }
@@ -25,6 +27,7 @@ impl VoteWeight {
         match self {
             Self::Equal => "equal",
             Self::Influence => "influence",
+            Self::Respect => "respect",
         }
     }
 }
@@ -44,6 +47,12 @@ impl VotingParams {
     pub fn influence() -> Self {
         Self {
             weight: VoteWeight::Influence,
+        }
+    }
+
+    pub fn respect() -> Self {
+        Self {
+            weight: VoteWeight::Respect,
         }
     }
 
@@ -85,12 +94,19 @@ mod tests {
             VoteWeight::parse("influence").unwrap(),
             VoteWeight::Influence
         );
+        assert_eq!(VoteWeight::parse("respect").unwrap(), VoteWeight::Respect);
     }
 
     #[test]
     fn config_toml_influence() {
         let p = VotingParams::from_config_toml("[voting]\nweight = \"influence\"\n").unwrap();
         assert_eq!(p.weight, VoteWeight::Influence);
+    }
+
+    #[test]
+    fn config_toml_respect() {
+        let p = VotingParams::from_config_toml("[voting]\nweight = \"respect\"\n").unwrap();
+        assert_eq!(p.weight, VoteWeight::Respect);
     }
 
     #[test]

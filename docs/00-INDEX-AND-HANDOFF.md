@@ -30,7 +30,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M12** | Done (tag `M12`) | [`M12-plan.md`](M12-plan.md), walkthrough [`M12-test-plan.md`](M12-test-plan.md) | Public vs hidden incentives (Observation/prompt) |
 | **M13** | Done (tag `M13`) | [`M13-plan.md`](M13-plan.md), walkthrough [`M13-test-plan.md`](M13-test-plan.md) | Opt-in influence-weighted votes |
 | **M14** | Done (tag `M14`) | [`M14-plan.md`](M14-plan.md), walkthrough [`M14-test-plan.md`](M14-test-plan.md) | Coalition `supporters_of` + viewer checkpoint scrubber |
-| **M15** | **Planned — next** | [`M15-plan.md`](M15-plan.md) | Opt-in respect-weighted votes |
+| **M15** | Done (tag `M15`) | [`M15-plan.md`](M15-plan.md), walkthrough [`M15-test-plan.md`](M15-test-plan.md) | Opt-in respect-weighted votes |
 | After M15 | Not started | listed at the bottom of `M15-plan.md` | `/set`, council/unanimous, action/board fog, protobuf/TLS, wire Give |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -66,7 +66,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 18b | `M13-test-plan.md` | M13 walkthrough (equal vs influence kingmaker) |
 | 19 | `M14-plan.md` | Milestone 14 (done, tag `M14`): coalition targeting + checkpoint scrubber |
 | 19b | `M14-test-plan.md` | M14 walkthrough (supporters_of + `--load DIR` scrubber) |
-| 20 | `M15-plan.md` | Milestone 15 (next): opt-in respect-weighted votes |
+| 20 | `M15-plan.md` | Milestone 15 (done, tag `M15`): opt-in respect-weighted votes |
+| 20b | `M15-test-plan.md` | M15 walkthrough (equal vs respect kingmaker) |
 
 ---
 
@@ -75,7 +76,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M15-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M15-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M15 is implemented; do not expand into items it defers (`/set`, council/unanimous, action/board fog, protobuf/TLS, wire Give).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -103,11 +104,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M14 are done (tag `M14`). Next work is M15.
+M1–M15 are done (tag `M15`). Later work is listed at the bottom of `M15-plan.md`.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M15-plan.md.
-Implement M15 ([voting] weight = "respect"; relationship_delta respect +
+M15 is implemented ([voting] weight = "respect"; relationship_delta respect +
 toward). Do not add /set, council/unanimous, board fog, protobuf, TLS,
 or wire Give.
 CI stays provider=mock with no network.

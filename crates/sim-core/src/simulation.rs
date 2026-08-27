@@ -158,7 +158,27 @@ impl Simulation {
                 .get(&id)
                 .map(|a| u64::from(a.influence_factor.max(1)))
                 .unwrap_or(1),
+            VoteWeight::Respect => self.incoming_respect_sum(id).max(1),
         }
+    }
+
+    /// Sum of `max(other.relationships[id].respect, 0)` over other living agents.
+    pub fn incoming_respect_sum(&self, id: AgentId) -> u64 {
+        let mut sum = 0u64;
+        for (oid, other) in &self.agents {
+            if *oid == id {
+                continue;
+            }
+            let r = other
+                .relationships
+                .get(&id)
+                .map(|row| row.respect)
+                .unwrap_or(0);
+            if r > 0 {
+                sum += r as u64;
+            }
+        }
+        sum
     }
 
     pub fn vote_weight_map(&self) -> BTreeMap<AgentId, u64> {

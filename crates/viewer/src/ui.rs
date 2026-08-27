@@ -525,16 +525,20 @@ fn draw_board(ui: &Ui, state: &SimState, open: &mut bool) {
             ui.separator();
             ui.text("proposals");
             let need = state.sim.vote_need();
-            let influence = state.sim.voting.weight == sim_core::VoteWeight::Influence;
-            if influence {
+            let weighted = matches!(
+                state.sim.voting.weight,
+                sim_core::VoteWeight::Influence | sim_core::VoteWeight::Respect
+            );
+            if weighted {
                 ui.text(format!(
-                    "tally influence  need {need}  total {}",
+                    "tally {}  need {need}  total {}",
+                    state.sim.voting.weight.as_str(),
                     state.sim.living_vote_total()
                 ));
             }
             for p in &state.sim.board.proposals {
                 let (yes_w, no_w) = state.sim.proposal_yes_no_weight(p);
-                if influence {
+                if weighted {
                     ui.text(format!(
                         "  #{} {:?} yes={} ({yes_w}) no={} ({no_w}) need={need} {:?}",
                         p.id,

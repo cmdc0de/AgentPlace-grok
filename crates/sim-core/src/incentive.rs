@@ -87,6 +87,11 @@ pub enum EffectSpec {
         trust: f64,
         #[serde(default)]
         affinity: f64,
+        #[serde(default)]
+        respect: f64,
+        /// Empty = every other agent. `agent:N` = that id only.
+        #[serde(default)]
+        toward: String,
     },
 }
 
@@ -128,6 +133,11 @@ impl IncentiveSchedule {
                     inc.applies_to
                 )));
             }
+            for e in &inc.effects {
+                if let EffectSpec::RelationshipDelta { toward, .. } = e {
+                    parse_toward(toward)?;
+                }
+            }
         }
         Ok(())
     }
@@ -141,6 +151,23 @@ impl IncentiveSchedule {
 
 fn window(inc: &Incentive, tick: u64) -> bool {
     tick >= inc.start_tick && inc.end_tick.map(|e| tick <= e).unwrap_or(true)
+}
+
+/// Empty → all others. `agent:N` → that id. Anything else is a load error.
+fn parse_toward(s: &str) -> Result<Option<AgentId>, SimError> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Ok(None);
+    }
+    if let Some(rest) = s.strip_prefix("agent:") {
+        let n: u64 = rest
+            .parse()
+            .map_err(|_| SimError::Config(format!("unsupported toward {s:?} (use agent:N)")))?;
+        return Ok(Some(AgentId(n)));
+    }
+    Err(SimError::Config(format!(
+        "unsupported toward {s:?} (use agent:N)"
+    )))
 }
 
 fn valid_scope(s: &str) -> bool {
@@ -372,10 +399,25 @@ fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
                     });
                 }
             }
-            EffectSpec::RelationshipDelta { trust, affinity } => {
+            EffectSpec::RelationshipDelta {
+                trust,
+                affinity,
+                respect,
+                toward,
+            } => {
                 let dt = (*trust * 100.0).round() as i16;
                 let da = (*affinity * 100.0).round() as i16;
-                let others: Vec<AgentId> = sim.agents.keys().copied().collect();
+                let dr = (*respect * 100.0).round() as i16;
+                let toward_id = parse_toward(toward).ok().flatten();
+                let others: Vec<AgentId> = if let Some(t) = toward_id {
+                    if sim.agents.contains_key(&t) {
+                        vec![t]
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    sim.agents.keys().copied().collect()
+                };
                 for id in &ids {
                     for other in &others {
                         if other == id {
@@ -385,6 +427,7 @@ fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
                             let row = a.relationships.entry(*other).or_default();
                             row.trust = row.trust.saturating_add(dt).clamp(REL_MIN, REL_MAX);
                             row.affinity = row.affinity.saturating_add(da).clamp(REL_MIN, REL_MAX);
+                            row.respect = row.respect.saturating_add(dr).clamp(REL_MIN, REL_MAX);
                             row.last_interaction_tick = sim.tick;
                         }
                     }
@@ -491,6 +534,46 @@ visibility = "maybe"
         )
         .unwrap_err();
         assert!(err.to_string().contains("config"), "{err}");
+    }
+
+    #[test]
+    fn toward_nope_is_load_error() {
+        let err = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "e"
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 70.0
+toward = "nope"
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("toward"), "{err}");
+    }
+
+    #[test]
+    fn parses_relationship_delta_respect_toward() {
+        let s = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "e"
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 70.0
+toward = "agent:0"
+"#,
+        )
+        .unwrap();
+        match &s.incentives[0].effects[0] {
+            EffectSpec::RelationshipDelta {
+                respect, toward, ..
+            } => {
+                assert!((*respect - 70.0).abs() < 1e-9);
+                assert_eq!(toward, "agent:0");
+            }
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

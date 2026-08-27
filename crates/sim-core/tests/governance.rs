@@ -53,6 +53,17 @@ type = "influence_factor_delta"
 delta = 70.0
 "#;
 
+const ESTEEM: &str = r#"
+[[incentives]]
+id = "esteem_0"
+description = "everyone respects agent 0"
+applies_to = "all"
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 70.0
+toward = "agent:0"
+"#;
+
 fn two_agent_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
         r#"
@@ -496,4 +507,47 @@ fn equal_no_boost_same_seed_same_hash() {
     a.run_ticks(8);
     b.run_ticks(8);
     assert_eq!(a.state_hash(), b.state_hash());
+}
+
+#[test]
+fn respect_kingmaker_one_support_accepts() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4014)).unwrap();
+    sim.voting.weight = VoteWeight::Respect;
+    sim.inject_schedule_toml(ESTEEM).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(
+        sim.board.proposals[0].status,
+        ProposalStatus::Accepted,
+        "yes_w should meet need; w0={} need={}",
+        sim.vote_weight_of(AgentId(0)),
+        sim.vote_need()
+    );
+    assert_eq!(sim.vote_weight_of(AgentId(0)), 14000);
+    assert_eq!(sim.vote_weight_of(AgentId(1)), 1);
+    assert_eq!(sim.board.adopted.len(), 1);
+}
+
+#[test]
+fn equal_with_esteem_still_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4015)).unwrap();
+    sim.voting.weight = VoteWeight::Equal;
+    sim.inject_schedule_toml(ESTEEM).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+}
+
+#[test]
+fn respect_zero_same_hash_as_equal() {
+    let cfg = three_agent_config(0x4D4016);
+    let mut eq = Simulation::new(cfg.clone()).unwrap();
+    let mut rs = Simulation::new(cfg).unwrap();
+    eq.chooser = sim_core::Chooser::Wait;
+    rs.chooser = sim_core::Chooser::Wait;
+    eq.voting.weight = VoteWeight::Equal;
+    rs.voting.weight = VoteWeight::Respect;
+    eq.run_ticks(8);
+    rs.run_ticks(8);
+    assert_eq!(eq.state_hash(), rs.state_hash());
 }

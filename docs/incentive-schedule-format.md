@@ -107,6 +107,8 @@ Applied once when the incentive **starts**.
 |---|---|---|
 | `trust` | no | `0.0` | Applied once at start to every in-scope agent vs every other agent (`0.1` → +10 millipoints). |
 | `affinity` | no | `0.0` | Same scale. |
+| `respect` | no | `0.0` | Same scale (`70.0` → +7000). |
+| `toward` | no | `""` | Omit / empty = every other agent. `toward = "agent:N"` = that id only (skip self). `toward = "nope"` is a load error. Missing agent at start is a no-op for that edge. |
 
 ### Not an effect type
 
@@ -118,9 +120,10 @@ Vote **tally** is not an incentive effect. Overlay on the experiment TOML (like 
 [voting]
 weight = "equal"       # default; omit = equal (one living agent = 1)
 # weight = "influence" # max(influence_factor, 1) millipoints
+# weight = "respect"   # max(incoming positive respect from other living agents, 1)
 ```
 
-Unknown `weight` is a load error. Pair `influence` with [`configs/incentives/leadership.toml`](../configs/incentives/leadership.toml) (`influence_factor_delta = 70.0` on `agent:0`) to A/B a kingmaker. Do not put `[voting]` in shipping `configs/default.toml`.
+Unknown `weight` is a load error. Pair `influence` with [`configs/incentives/leadership.toml`](../configs/incentives/leadership.toml) (`influence_factor_delta = 70.0` on `agent:0`) to A/B a kingmaker. Pair `respect` with [`configs/incentives/esteem.toml`](../configs/incentives/esteem.toml) (`relationship_delta` respect toward `agent:0`). Default respect 0 ⇒ same as equal. Do not put `[voting]` in shipping `configs/default.toml`.
 
 ## How a file is applied
 

@@ -1,7 +1,8 @@
 # M15 — Respect-weighted votes (opt-in)
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M14 complete (`docs/M14-plan.md`, git tag `M14`, commit `23e8058`)  
+**Walkthrough:** [`M15-test-plan.md`](M15-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (acceptance: simple majority vs weighted-by-status), `M13-plan.md` (`equal` | `influence`), `M5-plan.md` (`RelationshipSummary.respect` exists, unused in tally)
 
 ## Context
@@ -141,6 +142,8 @@ cargo test -p viewer
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M15-test-plan.md`](M15-test-plan.md).
 
 ```bash
 cargo test -p sim-core

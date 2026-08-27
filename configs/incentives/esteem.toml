@@ -1,0 +1,19 @@
+# Directed respect toward agent 0. Pair with overlay [voting] weight = "respect"
+# so one Support can pass a 3-agent 50% board (equal tally stays Open).
+# respect 70.0 → +7000 millipoints from each other living agent (2 × 7000 = 14000).
+#
+#   # in a copied experiment TOML:
+#   [voting]
+#   weight = "respect"
+#   sim-cli --config that.toml --incentives configs/incentives/esteem.toml
+#
+# Field list: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "esteem_0"
+description = "everyone respects agent 0"
+applies_to = "all"
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 70.0
+toward = "agent:0"
