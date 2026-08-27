@@ -106,8 +106,15 @@ impl PublicBoard {
         }
     }
 
-    pub fn tick_lifecycle(&mut self, population: u32, threshold: f64, lifetime: u64, tick: u64) {
-        let need = ((threshold * f64::from(population)).ceil() as u32).max(1);
+    pub fn tick_lifecycle(
+        &mut self,
+        total_weight: u64,
+        weight_of: impl Fn(AgentId) -> u64,
+        threshold: f64,
+        lifetime: u64,
+        tick: u64,
+    ) {
+        let need = ((threshold * total_weight as f64).ceil() as u64).max(1);
         let mut newly = Vec::new();
         for p in &mut self.proposals {
             if p.status != ProposalStatus::Open {
@@ -118,8 +125,8 @@ impl PublicBoard {
                 self.expired_count += 1;
                 continue;
             }
-            let yes = p.supporters.len() as u32;
-            let no = p.opposers.len() as u32;
+            let yes: u64 = p.supporters.iter().map(|id| weight_of(*id)).sum();
+            let no: u64 = p.opposers.iter().map(|id| weight_of(*id)).sum();
             if yes >= need {
                 p.status = ProposalStatus::Accepted;
                 self.accepted_count += 1;

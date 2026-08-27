@@ -17,6 +17,7 @@ use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
 use crate::seeding::{RngBank, derive_seed, resolve_seed};
 use crate::timing::{self, AgentTiming, TickTiming};
+use crate::voting::{VoteWeight, VotingParams};
 use crate::world::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -62,6 +63,8 @@ pub struct Simulation {
     pub last_tick_timing: Option<TickTiming>,
     /// Overlay/constants. Not in ExperimentConfig postcard.
     pub storage: StorageParams,
+    /// Overlay. Not in ExperimentConfig postcard.
+    pub voting: VotingParams,
 }
 
 impl Simulation {
@@ -111,6 +114,7 @@ impl Simulation {
             incentive_active: BTreeSet::new(),
             last_tick_timing: None,
             storage: StorageParams::default(),
+            voting: VotingParams::default(),
         })
     }
 
@@ -146,6 +150,40 @@ impl Simulation {
         self.agents.keys().copied().collect()
     }
 
+    pub fn vote_weight_of(&self, id: AgentId) -> u64 {
+        match self.voting.weight {
+            VoteWeight::Equal => 1,
+            VoteWeight::Influence => self
+                .agents
+                .get(&id)
+                .map(|a| u64::from(a.influence_factor.max(1)))
+                .unwrap_or(1),
+        }
+    }
+
+    pub fn vote_weight_map(&self) -> BTreeMap<AgentId, u64> {
+        self.agents
+            .keys()
+            .copied()
+            .map(|id| (id, self.vote_weight_of(id)))
+            .collect()
+    }
+
+    pub fn living_vote_total(&self) -> u64 {
+        self.vote_weight_map().values().copied().sum()
+    }
+
+    pub fn vote_need(&self) -> u64 {
+        let th = incentive::proposal_threshold(self);
+        ((th * self.living_vote_total() as f64).ceil() as u64).max(1)
+    }
+
+    pub fn proposal_yes_no_weight(&self, p: &crate::board::Proposal) -> (u64, u64) {
+        let yes: u64 = p.supporters.iter().map(|id| self.vote_weight_of(*id)).sum();
+        let no: u64 = p.opposers.iter().map(|id| self.vote_weight_of(*id)).sum();
+        (yes, no)
+    }
+
     pub fn tick(&mut self) -> bool {
         if self.config.simulation.max_ticks > 0 && self.tick >= self.config.simulation.max_ticks {
             return false;
@@ -173,11 +211,18 @@ impl Simulation {
         self.reap_dead();
         let world_ns = timing::ns_since(world0);
         let board0 = Instant::now();
-        let pop = self.agents.len() as u32;
         let th = incentive::proposal_threshold(self);
         let life = self.config.proposals.proposal_lifetime_ticks;
         let tick = self.tick;
-        self.board.tick_lifecycle(pop, th, life, tick);
+        let weights = self.vote_weight_map();
+        let total: u64 = weights.values().copied().sum();
+        self.board.tick_lifecycle(
+            total,
+            |id| weights.get(&id).copied().unwrap_or(1),
+            th,
+            life,
+            tick,
+        );
         let board_ns = timing::ns_since(board0);
         let agents0 = Instant::now();
         let mut order: Vec<AgentId> = self.agents.keys().copied().collect();

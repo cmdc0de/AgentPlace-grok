@@ -23,6 +23,7 @@ pub mod simulation;
 pub mod social;
 pub mod species;
 pub mod timing;
+pub mod voting;
 pub mod world;
 
 pub use agent::{Abilities, Agent, AgentId, ItemId, Needs, Personality};
@@ -51,4 +52,5 @@ pub use seeding::{RngBank, derive_seed};
 pub use simulation::{Simulation, StateHash};
 pub use social::{RelationView, RelationshipSummary};
 pub use timing::{AgentTiming, TickTiming, append_timing_jsonl};
+pub use voting::{VoteWeight, VotingParams};
 pub use world::World;

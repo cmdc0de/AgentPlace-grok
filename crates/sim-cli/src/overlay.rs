@@ -11,6 +11,13 @@ pub struct OverlayFile {
     pub metrics: MetricsOverlay,
     #[serde(default)]
     pub storage: StorageOverlay,
+    #[serde(default)]
+    pub voting: VotingOverlay,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct VotingOverlay {
+    pub weight: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

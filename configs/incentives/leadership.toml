@@ -1,0 +1,18 @@
+# Boost agent 0's influence. Pair with overlay [voting] weight = "influence"
+# so one Support can pass a 3-agent 50% board (equal tally stays Open).
+# delta 70.0 → +7000 millipoints (base 3000 → clamp 10000).
+#
+#   # in a copied experiment TOML:
+#   [voting]
+#   weight = "influence"
+#   sim-cli --config that.toml --incentives configs/incentives/leadership.toml
+#
+# Field list: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "kingmaker"
+description = "boost agent 0 influence"
+applies_to = "agent:0"
+[[incentives.effects]]
+type = "influence_factor_delta"
+delta = 70.0

@@ -113,6 +113,16 @@ Applied once when the incentive **starts**.
 
 `type = "visibility_modifier"` is still a **load error**. Use the `visibility` field on `[[incentives]]` instead (`public` / `hidden`). Covert payoff A/B should use mechanical effects without `goal_injection` (goal text remains in Observation even when the banner is hidden).
 
+Vote **tally** is not an incentive effect. Overlay on the experiment TOML (like `[storage]`), not in this schedule file:
+
+```toml
+[voting]
+weight = "equal"       # default; omit = equal (one living agent = 1)
+# weight = "influence" # max(influence_factor, 1) millipoints
+```
+
+Unknown `weight` is a load error. Pair `influence` with [`configs/incentives/leadership.toml`](../configs/incentives/leadership.toml) (`influence_factor_delta = 70.0` on `agent:0`) to A/B a kingmaker. Do not put `[voting]` in shipping `configs/default.toml`.
+
 ## How a file is applied
 
 1. **Tick 0 / `--incentives`:** schedule is loaded before ticks; effects whose window includes the current tick activate at the **start** of that tick.

@@ -1,7 +1,8 @@
 # M13 — Influence-weighted votes (opt-in)
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M12 complete (`docs/M12-plan.md`, git tag `M12`, commit `ba50e22`)  
+**Walkthrough:** [`M13-test-plan.md`](M13-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (acceptance: simple majority vs weighted-by-status), `M4-plan.md` (one-agent-one-vote), `M5-plan.md` (`influence_factor` does not weight votes today)
 
 ## Context
@@ -125,6 +126,8 @@ cargo test -p sim-cli --test ab
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M13-test-plan.md`](M13-test-plan.md).
 
 ```bash
 cargo test -p sim-core

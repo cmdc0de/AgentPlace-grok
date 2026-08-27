@@ -158,6 +158,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         sim.storage = p;
     }
+    if let Some(w) = overlay.voting.weight.as_deref() {
+        sim.voting.weight = sim_core::VoteWeight::parse(w)?;
+    }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
     }

@@ -293,6 +293,7 @@ impl Simulation {
             incentive_active,
             last_tick_timing: None,
             storage: crate::haul::StorageParams::default(),
+            voting: crate::voting::VotingParams::default(),
         })
     }
 

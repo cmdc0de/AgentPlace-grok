@@ -3,7 +3,8 @@ use sim_core::board::{AdoptedRule, ProposalStatus, StructuredRule};
 use sim_core::event_log::SimEventKind;
 use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::{
-    AgentId, ExperimentConfig, ItemId, Simulation, build_report, observation, report_markdown,
+    AgentId, ExperimentConfig, ItemId, Simulation, VoteWeight, build_report, observation,
+    report_markdown,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -22,6 +23,35 @@ count = 4
     );
     ExperimentConfig::from_toml_str(&toml).unwrap()
 }
+
+fn three_agent_config(master_seed: u64) -> ExperimentConfig {
+    let toml = format!(
+        r#"
+master_seed = {master_seed}
+[simulation]
+max_ticks = 10000
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 3
+[proposals]
+default_acceptance_threshold = 0.5
+"#
+    );
+    ExperimentConfig::from_toml_str(&toml).unwrap()
+}
+
+const KINGMAKER: &str = r#"
+[[incentives]]
+id = "kingmaker"
+description = "boost agent 0 influence"
+applies_to = "agent:0"
+[[incentives.effects]]
+type = "influence_factor_delta"
+delta = 70.0
+"#;
 
 fn two_agent_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -406,4 +436,64 @@ fn m3_empty_board_checkpoint_still_loads() {
     let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
     assert!(loaded.board.proposals.is_empty());
     assert!(loaded.agents.get(&AgentId(0)).unwrap().goals.is_empty());
+}
+
+fn propose_only_agent0(sim: &mut Simulation) {
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "do not eat mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+}
+
+#[test]
+fn equal_tally_one_of_three_stays_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4010)).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+    assert!(sim.board.adopted.is_empty());
+}
+
+#[test]
+fn influence_kingmaker_one_support_accepts() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4011)).unwrap();
+    sim.voting.weight = VoteWeight::Influence;
+    sim.inject_schedule_toml(KINGMAKER).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(
+        sim.board.proposals[0].status,
+        ProposalStatus::Accepted,
+        "yes_w should meet need; inf0={} need={}",
+        sim.vote_weight_of(AgentId(0)),
+        sim.vote_need()
+    );
+    assert_eq!(sim.board.adopted.len(), 1);
+}
+
+#[test]
+fn equal_with_kingmaker_still_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4012)).unwrap();
+    sim.voting.weight = VoteWeight::Equal;
+    sim.inject_schedule_toml(KINGMAKER).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+}
+
+#[test]
+fn equal_no_boost_same_seed_same_hash() {
+    let cfg = three_agent_config(0x4D4013);
+    let mut a = Simulation::new(cfg.clone()).unwrap();
+    let mut b = Simulation::new(cfg).unwrap();
+    a.chooser = sim_core::Chooser::Wait;
+    b.chooser = sim_core::Chooser::Wait;
+    a.run_ticks(8);
+    b.run_ticks(8);
+    assert_eq!(a.state_hash(), b.state_hash());
 }

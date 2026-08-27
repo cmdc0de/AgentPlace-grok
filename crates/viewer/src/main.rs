@@ -52,10 +52,19 @@ fn main() {
     let mut net_link = None;
     let plugin = match parsed {
         ViewerSource::Config(path) => {
-            let config = ExperimentConfig::load_path(&path).unwrap_or_else(|e| {
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!("failed to read {}: {e}", path.display());
+            });
+            let config = ExperimentConfig::from_toml_str(&text).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
             });
-            SimPlugin::new(config)
+            let mut sim = Simulation::new(config).unwrap_or_else(|e| {
+                panic!("failed to start sim: {e}");
+            });
+            sim.voting = sim_core::VotingParams::from_config_toml(&text).unwrap_or_else(|e| {
+                panic!("failed to parse [voting]: {e}");
+            });
+            SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {
             let sim = Simulation::load_checkpoint(&path).unwrap_or_else(|e| {
