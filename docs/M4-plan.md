@@ -90,7 +90,8 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 | **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
 | **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
 | **M14** | Done — [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
-| **M15** | [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
 | Later | Meta-rules, Attack/Flee, dialects, lie detection |
 
 Do not pull incentives into M4. The A/B loop needs a working board and a readable food report first.

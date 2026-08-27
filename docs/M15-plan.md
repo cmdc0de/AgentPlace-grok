@@ -91,7 +91,8 @@ Board UI: in `respect` mode show `yes_w / need` plus head counts (same as influe
 
 | Later | What |
 |---|---|
-| After M15 | `/set`; council/unanimous; hide others’ actions/board; protobuf/TLS; wire Give; join/leave one-shot tracking; jump-to-tick without a ckpt; event-log timeline; meta-rules |
+| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| After M16 | protobuf/TLS; wire Give; join/leave one-shot tracking; jump-to-tick without a ckpt; event-log timeline; meta-rules |
 | Not M15 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
@@ -100,7 +101,7 @@ Board UI: in `respect` mode show `yes_w / need` plus head counts (same as influe
 2. Weight = incoming positive respect from other **living** agents; floor 1.
 3. `relationship_delta` gains `respect` and optional `toward = "agent:N"`.
 4. Do not change `configs/default.toml`, `coop.toml`, or `leadership.toml`.
-5. `/set` / council / board fog / protobuf / TLS / wire Give → later.
+5. `/set` / council / board fog → M16. Protobuf / TLS / wire Give → later.
 6. Mock CI. `PROTOCOL_VERSION = 2`.
 
 ## Tests (M15 acceptance bar)

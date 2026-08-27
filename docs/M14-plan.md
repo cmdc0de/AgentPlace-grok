@@ -60,8 +60,9 @@ Helper (sim-core, no Bevy): list ticks in a dir; `ckpt_at_or_before(dir, tick) -
 
 | Later | What |
 |---|---|
-| **M15** | [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
-| After M15 | `/set`; hide others’ actions/board; protobuf/TLS; wire Give; join/leave influence tracking; jump-to-tick without a ckpt; event-log timeline; council/unanimous; meta-rules |
+| **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| After M16 | protobuf/TLS; wire Give; join/leave influence tracking; jump-to-tick without a ckpt; event-log timeline; meta-rules |
 | Not M14 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

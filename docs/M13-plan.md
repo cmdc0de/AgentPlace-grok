@@ -76,8 +76,9 @@ Board UI in influence mode: `yes_w / need` plus head counts. `--compare` still u
 | Later | What |
 |---|---|
 | **M14** | Done — [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
-| **M15** | [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
-| After M15 | `/set`; hide others’ actions/board; protobuf/TLS; wire Give; council/unanimous; meta-rules |
+| **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| After M16 | protobuf/TLS; wire Give; meta-rules |
 | Not M13 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

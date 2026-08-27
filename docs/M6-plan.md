@@ -69,8 +69,9 @@ No `/set`, `/give`, `/inject`. Those wait for M8.
 | **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
 | **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
 | **M14** | Done — [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
-| **M15** | [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
-| Later | Metrics charts, browser imgui, live embeddings, `/set` |
+| **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| Later | Metrics charts, browser imgui, live embeddings |
 
 ## Key decisions
 
