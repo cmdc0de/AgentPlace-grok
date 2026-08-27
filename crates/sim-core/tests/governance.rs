@@ -3,8 +3,8 @@ use sim_core::board::{AdoptedRule, ProposalStatus, StructuredRule};
 use sim_core::event_log::SimEventKind;
 use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::{
-    AgentId, ExperimentConfig, ItemId, Simulation, VoteWeight, build_report, observation,
-    report_markdown,
+    AgentId, ExperimentConfig, ItemId, Simulation, VoteAccept, VoteWeight, build_report,
+    observation, report_markdown,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -550,4 +550,128 @@ fn respect_zero_same_hash_as_equal() {
     eq.run_ticks(8);
     rs.run_ticks(8);
     assert_eq!(eq.state_hash(), rs.state_hash());
+}
+
+fn support(sim: &mut Simulation, id: u64, pid: u64) {
+    sim_core::execute::execute_primary(
+        sim,
+        AgentId(id),
+        &PrimaryAction::Support { proposal_id: pid },
+    );
+}
+
+fn oppose(sim: &mut Simulation, id: u64, pid: u64) {
+    sim_core::execute::execute_primary(
+        sim,
+        AgentId(id),
+        &PrimaryAction::Oppose { proposal_id: pid },
+    );
+}
+
+#[test]
+fn unanimous_one_of_three_stays_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4020)).unwrap();
+    sim.voting.accept = VoteAccept::Unanimous;
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+}
+
+#[test]
+fn unanimous_all_support_accepts() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4021)).unwrap();
+    sim.voting.accept = VoteAccept::Unanimous;
+    propose_only_agent0(&mut sim);
+    support(&mut sim, 1, 0);
+    support(&mut sim, 2, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    assert_eq!(sim.board.adopted.len(), 1);
+}
+
+#[test]
+fn unanimous_one_oppose_rejects() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4022)).unwrap();
+    sim.voting.accept = VoteAccept::Unanimous;
+    propose_only_agent0(&mut sim);
+    oppose(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Rejected);
+}
+
+#[test]
+fn council_two_support_accepts_with_silent_third() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4023)).unwrap();
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1)];
+    propose_only_agent0(&mut sim);
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+}
+
+#[test]
+fn council_one_oppose_rejects() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4024)).unwrap();
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1)];
+    propose_only_agent0(&mut sim);
+    oppose(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Rejected);
+}
+
+#[test]
+fn fog_board_omits_far_author() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4025)).unwrap();
+    sim.config.proposals.public_board_always_visible = false;
+    sim.chooser = sim_core::Chooser::Wait;
+    if let Some(a) = sim.agents.get_mut(&AgentId(0)) {
+        a.x = 0;
+        a.y = 0;
+    }
+    if let Some(a) = sim.agents.get_mut(&AgentId(1)) {
+        a.x = 31;
+        a.y = 31;
+    }
+    propose_only_agent0(&mut sim);
+    let obs0 = observation::build(&sim, AgentId(0));
+    assert!(
+        obs0.board.iter().any(|p| p.id == 0),
+        "author should see own proposal"
+    );
+    let obs1 = observation::build(&sim, AgentId(1));
+    assert!(
+        obs1.board.iter().all(|p| p.id != 0),
+        "far agent must not see open proposal"
+    );
+    assert!(
+        !obs1
+            .legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Support { proposal_id: 0 })),
+        "Support of fogged id must not be legal"
+    );
+}
+
+#[test]
+fn identified_agent_has_last_action() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4026)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    if let Some(a) = sim.agents.get_mut(&AgentId(0)) {
+        a.x = 5;
+        a.y = 5;
+    }
+    if let Some(a) = sim.agents.get_mut(&AgentId(1)) {
+        a.x = 6;
+        a.y = 5;
+    }
+    sim.tick();
+    let obs = observation::build(&sim, AgentId(0));
+    let other = obs
+        .agents
+        .iter()
+        .find(|a| a.id == Some(AgentId(1)))
+        .expect("identified neighbor");
+    assert_eq!(other.last_action.as_deref(), Some("wait"));
 }

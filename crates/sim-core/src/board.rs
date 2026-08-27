@@ -144,6 +144,39 @@ impl PublicBoard {
         self.adopted.extend(newly);
     }
 
+    /// Unanimous / council: Accept iff every `living` id Supports; Reject iff any Opposes.
+    /// Empty `living` stays Open (until expiry).
+    pub fn tick_stance_complete(&mut self, living: &[AgentId], lifetime: u64, tick: u64) {
+        let mut newly = Vec::new();
+        for p in &mut self.proposals {
+            if p.status != ProposalStatus::Open {
+                continue;
+            }
+            if lifetime > 0 && tick.saturating_sub(p.tick_created) >= lifetime {
+                p.status = ProposalStatus::Expired;
+                self.expired_count += 1;
+                continue;
+            }
+            if living.is_empty() {
+                continue;
+            }
+            if living.iter().all(|id| p.supporters.contains(id)) {
+                p.status = ProposalStatus::Accepted;
+                self.accepted_count += 1;
+                newly.push(AdoptedRule {
+                    proposal_id: p.id,
+                    tick_accepted: tick,
+                    text: p.text.clone(),
+                    rule: p.rule,
+                });
+            } else if living.iter().any(|id| p.opposers.contains(id)) {
+                p.status = ProposalStatus::Rejected;
+                self.rejected_count += 1;
+            }
+        }
+        self.adopted.extend(newly);
+    }
+
     pub fn blocks_eat(&self, species: u8) -> bool {
         self.adopted.iter().any(|r| {
             matches!(r.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == species)

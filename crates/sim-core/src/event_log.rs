@@ -286,3 +286,45 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Unpack { .. } => "Unpack",
     }
 }
+
+pub fn kind_slug(kind: &SimEventKind) -> &'static str {
+    match kind {
+        SimEventKind::Wait => "wait",
+        SimEventKind::Rest => "rest",
+        SimEventKind::Move { .. } => "move",
+        SimEventKind::Gather { .. } => "gather",
+        SimEventKind::Drink => "drink",
+        SimEventKind::Eat { .. } => "eat",
+        SimEventKind::Hunt { .. } => "hunt",
+        SimEventKind::Fish { .. } => "fish",
+        SimEventKind::Farm { .. } => "farm",
+        SimEventKind::Craft { .. } => "craft",
+        SimEventKind::Speak { .. } => "speak",
+        SimEventKind::LlmWait => "llm_wait",
+        SimEventKind::Propose { .. } => "propose",
+        SimEventKind::Support { .. } => "support",
+        SimEventKind::Oppose { .. } => "oppose",
+        SimEventKind::RuleBlocked { .. } => "rule_blocked",
+        SimEventKind::IncentiveApplied { .. } => "incentive_applied",
+        SimEventKind::IncentiveEnded { .. } => "incentive_ended",
+        SimEventKind::Died { .. } => "died",
+        SimEventKind::Transfer { .. } => "transfer",
+        SimEventKind::Store { .. } => "store",
+        SimEventKind::Retrieve { .. } => "retrieve",
+        SimEventKind::Give { .. } => "give",
+        SimEventKind::Pack { .. } => "pack",
+        SimEventKind::Unpack { .. } => "unpack",
+    }
+}
+
+pub fn is_primary_kind(kind: &SimEventKind) -> bool {
+    !matches!(
+        kind,
+        SimEventKind::Speak { .. }
+            | SimEventKind::LlmWait
+            | SimEventKind::IncentiveApplied { .. }
+            | SimEventKind::IncentiveEnded { .. }
+            | SimEventKind::Died { .. }
+            | SimEventKind::RuleBlocked { .. }
+    )
+}

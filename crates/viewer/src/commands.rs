@@ -127,6 +127,7 @@ pub enum UiCommand {
     Tick,
     Inject { path: Option<String> },
     Give { id: u64, item: String, qty: u32 },
+    Set { id: u64, field: String, value: u32 },
     Scrub { tick: u64 },
     CkptNext,
     CkptPrev,
@@ -179,6 +180,7 @@ commands:
   /tick
   /inject PATH     load incentive TOML (needs --allow-control when remote)
   /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
+  /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
   /scrub TICK      load ckpt at or before TICK (--load DIR, in-process)
   /ckpt next|prev  adjacent checkpoint in the run directory
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
@@ -256,6 +258,17 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
                 item,
                 qty: qty.max(1),
             })
+        }
+        "set" => {
+            let id_s = arg.ok_or("set requires agent id")?;
+            let id: u64 = id_s.parse().map_err(|_| format!("bad agent id: {id_s}"))?;
+            let field = parts
+                .next()
+                .ok_or("set requires field (hunger|thirst|energy|influence)")?
+                .to_ascii_lowercase();
+            let v = parts.next().ok_or("set requires a value 0–100")?;
+            let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
+            Ok(UiCommand::Set { id, field, value })
         }
         other => Err(format!("unknown: /{other}  (try /help)")),
     }
@@ -433,6 +446,18 @@ pub fn run_command(
                 Err(e) => vec![format!("ckpt error: {e}")],
             }
         }
+        UiCommand::Set { id, field, value } => {
+            if state.remote {
+                return vec!["set is in-process only (not on the attach wire)".into()];
+            }
+            match state
+                .sim
+                .set_display_field(sim_core::AgentId(id), &field, value)
+            {
+                Ok(milli) => vec![format!("set agent {id} {field}={value} ({milli} milli)")],
+                Err(e) => vec![format!("set error: {e}")],
+            }
+        }
     }
 }
 
@@ -487,6 +512,7 @@ mod tests {
         assert!(text.contains("/follow"));
         assert!(text.contains("/inject"));
         assert!(text.contains("/give"));
+        assert!(text.contains("/set"));
         assert!(text.contains("/scrub"));
         assert!(text.contains("/ckpt"));
     }
@@ -563,6 +589,48 @@ mod tests {
         );
         assert!(msgs[0].contains("in-process only"), "{msgs:?}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_set() {
+        assert_eq!(
+            parse_command("/set 0 hunger 50").unwrap(),
+            UiCommand::Set {
+                id: 0,
+                field: "hunger".into(),
+                value: 50
+            }
+        );
+        assert!(parse_command("/set 0 nope 1").is_ok());
+        let mut sim = Simulation::new(default_config_for_tests()).unwrap();
+        let before = sim.state_hash();
+        let milli = sim
+            .set_display_field(sim_core::AgentId(0), "hunger", 50)
+            .unwrap();
+        assert_eq!(milli, 5000);
+        assert_eq!(
+            sim.agents.get(&sim_core::AgentId(0)).unwrap().needs.hunger,
+            5000
+        );
+        assert_ne!(before, sim.state_hash());
+        let mut state = SimState {
+            sim,
+            paused: true,
+            follow: None,
+            remote: true,
+        };
+        let msgs = run_command(
+            UiCommand::Set {
+                id: 0,
+                field: "hunger".into(),
+                value: 10,
+            },
+            &mut state,
+            &mut false,
+            &mut WindowFlags::default(),
+            &mut CkptScrubber::default(),
+        );
+        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
     }
 
     #[test]

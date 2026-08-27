@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M15** (`docs/M15-plan.md`). Walkthrough: [`docs/M15-test-plan.md`](docs/M15-test-plan.md).
+Deterministic multi-agent simulation. Current slice: **M16** (`docs/M16-plan.md`). Walkthrough: [`docs/M16-test-plan.md`](docs/M16-test-plan.md).
 
 Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md).
 
@@ -72,7 +72,7 @@ Opt-in remote pause/step/save/report/inject: add `--allow-control` (and optional
 
 Incentive A/B (postcard wire unchanged except `PROTOCOL_VERSION = 2` for `Tick.metrics`; timing is not hashed).
 
-**A schedule is one TOML file with one or more `[[incentives]]` tables** — not one file per incentive. `--inject` / `/inject` replace the whole schedule with that file. Field reference: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md). Example: [`configs/incentives/coop.toml`](configs/incentives/coop.toml). Hidden banners: `visibility = "hidden"` (effects still apply; LLM/Observation omit the id). Covert payoff example: [`configs/incentives/hidden-bonus.toml`](configs/incentives/hidden-bonus.toml). Coalition targeting: `applies_to = "supporters_of:proposal_N"` ([`configs/incentives/coalition.toml`](configs/incentives/coalition.toml)) — current supporters get per-tick effects (e.g. 1.4× food). Votes default to **equal** (one living agent = 1). Overlay `[voting] weight = "influence"` uses `max(influence_factor, 1)` millipoints; pair with [`configs/incentives/leadership.toml`](configs/incentives/leadership.toml) to A/B a kingmaker. Overlay `[voting] weight = "respect"` uses incoming positive respect from other living agents (floor 1); pair with [`configs/incentives/esteem.toml`](configs/incentives/esteem.toml) (`relationship_delta` toward `agent:0`). Default respect 0 ⇒ same as equal.
+**A schedule is one TOML file with one or more `[[incentives]]` tables** — not one file per incentive. `--inject` / `/inject` replace the whole schedule with that file. Field reference: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md). Example: [`configs/incentives/coop.toml`](configs/incentives/coop.toml). Hidden banners: `visibility = "hidden"` (effects still apply; LLM/Observation omit the id). Covert payoff example: [`configs/incentives/hidden-bonus.toml`](configs/incentives/hidden-bonus.toml). Coalition targeting: `applies_to = "supporters_of:proposal_N"` ([`configs/incentives/coalition.toml`](configs/incentives/coalition.toml)) — current supporters get per-tick effects (e.g. 1.4× food). Votes default to **equal** (one living agent = 1). Overlay `[voting] weight = "influence"` uses `max(influence_factor, 1)` millipoints; pair with [`configs/incentives/leadership.toml`](configs/incentives/leadership.toml) to A/B a kingmaker. Overlay `[voting] weight = "respect"` uses incoming positive respect from other living agents (floor 1); pair with [`configs/incentives/esteem.toml`](configs/incentives/esteem.toml) (`relationship_delta` toward `agent:0`). Default respect 0 ⇒ same as equal. Overlay `[voting] accept = "unanimous"` or `"council"` (with `council = [0, 1]`) is stance-complete; `weight` applies only to majority. Viewer `/set ID hunger|thirst|energy|influence N` is in-process (display 0–100 → millipoints ×100). `public_board_always_visible = false` shows open proposals in identity range (plus author / own stance).
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 80 --llm mock --quiet
@@ -96,7 +96,7 @@ cargo test -p sim-cli --test net
 cargo test -p sim-cli --test ab
 ```
 
-Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Replay JSONL stores raw model text; `{"__llm_wait__":true}` re-emits `LlmWait`. Researcher walkthrough: [`docs/M15-test-plan.md`](docs/M15-test-plan.md). Plan: [`docs/M15-plan.md`](docs/M15-plan.md).
+Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Replay JSONL stores raw model text; `{"__llm_wait__":true}` re-emits `LlmWait`. Researcher walkthrough: [`docs/M16-test-plan.md`](docs/M16-test-plan.md). Plan: [`docs/M16-plan.md`](docs/M16-plan.md).
 
 Shared land-cell **crates** (slot 16, weight 80): `Store` / `Retrieve` / `Transfer` cost energy ∝ item weight (pack source is cheaper, haul 0.1 vs 0.4). **Basket** is a worn backpack (8 slots, weight 25); `Pack` / `Unpack`; Move pays cargo (`loose × 0.4 × 0.05 + pack × 0.1 × 0.05`). Viewer: brown crate on the cell; darker satchel on the capsule when a Basket is held. `/give ID ITEM QTY` in-process only (hash-sensitive). Mock + coop storage goal **Gathers then Stores** (Eat only below 50% hunger while that goal is on).
 

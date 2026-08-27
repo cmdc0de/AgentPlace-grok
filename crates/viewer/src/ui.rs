@@ -524,6 +524,19 @@ fn draw_board(ui: &Ui, state: &SimState, open: &mut bool) {
             ));
             ui.separator();
             ui.text("proposals");
+            if state.sim.voting.accept != sim_core::VoteAccept::Majority {
+                ui.text(format!(
+                    "accept {}  council {:?}",
+                    state.sim.voting.accept.as_str(),
+                    state
+                        .sim
+                        .voting
+                        .council
+                        .iter()
+                        .map(|id| id.0)
+                        .collect::<Vec<_>>()
+                ));
+            }
             let need = state.sim.vote_need();
             let weighted = matches!(
                 state.sim.voting.weight,

@@ -28,6 +28,9 @@ pub struct AgentView {
     pub id: Option<AgentId>,
     pub x: u32,
     pub y: u32,
+    /// Last primary kind (`move`, `eat`, …) when identified. Silhouettes omit this.
+    #[serde(default)]
+    pub last_action: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +221,11 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
                 id: named.then_some(other.id),
                 x: other.x,
                 y: other.y,
+                last_action: if named {
+                    last_primary_kind(sim, other.id)
+                } else {
+                    None
+                },
             });
         }
     }
@@ -314,13 +322,46 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
     }
 }
 
-fn board_view(sim: &Simulation, ident: u32, agent: &Agent) -> Vec<ProposalView> {
-    if !sim.config.proposals.public_board_always_visible {
-        return Vec::new();
+fn last_primary_kind(sim: &Simulation, id: AgentId) -> Option<String> {
+    let cur = sim.tick;
+    let prev = cur.saturating_sub(1);
+    sim.events
+        .events
+        .iter()
+        .rev()
+        .find(|e| {
+            e.agent == id
+                && (e.tick == cur || e.tick == prev)
+                && crate::event_log::is_primary_kind(&e.kind)
+        })
+        .map(|e| crate::event_log::kind_slug(&e.kind).to_string())
+}
+
+fn open_proposal_visible(
+    sim: &Simulation,
+    agent: &Agent,
+    ident: u32,
+    p: &crate::board::Proposal,
+) -> bool {
+    if sim.config.proposals.public_board_always_visible || sim.config.observation.full_information {
+        return true;
     }
+    if p.author == agent.id || p.supporters.contains(&agent.id) || p.opposers.contains(&agent.id) {
+        return true;
+    }
+    sim.agents
+        .get(&p.author)
+        .is_some_and(|a| chebyshev(agent.x, agent.y, a.x, a.y) <= ident)
+}
+
+fn board_view(sim: &Simulation, ident: u32, agent: &Agent) -> Vec<ProposalView> {
     sim.board
         .proposals
         .iter()
+        .filter(|p| {
+            p.status != crate::board::ProposalStatus::Open
+                || open_proposal_visible(sim, agent, ident, p)
+        })
         .map(|p| {
             let named = ident >= 255
                 || sim.config.observation.full_information
@@ -526,7 +567,18 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             rule: None,
         });
     }
+    let ident = if sim.config.observation.full_information {
+        sim.world.width.max(sim.world.height)
+    } else {
+        effective_range(
+            sim.config.observation.base_agent_identity_range,
+            agent.personality.perceptiveness,
+        )
+    };
     for p in sim.board.open() {
+        if !open_proposal_visible(sim, agent, ident, p) {
+            continue;
+        }
         legal.push(PrimaryAction::Support { proposal_id: p.id });
         legal.push(PrimaryAction::Oppose { proposal_id: p.id });
     }

@@ -1,7 +1,8 @@
 # M16 — Council/unanimous votes, `/set`, range-limited board
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M15 complete (`docs/M15-plan.md`, git tag `M15`, commit `7b00386`)  
+**Walkthrough:** [`M16-test-plan.md`](M16-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (unanimous / council), `M6-plan.md` (`/set` deferred), `decision-observation-llm-economy-metrics-spec.md` §2 (`public_board_always_visible`), `M13-plan.md` / `M15-plan.md` (majority overlay)
 
 ## Context
@@ -151,6 +152,8 @@ cargo test -p viewer
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M16-test-plan.md`](M16-test-plan.md).
 
 ```bash
 cargo test -p sim-core

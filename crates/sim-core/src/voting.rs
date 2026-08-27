@@ -1,5 +1,6 @@
 //! Vote tally mode. Overlay-overridable; not ExperimentConfig.
 
+use crate::agent::AgentId;
 use crate::error::SimError;
 use serde::Deserialize;
 
@@ -33,26 +34,57 @@ impl VoteWeight {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VoteAccept {
+    #[default]
+    Majority,
+    Unanimous,
+    Council,
+}
+
+impl VoteAccept {
+    pub fn parse(s: &str) -> Result<Self, SimError> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "" | "majority" => Ok(Self::Majority),
+            "unanimous" => Ok(Self::Unanimous),
+            "council" => Ok(Self::Council),
+            other => Err(SimError::Config(format!(
+                "unknown voting accept {other:?} (use majority, unanimous, or council)"
+            ))),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Majority => "majority",
+            Self::Unanimous => "unanimous",
+            Self::Council => "council",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VotingParams {
     pub weight: VoteWeight,
+    pub accept: VoteAccept,
+    pub council: Vec<AgentId>,
 }
 
 impl VotingParams {
     pub fn equal() -> Self {
-        Self {
-            weight: VoteWeight::Equal,
-        }
+        Self::default()
     }
 
     pub fn influence() -> Self {
         Self {
             weight: VoteWeight::Influence,
+            ..Self::default()
         }
     }
 
     pub fn respect() -> Self {
         Self {
             weight: VoteWeight::Respect,
+            ..Self::default()
         }
     }
 
@@ -66,11 +98,23 @@ impl VotingParams {
         #[derive(Default, Deserialize)]
         struct Table {
             weight: Option<String>,
+            accept: Option<String>,
+            #[serde(default)]
+            council: Vec<u64>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
         if let Some(w) = slice.voting.weight {
             p.weight = VoteWeight::parse(&w)?;
+        }
+        if let Some(a) = slice.voting.accept {
+            p.accept = VoteAccept::parse(&a)?;
+        }
+        p.council = slice.voting.council.into_iter().map(AgentId).collect();
+        if p.accept == VoteAccept::Council && p.council.is_empty() {
+            return Err(SimError::Config(
+                "voting accept = \"council\" requires a non-empty council list".into(),
+            ));
         }
         Ok(p)
     }
@@ -113,5 +157,39 @@ mod tests {
     fn config_toml_unknown_errors() {
         let err = VotingParams::from_config_toml("[voting]\nweight = \"maybe\"\n").unwrap_err();
         assert!(err.to_string().contains("unknown"), "{err}");
+    }
+
+    #[test]
+    fn omit_accept_is_majority() {
+        let p = VotingParams::from_config_toml("[voting]\nweight = \"equal\"\n").unwrap();
+        assert_eq!(p.accept, VoteAccept::Majority);
+        assert!(p.council.is_empty());
+    }
+
+    #[test]
+    fn config_toml_unanimous() {
+        let p = VotingParams::from_config_toml("[voting]\naccept = \"unanimous\"\n").unwrap();
+        assert_eq!(p.accept, VoteAccept::Unanimous);
+    }
+
+    #[test]
+    fn config_toml_council() {
+        let p =
+            VotingParams::from_config_toml("[voting]\naccept = \"council\"\ncouncil = [0, 1]\n")
+                .unwrap();
+        assert_eq!(p.accept, VoteAccept::Council);
+        assert_eq!(p.council, vec![AgentId(0), AgentId(1)]);
+    }
+
+    #[test]
+    fn council_without_list_errors() {
+        let err = VotingParams::from_config_toml("[voting]\naccept = \"council\"\n").unwrap_err();
+        assert!(err.to_string().contains("council"), "{err}");
+    }
+
+    #[test]
+    fn unknown_accept_errors() {
+        let err = VotingParams::from_config_toml("[voting]\naccept = \"maybe\"\n").unwrap_err();
+        assert!(err.to_string().contains("accept"), "{err}");
     }
 }

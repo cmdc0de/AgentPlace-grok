@@ -121,9 +121,11 @@ Vote **tally** is not an incentive effect. Overlay on the experiment TOML (like 
 weight = "equal"       # default; omit = equal (one living agent = 1)
 # weight = "influence" # max(influence_factor, 1) millipoints
 # weight = "respect"   # max(incoming positive respect from other living agents, 1)
+accept = "majority"    # default; omit = majority. Also unanimous | council
+# council = [0, 1]     # required when accept = "council"
 ```
 
-Unknown `weight` is a load error. Pair `influence` with [`configs/incentives/leadership.toml`](../configs/incentives/leadership.toml) (`influence_factor_delta = 70.0` on `agent:0`) to A/B a kingmaker. Pair `respect` with [`configs/incentives/esteem.toml`](../configs/incentives/esteem.toml) (`relationship_delta` respect toward `agent:0`). Default respect 0 ⇒ same as equal. Do not put `[voting]` in shipping `configs/default.toml`.
+Unknown `weight` or `accept` is a load error. `accept = "council"` with an empty list is a load error. `weight` applies only to `majority`; unanimous/council are stance-complete (every living / council member must Support; any Oppose Rejects). Pair `influence` with [`configs/incentives/leadership.toml`](../configs/incentives/leadership.toml). Pair `respect` with [`configs/incentives/esteem.toml`](../configs/incentives/esteem.toml). Default respect 0 ⇒ same as equal. Do not put `[voting]` in shipping `configs/default.toml`.
 
 ## How a file is applied
 

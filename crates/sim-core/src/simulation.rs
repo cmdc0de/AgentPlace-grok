@@ -17,7 +17,7 @@ use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
 use crate::seeding::{RngBank, derive_seed, resolve_seed};
 use crate::timing::{self, AgentTiming, TickTiming};
-use crate::voting::{VoteWeight, VotingParams};
+use crate::voting::{VoteAccept, VoteWeight, VotingParams};
 use crate::world::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -139,6 +139,31 @@ impl Simulation {
         Ok(added)
     }
 
+    /// Display 0–100 → millipoints `N * 100` clamped to 0..=10_000.
+    pub fn set_display_field(
+        &mut self,
+        id: crate::agent::AgentId,
+        field: &str,
+        display: u32,
+    ) -> Result<u32, SimError> {
+        let milli = display.saturating_mul(100).min(10_000);
+        let Some(agent) = self.agents.get_mut(&id) else {
+            return Err(SimError::Config(format!("no agent {}", id.0)));
+        };
+        match field {
+            "hunger" => agent.needs.hunger = milli,
+            "thirst" => agent.needs.thirst = milli,
+            "energy" => agent.needs.energy = milli,
+            "influence" => agent.influence_factor = milli,
+            other => {
+                return Err(SimError::Config(format!(
+                    "unknown set field {other:?} (use hunger, thirst, energy, or influence)"
+                )));
+            }
+        }
+        Ok(milli)
+    }
+
     pub fn inject_schedule_toml(&mut self, toml: &str) -> Result<(), SimError> {
         let sched = IncentiveSchedule::from_toml_str(toml)?;
         self.incentives = sched;
@@ -234,15 +259,33 @@ impl Simulation {
         let th = incentive::proposal_threshold(self);
         let life = self.config.proposals.proposal_lifetime_ticks;
         let tick = self.tick;
-        let weights = self.vote_weight_map();
-        let total: u64 = weights.values().copied().sum();
-        self.board.tick_lifecycle(
-            total,
-            |id| weights.get(&id).copied().unwrap_or(1),
-            th,
-            life,
-            tick,
-        );
+        match self.voting.accept {
+            VoteAccept::Majority => {
+                let weights = self.vote_weight_map();
+                let total: u64 = weights.values().copied().sum();
+                self.board.tick_lifecycle(
+                    total,
+                    |id| weights.get(&id).copied().unwrap_or(1),
+                    th,
+                    life,
+                    tick,
+                );
+            }
+            VoteAccept::Unanimous => {
+                let living: Vec<AgentId> = self.agents.keys().copied().collect();
+                self.board.tick_stance_complete(&living, life, tick);
+            }
+            VoteAccept::Council => {
+                let living: Vec<AgentId> = self
+                    .voting
+                    .council
+                    .iter()
+                    .copied()
+                    .filter(|id| self.agents.contains_key(id))
+                    .collect();
+                self.board.tick_stance_complete(&living, life, tick);
+            }
+        }
         let board_ns = timing::ns_since(board0);
         let agents0 = Instant::now();
         let mut order: Vec<AgentId> = self.agents.keys().copied().collect();
