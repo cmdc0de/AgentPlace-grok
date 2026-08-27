@@ -89,8 +89,9 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 |---|---|
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store; `/give` |
 | **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
-| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
-| After M12 | Protobuf / JSON envelope; TLS/`wss`; timeline; vote weighting; `/set`; wire Give; reflection-on-evict; embeddings |
+| **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
+| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| After M13 | Protobuf / JSON envelope; TLS/`wss`; timeline; `/set`; wire Give; reflection-on-evict; embeddings |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions

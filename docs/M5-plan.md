@@ -132,8 +132,9 @@ HUD **legend** (Bevy `Text`, not imgui): a left-side column, **one kind per line
 | **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare` |
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers |
 | **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
-| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
-| Later | Weighted-by-status voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, meta-rules |
+| **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
+| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| Later | Respect-weighted voting, live embedding models, LLM reflection-on-evict, dialects, lie detection, meta-rules |
 
 Do **not** pull incentives into M5. Relationships have to exist before an incentive can target them.
 

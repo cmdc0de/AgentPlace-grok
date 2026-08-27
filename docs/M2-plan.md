@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M11 are done (tag `M11`). **Current next slice:** [`M12-plan.md`](M12-plan.md) (public vs hidden incentives). Later work is listed at the bottom of that file.
+M3–M12 are done (tag `M12`). **Current next slice:** [`M13-plan.md`](M13-plan.md) (opt-in influence-weighted votes). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

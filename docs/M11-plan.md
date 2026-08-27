@@ -67,8 +67,9 @@ Eat-all in the 50–75% band is **off** when a storage goal is active.
 
 | Later | What |
 |---|---|
-| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
-| After M12 | Protobuf/TLS; timeline; vote weighting; `/set`; wire Give; second pack; mesh scale-by-fill; reflection; embeddings |
+| **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
+| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| After M13 | Protobuf/TLS; timeline; `/set`; wire Give; second pack; mesh scale-by-fill; reflection; embeddings |
 | Not M11 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
