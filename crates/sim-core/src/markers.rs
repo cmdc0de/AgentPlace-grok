@@ -93,6 +93,15 @@ pub fn marker_stockpile() -> MarkerSpec {
     }
 }
 
+/// Worn Basket satchel. Distinct from the ground-crate brown (`srgb(0.35, 0.22, 0.12)`).
+pub fn marker_satchel() -> MarkerSpec {
+    MarkerSpec {
+        shape: MarkerShape::Cube,
+        rgb: [89, 56, 31],
+        name: "satchel",
+    }
+}
+
 pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
     vec![
         ("land", MarkerShape::Cube, [56, 107, 41]),
@@ -107,6 +116,7 @@ pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
         ("perch", MarkerShape::FlatCuboid, [64, 115, 191]),
         ("mineral", MarkerShape::Cube, [140, 133, 122]),
         ("stockpile", MarkerShape::Cube, [140, 97, 46]),
+        ("satchel", MarkerShape::Cube, [89, 56, 31]),
         ("agent", MarkerShape::Capsule, [180, 80, 160]),
     ]
 }

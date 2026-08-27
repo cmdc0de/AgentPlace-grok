@@ -376,6 +376,29 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 }
             }
             ui.separator();
+            if a.has_basket() {
+                let params = state.sim.storage;
+                ui.text(format!(
+                    "pack slots {}/{}  weight {:.1}/{}",
+                    a.pack_count(),
+                    params.pack_slot_cap,
+                    a.pack_weight_milli() as f32 / 100.0,
+                    params.pack_weight_cap_milli / 100
+                ));
+                if a.pack.is_empty() {
+                    ui.text("  (empty)");
+                } else {
+                    for (item, n) in &a.pack {
+                        ui.text(format!(
+                            "  {} x{n}",
+                            item_label(*item, &state.sim.config.world.species)
+                        ));
+                    }
+                }
+            } else {
+                ui.text("pack: (no basket)");
+            }
+            ui.separator();
             if let Some(c) = state.sim.world.stockpile_at(a.x, a.y) {
                 let params = state.sim.storage;
                 ui.text(format!(
@@ -649,6 +672,8 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Store { .. } => "store",
         SimEventKind::Retrieve { .. } => "retrieve",
         SimEventKind::Give { .. } => "give",
+        SimEventKind::Pack { .. } => "pack",
+        SimEventKind::Unpack { .. } => "unpack",
     }
 }
 

@@ -40,6 +40,13 @@ struct StockpileVisual {
     y: u32,
 }
 
+#[derive(Component)]
+struct SatchelVisual {
+    id: AgentId,
+}
+
+const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
+
 fn main() {
     let parsed = parse_args();
     let mut net_link = None;
@@ -92,6 +99,7 @@ fn main() {
                 handle_input,
                 sync_agent_transforms,
                 sync_stockpile_markers,
+                sync_satchel_markers,
                 update_camera,
                 update_vision_overlay,
                 update_fog_visibility,
@@ -284,6 +292,17 @@ fn setup_scene(
             AgentVisual { id: agent.id },
             Visibility::default(),
         ));
+        if agent.shows_satchel() {
+            spawn_satchel(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                world,
+                agent.id,
+                agent.x,
+                agent.y,
+            );
+        }
     }
 
     let cx = world.width as f32 * 0.5;
@@ -374,6 +393,71 @@ fn sync_stockpile_markers(
             &state.sim.world,
             x,
             y,
+        );
+    }
+}
+
+fn spawn_satchel(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    world: &sim_core::World,
+    id: AgentId,
+    x: u32,
+    y: u32,
+) {
+    let spec = markers::marker_satchel();
+    let [r, g, b] = markers::rgb_f32(spec.rgb);
+    let mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(r, g, b),
+        perceptual_roughness: 0.7,
+        ..default()
+    });
+    let pos = agent_world_pos(world, x, y) + SATCHEL_OFFSET;
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.16, 0.18, 0.12))),
+        MeshMaterial3d(mat),
+        Transform::from_translation(pos),
+        SatchelVisual { id },
+        Visibility::default(),
+    ));
+}
+
+fn sync_satchel_markers(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    state: Res<SimState>,
+    existing: Query<(Entity, &SatchelVisual)>,
+) {
+    let live: std::collections::BTreeSet<AgentId> = state
+        .sim
+        .agents
+        .values()
+        .filter(|a| a.shows_satchel())
+        .map(|a| a.id)
+        .collect();
+    let have: std::collections::BTreeSet<AgentId> = existing.iter().map(|(_, v)| v.id).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&v.id) {
+            commands.entity(e).despawn();
+        }
+    }
+    for id in live {
+        if have.contains(&id) {
+            continue;
+        }
+        let Some(agent) = state.sim.agents.get(&id) else {
+            continue;
+        };
+        spawn_satchel(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &state.sim.world,
+            id,
+            agent.x,
+            agent.y,
         );
     }
 }
@@ -521,10 +605,20 @@ fn handle_input(
     }
 }
 
-fn sync_agent_transforms(state: Res<SimState>, mut query: Query<(&AgentVisual, &mut Transform)>) {
-    for (visual, mut transform) in &mut query {
+fn sync_agent_transforms(
+    state: Res<SimState>,
+    mut agents: Query<(&AgentVisual, &mut Transform)>,
+    mut satchels: Query<(&SatchelVisual, &mut Transform), Without<AgentVisual>>,
+) {
+    for (visual, mut transform) in &mut agents {
         if let Some(agent) = state.sim.agents.get(&visual.id) {
             transform.translation = agent_world_pos(&state.sim.world, agent.x, agent.y);
+        }
+    }
+    for (visual, mut transform) in &mut satchels {
+        if let Some(agent) = state.sim.agents.get(&visual.id) {
+            transform.translation =
+                agent_world_pos(&state.sim.world, agent.x, agent.y) + SATCHEL_OFFSET;
         }
     }
 }
@@ -598,6 +692,10 @@ fn update_fog_visibility(
     ui: Res<UiState>,
     mut markers: Query<(&WorldMarker, &mut Visibility), Without<AgentVisual>>,
     mut agents: Query<(&AgentVisual, &mut Visibility), Without<WorldMarker>>,
+    mut satchels: Query<
+        (&SatchelVisual, &mut Visibility),
+        (Without<WorldMarker>, Without<AgentVisual>),
+    >,
 ) {
     let fog_obs = if ui.fog {
         state.follow.map(|id| observation::build(&state.sim, id))
@@ -616,6 +714,25 @@ fn update_fog_visibility(
         };
     }
     for (visual, mut vis) in &mut agents {
+        let show = match &fog_obs {
+            None => true,
+            Some(obs) => {
+                let pos = state
+                    .sim
+                    .agents
+                    .get(&visual.id)
+                    .map(|a| (a.x, a.y))
+                    .unwrap_or((0, 0));
+                observation::agent_visible_in_observation(obs, visual.id, pos.0, pos.1)
+            }
+        };
+        *vis = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for (visual, mut vis) in &mut satchels {
         let show = match &fog_obs {
             None => true,
             Some(obs) => {

@@ -86,6 +86,14 @@ pub enum SimEventKind {
         item: ItemId,
         qty: u32,
     },
+    Pack {
+        item: ItemId,
+        qty: u32,
+    },
+    Unpack {
+        item: ItemId,
+        qty: u32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -222,6 +230,16 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hash_item(hasher, *item);
             hasher.update(qty.to_le_bytes());
         }
+        SimEventKind::Pack { item, qty } => {
+            hasher.update([23u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+        }
+        SimEventKind::Unpack { item, qty } => {
+            hasher.update([24u8]);
+            hash_item(hasher, *item);
+            hasher.update(qty.to_le_bytes());
+        }
     }
 }
 
@@ -264,5 +282,7 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Store { .. } => "Store",
         SimEventKind::Retrieve { .. } => "Retrieve",
         SimEventKind::Give { .. } => "Give",
+        SimEventKind::Pack { .. } => "Pack",
+        SimEventKind::Unpack { .. } => "Unpack",
     }
 }

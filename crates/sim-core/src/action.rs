@@ -47,6 +47,14 @@ pub enum PrimaryAction {
         item: ItemId,
         qty: u32,
     },
+    Pack {
+        item: ItemId,
+        qty: u32,
+    },
+    Unpack {
+        item: ItemId,
+        qty: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

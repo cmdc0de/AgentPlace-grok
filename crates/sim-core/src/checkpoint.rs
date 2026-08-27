@@ -456,6 +456,7 @@ pub fn agents_markdown(sim: &Simulation) -> String {
              - needs: hunger {:.1} thirst {:.1} energy {:.1}\n\
              - illness_ticks: {}\n\
              - inventory_items: {}\n\
+             - pack_items: {}\n\
              - consumption: veg {} animal {} fish {} toxic {}\n\
              - goals: {}\n\n",
             agent.id.0,
@@ -468,6 +469,7 @@ pub fn agents_markdown(sim: &Simulation) -> String {
             agent.needs.energy as f64 / 100.0,
             agent.illness_ticks,
             agent.inventory_count(),
+            agent.pack_count(),
             agent.consumption.vegetation,
             agent.consumption.animal,
             agent.consumption.fish,
@@ -554,6 +556,8 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         SimEventKind::Store { qty, .. } => format!("{{\"type\":\"store\",\"qty\":{qty}}}"),
         SimEventKind::Retrieve { qty, .. } => format!("{{\"type\":\"retrieve\",\"qty\":{qty}}}"),
         SimEventKind::Give { qty, .. } => format!("{{\"type\":\"give\",\"qty\":{qty}}}"),
+        SimEventKind::Pack { qty, .. } => format!("{{\"type\":\"pack\",\"qty\":{qty}}}"),
+        SimEventKind::Unpack { qty, .. } => format!("{{\"type\":\"unpack\",\"qty\":{qty}}}"),
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

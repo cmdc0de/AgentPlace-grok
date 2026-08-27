@@ -288,6 +288,30 @@ pub fn parse_choice_json(
                 qty: parsed.qty.unwrap_or(1).max(1),
             }
         }
+        "pack" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Food(1));
+            PrimaryAction::Pack {
+                item,
+                qty: parsed.qty.unwrap_or(1).max(1),
+            }
+        }
+        "unpack" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Food(1));
+            PrimaryAction::Unpack {
+                item,
+                qty: parsed.qty.unwrap_or(1).max(1),
+            }
+        }
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {

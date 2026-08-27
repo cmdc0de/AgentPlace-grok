@@ -2,19 +2,32 @@
 
 use crate::agent::ItemId;
 use crate::species::f64_to_milli;
+use std::collections::BTreeMap;
 
-/// Default container item-count cap.
+/// Default land-cell crate item-count cap.
 pub const SLOT_CAP: u32 = 16;
-/// Default container weight cap (80.0 display).
+/// Default crate weight cap (80.0 display).
 pub const WEIGHT_CAP_MILLI: u32 = 8_000;
-/// Haul multiplier 0.4 display → millipoints.
+/// Pocket/crate haul multiplier 0.4 display → millipoints.
 pub const HAUL_MILLI: u32 = 40;
+/// Worn Basket pack: 8 slots.
+pub const PACK_SLOT_CAP: u32 = 8;
+/// Pack weight cap (25.0 display).
+pub const PACK_WEIGHT_CAP_MILLI: u32 = 2_500;
+/// Pack haul multiplier 0.1 display → millipoints.
+pub const PACK_HAUL_MILLI: u32 = 10;
+/// Move step factor ≈ 0.05 display per cell.
+pub const MOVE_STEP_K_MILLI: u32 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StorageParams {
     pub slot_cap: u32,
     pub weight_cap_milli: u32,
     pub haul_milli: u32,
+    pub pack_slot_cap: u32,
+    pub pack_weight_cap_milli: u32,
+    pub pack_haul_milli: u32,
+    pub move_step_k_milli: u32,
 }
 
 impl Default for StorageParams {
@@ -23,6 +36,10 @@ impl Default for StorageParams {
             slot_cap: SLOT_CAP,
             weight_cap_milli: WEIGHT_CAP_MILLI,
             haul_milli: HAUL_MILLI,
+            pack_slot_cap: PACK_SLOT_CAP,
+            pack_weight_cap_milli: PACK_WEIGHT_CAP_MILLI,
+            pack_haul_milli: PACK_HAUL_MILLI,
+            move_step_k_milli: MOVE_STEP_K_MILLI,
         }
     }
 }
@@ -33,6 +50,7 @@ impl StorageParams {
             slot_cap: slot_cap.max(1),
             weight_cap_milli: f64_to_milli(weight_cap).max(1),
             haul_milli: f64_to_milli(haul).max(1),
+            ..Self::default()
         }
     }
 }
@@ -65,6 +83,47 @@ pub fn items_weight_milli(items: &[(ItemId, u32)]) -> u32 {
         .sum()
 }
 
+pub fn map_weight_milli(items: &BTreeMap<ItemId, u32>) -> u32 {
+    items
+        .iter()
+        .map(|(item, qty)| item_weight_milli(*item).saturating_mul(*qty))
+        .sum()
+}
+
+pub fn map_slot_count(items: &BTreeMap<ItemId, u32>) -> u32 {
+    items.values().copied().sum()
+}
+
+pub fn can_fit(
+    items: &BTreeMap<ItemId, u32>,
+    item: ItemId,
+    qty: u32,
+    slot_cap: u32,
+    weight_cap_milli: u32,
+) -> bool {
+    if qty == 0 {
+        return false;
+    }
+    let slots = map_slot_count(items).saturating_add(qty);
+    let weight =
+        map_weight_milli(items).saturating_add(item_weight_milli(item).saturating_mul(qty));
+    slots <= slot_cap && weight <= weight_cap_milli
+}
+
+/// `loose_weight × haul × step_k + pack_weight × pack_haul × step_k` in millipoints.
+pub fn move_cargo_cost_milli(
+    loose_weight_milli: u32,
+    pack_weight_milli: u32,
+    haul_milli: u32,
+    pack_haul_milli: u32,
+    step_k_milli: u32,
+) -> u32 {
+    let k = u64::from(step_k_milli.max(1));
+    let loose = u64::from(loose_weight_milli) * u64::from(haul_milli.max(1)) * k / 10_000;
+    let packed = u64::from(pack_weight_milli) * u64::from(pack_haul_milli.max(1)) * k / 10_000;
+    (loose + packed) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +138,15 @@ mod tests {
     #[test]
     fn food_is_lighter_than_stone() {
         assert!(item_weight_milli(ItemId::Food(1)) < item_weight_milli(ItemId::Stone));
+    }
+
+    #[test]
+    fn packed_food_move_cheaper_than_loose() {
+        let food_w = item_weight_milli(ItemId::Food(1)) * 10;
+        let loose =
+            move_cargo_cost_milli(food_w, 0, HAUL_MILLI, PACK_HAUL_MILLI, MOVE_STEP_K_MILLI);
+        let packed =
+            move_cargo_cost_milli(0, food_w, HAUL_MILLI, PACK_HAUL_MILLI, MOVE_STEP_K_MILLI);
+        assert!(packed < loose, "packed={packed} loose={loose}");
     }
 }

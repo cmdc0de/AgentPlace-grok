@@ -44,9 +44,16 @@ These thresholds are what the **mock policy** uses (`policy.rs`). The LLM prompt
 | **Hungry** | hunger **< 75** (`hunger_max * 3 / 4`) | < 7500 |
 | **Tired** | energy **< 33.3** (`energy_max / 3`) | < 3333 |
 
-Priority: **thirst → hunger → tired**. Thirsty agents `Drink` if adjacent to water, else move toward it. Hungry agents `Eat` if they have food, else Gather/Hunt/Fish/move toward food. Tired agents `Rest`.
+Priority: **thirst → (storage-aware hunger) → tired**. Thirsty agents `Drink` if adjacent to water, else move toward it. Tired agents `Rest`.
 
-M9 moved the hunger/thirst cutoffs from 50% to 75% so default-decay mock agents `Drink` before tick-400 thirst-death (thirsty from tick ~100). Same-seed hashes still match.
+Without a storage goal, **hungry** still means Eat / Retrieve / Gather / Hunt / Fish (75% cutoff). **With** a storage goal (`keep the shared storage stocked`):
+
+- Eat / Retrieve only when hunger **< 50%**
+- Store food to the **cell crate** whenever legal
+- Gather (and walk toward plants) to stock that crate even at full hunger
+- Pack leftover food into a Basket backpack when legal
+
+M9 moved the hunger/thirst cutoffs from 50% to 75% so default-decay mock agents `Drink` before tick-400 thirst-death (thirsty from tick ~100). M11 keeps that, and only restores the 50% Eat line when the coop storage goal is on so surplus actually hits the crate.
 
 Reports: `hunger: … (below half: N)` counts agents with display hunger **< 50**.
 
@@ -59,9 +66,13 @@ Reports: `hunger: … (below half: N)` counts agents with display hunger **< 50*
 | **Rest** | Energy += 0.4 per tick (clamped to max). |
 | Toxic / allergenic Eat | Also illness (`illness_ticks`), extra energy drain (−8.0 on that eat), toxic_events++. |
 | **Shout** | Energy −5.0 if they can pay it; otherwise the utterance is not a shout. |
-| **Store / Retrieve / Transfer** | Energy `qty × unit_weight × 0.4` (display). Unaffordable ⇒ not legal. Stone 3.0, wood 1.5, food 0.5, tools 2.0, fiber 0.4. |
+| **Store / Retrieve / Transfer** | Energy `qty × unit_weight × haul`. Source is **pockets** (haul **0.4**) or the **pack** (haul **0.1**) when the item is packed. Unaffordable ⇒ not legal. Stone 3.0, wood 1.5, food 0.5, tools 2.0, fiber 0.4. |
+| **Pack / Unpack** | Pockets ↔ worn Basket pack (8 slots, weight 25.0). Haul **0.1**. Cannot pack the Basket itself. |
+| **Move** | Extra cargo cost `loose_weight × 0.4 × 0.05 + pack_weight × 0.1 × 0.05` (display per cell). Unaffordable ⇒ not legal. Empty pockets still use the energy-0 50% fail. Rest still regenerates. |
 
-Shared **land-cell containers** (one per cell): slot cap 16 and weight cap 80.0. Empty containers despawn. Viewer shows a brown crate mesh. `/give ID ITEM QTY` in the in-process viewer is a hash-sensitive cheat (no energy).
+Shared **land-cell containers** (one per cell): slot cap 16 and weight cap 80.0. Empty containers despawn. Viewer: brown **crate** on the cell; darker **satchel** on the agent capsule whenever they hold a Basket (even if the pack is empty). `/give ID ITEM QTY` in the in-process viewer is a hash-sensitive cheat (no energy). Giving a `basket` enables the pack.
+
+Removing the last Basket **Unpacks** the pack into pockets; leftover that will not fit is **Stored** on the current land cell if the crate has room; otherwise Transfer/Store of that last Basket is not legal (nothing is voided).
 
 `resource_multiplier` (incentives) scales **food gather qty** and **eat nutrition** only. It does not change decay.
 
@@ -85,9 +96,10 @@ With default decay and no Drink, **thirst hits 0 at tick 400**; hunger at ~667. 
 
 ## Quick sanity numbers (default config, no eating)
 
-| Tick | Hunger | Thirst | Energy | Mock thirsty? | Mock hungry? |
+| Tick | Hunger | Thirst | Energy | Mock thirsty? | Mock hungry (no storage goal)? |
 |---|---|---|---|---|---|
 | 0 | 100 | 100 | 100 | no | no |
-| 200 | 70 | 50 | 84 | no (thirst == 50, need **< 50**) | no |
-| 201 | 69.85 | 49.75 | 83.92 | **yes** | no |
-| 334 | 49.9 | … | … | yes | **yes** |
+| 100 | 85 | 75 | 92 | no (need **< 75**) | no |
+| 101 | 84.85 | 74.75 | 91.92 | **yes** | no |
+| 167 | 74.95 | … | … | yes | **yes** |
+| 200 | 70 | 50 | 84 | yes | yes |

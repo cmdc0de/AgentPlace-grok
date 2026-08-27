@@ -1,7 +1,8 @@
 # M11 — Mock fills the crate + worn backpacks
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M10 complete (`docs/M10-plan.md`, git tag `M10`, commit `7a17759`)  
+**Walkthrough:** [`M11-test-plan.md`](M11-test-plan.md)  
 **Specs:** `decision-observation-llm-economy-metrics-spec.md` §4 (Store/Transfer), `needs-and-survival.md`, `incentive-schedule-format.md` (coop storage goal)
 
 ## Context
@@ -133,13 +134,15 @@ cargo run -p sim-cli -- --config configs/default.toml \
 
 ## Verification (when implemented)
 
+Walkthrough: [`M11-test-plan.md`](M11-test-plan.md).
+
 ```bash
 cargo test -p sim-core
 cargo test -p viewer
 cargo run -p sim-cli -- --compare /tmp/m11-base /tmp/m11-coop
 ```
 
-Expect stockpile qty **B &gt; A** on mock coop vs baseline.
+Expect stockpile qty **B &gt; A** on mock coop vs baseline (80-tick default: qty 0 vs 75).
 
 ## Risks
 

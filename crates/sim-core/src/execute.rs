@@ -36,6 +36,8 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Transfer { item, qty, to } => transfer(sim, id, *item, *qty, *to),
         PrimaryAction::Store { item, qty } => store(sim, id, *item, *qty),
         PrimaryAction::Retrieve { item, qty } => retrieve(sim, id, *item, *qty),
+        PrimaryAction::Pack { item, qty } => pack_item(sim, id, *item, *qty),
+        PrimaryAction::Unpack { item, qty } => unpack_item(sim, id, *item, *qty),
     }
 }
 
@@ -80,8 +82,7 @@ fn is_legal(sim: &Simulation, id: AgentId, action: &PrimaryAction) -> bool {
     }
 }
 
-fn pay_haul(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) -> bool {
-    let cost = crate::haul::haul_cost_milli(item, qty, sim.storage.haul_milli);
+fn pay_energy(sim: &mut Simulation, id: AgentId, cost: u32) -> bool {
     let Some(a) = sim.agents.get_mut(&id) else {
         return false;
     };
@@ -90,6 +91,141 @@ fn pay_haul(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) -> bool {
     }
     a.needs.energy -= cost;
     true
+}
+
+fn pay_haul(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) -> bool {
+    let cost = crate::haul::haul_cost_milli(item, qty, sim.storage.haul_milli);
+    pay_energy(sim, id, cost)
+}
+
+fn source_haul(sim: &Simulation, id: AgentId, item: ItemId) -> u32 {
+    let Some(a) = sim.agents.get(&id) else {
+        return sim.storage.haul_milli;
+    };
+    if item != ItemId::Basket && a.has_basket() && a.pack.get(&item).copied().unwrap_or(0) > 0 {
+        sim.storage.pack_haul_milli
+    } else {
+        sim.storage.haul_milli
+    }
+}
+
+fn unload_pack_after_last_basket(sim: &mut Simulation, id: AgentId) -> bool {
+    let Some(agent) = sim.agents.get(&id) else {
+        return false;
+    };
+    if agent.has_basket() || agent.pack_count() == 0 {
+        return true;
+    }
+    let (to_pockets, leftover) = agent.split_pack_unload(0);
+    let (x, y) = (agent.x, agent.y);
+    let params = sim.storage;
+    if !leftover.is_empty() && !sim.world.crate_can_take(x, y, None, &leftover, &params) {
+        return false;
+    }
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return false;
+    };
+    for (item, qty) in &to_pockets {
+        if !a.take_pack(*item, *qty) {
+            return false;
+        }
+        if a.try_add_item(*item, *qty) < *qty {
+            a.try_add_pack(*item, *qty, &params);
+            return false;
+        }
+    }
+    for (item, qty) in leftover {
+        if !sim
+            .agents
+            .get_mut(&id)
+            .is_some_and(|a| a.take_pack(item, qty))
+        {
+            return false;
+        }
+        if !sim.world.try_store(x, y, item, qty, &params) {
+            if let Some(a) = sim.agents.get_mut(&id) {
+                a.try_add_pack(item, qty, &params);
+            }
+            return false;
+        }
+        push(sim, id, SimEventKind::Store { item, qty });
+    }
+    true
+}
+
+fn pack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
+    if item == ItemId::Basket {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    if !agent.has_basket() || agent.inventory.get(&item).copied().unwrap_or(0) < qty {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let params = sim.storage;
+    if !crate::haul::can_fit(
+        &agent.pack,
+        item,
+        qty,
+        params.pack_slot_cap,
+        params.pack_weight_cap_milli,
+    ) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let cost = crate::haul::haul_cost_milli(item, qty, params.pack_haul_milli);
+    if !pay_energy(sim, id, cost) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return;
+    };
+    if !a.take_item(item, qty) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if a.try_add_pack(item, qty, &params) < qty {
+        a.try_add_item(item, qty);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(sim, id, SimEventKind::Pack { item, qty });
+}
+
+fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    if !agent.has_basket() || agent.pack.get(&item).copied().unwrap_or(0) < qty {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if agent.inventory_count().saturating_add(qty) > agent.inventory_cap {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let cost = crate::haul::haul_cost_milli(item, qty, sim.storage.pack_haul_milli);
+    if !pay_energy(sim, id, cost) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return;
+    };
+    if !a.take_pack(item, qty) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if a.try_add_item(item, qty) < qty {
+        a.try_add_pack(item, qty, &sim.storage);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(sim, id, SimEventKind::Unpack { item, qty });
 }
 
 fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: AgentId) {
@@ -103,19 +239,42 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
     };
     let room = recv.inventory_cap.saturating_sub(recv.inventory_count());
     let moved = qty.min(room);
-    if moved == 0 || sender.inventory.get(&item).copied().unwrap_or(0) < moved {
+    let have_pockets = sender.inventory.get(&item).copied().unwrap_or(0);
+    let have_pack = sender.pack.get(&item).copied().unwrap_or(0);
+    if moved == 0 || have_pockets + have_pack < moved {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if !pay_haul(sim, id, item, moved) {
+    if item == ItemId::Basket && sender.basket_count() <= moved {
+        let leftover = sender.split_pack_unload(moved).1;
+        if !leftover.is_empty()
+            && !sim
+                .world
+                .crate_can_take(sender.x, sender.y, None, &leftover, &sim.storage)
+        {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+    }
+    let haul = source_haul(sim, id, item);
+    let cost = crate::haul::haul_cost_milli(item, moved, haul);
+    if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if !sim
+    if sim
         .agents
         .get_mut(&id)
-        .is_some_and(|a| a.take_item(item, moved))
+        .and_then(|a| a.take_from_pack_or_pockets(item, moved))
+        .is_none()
     {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if item == ItemId::Basket && !unload_pack_after_last_basket(sim, id) {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            a.try_add_item(item, moved);
+        }
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -150,25 +309,48 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         return;
     };
     let (x, y) = (agent.x, agent.y);
-    if agent.inventory.get(&item).copied().unwrap_or(0) < qty {
+    let have_pockets = agent.inventory.get(&item).copied().unwrap_or(0);
+    let have_pack = agent.pack.get(&item).copied().unwrap_or(0);
+    if have_pockets + have_pack < qty {
         push(sim, id, SimEventKind::Wait);
         return;
+    }
+    if item == ItemId::Basket && agent.basket_count() <= qty {
+        let leftover = agent.split_pack_unload(qty).1;
+        if !sim
+            .world
+            .crate_can_take(x, y, Some((item, qty)), &leftover, &sim.storage)
+        {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
     }
     let params = sim.storage;
     if !sim.world.try_store(x, y, item, qty, &params) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if !pay_haul(sim, id, item, qty) {
+    let haul = source_haul(sim, id, item);
+    let cost = crate::haul::haul_cost_milli(item, qty, haul);
+    if !pay_energy(sim, id, cost) {
         sim.world.try_retrieve(x, y, item, qty);
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if !sim
+    if sim
         .agents
         .get_mut(&id)
-        .is_some_and(|a| a.take_item(item, qty))
+        .and_then(|a| a.take_from_pack_or_pockets(item, qty))
+        .is_none()
     {
+        sim.world.try_retrieve(x, y, item, qty);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if item == ItemId::Basket && !unload_pack_after_last_basket(sim, id) {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            a.try_add_item(item, qty);
+        }
         sim.world.try_retrieve(x, y, item, qty);
         push(sim, id, SimEventKind::Wait);
         return;
@@ -261,12 +443,21 @@ fn move_rel(sim: &mut Simulation, id: AgentId, dx: i32, dy: i32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if agent.needs.energy == 0 {
+    let cost = agent.move_cost_milli(&sim.storage);
+    if agent.needs.energy < cost {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if cost == 0 && agent.needs.energy == 0 {
         let fail = sim.rngs.agent_stream(id).random_bool(0.5);
         if fail {
             push(sim, id, SimEventKind::Wait);
             return;
         }
+    }
+    if !pay_energy(sim, id, cost) {
+        push(sim, id, SimEventKind::Wait);
+        return;
     }
     if let Some(a) = sim.agents.get_mut(&id) {
         a.x = nx as u32;
@@ -345,17 +536,18 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
         )
         .max(1)
     };
+    let params = sim.storage;
     if let Some(a) = sim.agents.get_mut(&id) {
         match spec.yield_kind {
             VegYield::Wood => {
                 got_item = ItemId::Wood;
-                qty = a.try_add_item(ItemId::Wood, spec.wood_yield.max(1));
+                qty = a.add_to_pockets_or_pack(ItemId::Wood, spec.wood_yield.max(1), &params);
             }
             VegYield::Food => {
                 got_item = ItemId::Food(species);
-                qty = a.try_add_item(ItemId::Food(species), food_n);
+                qty = a.add_to_pockets_or_pack(ItemId::Food(species), food_n, &params);
                 if spec.fiber_yield > 0 {
-                    let _ = a.try_add_item(ItemId::Fiber, spec.fiber_yield);
+                    let _ = a.add_to_pockets_or_pack(ItemId::Fiber, spec.fiber_yield, &params);
                 }
             }
         }
@@ -402,9 +594,10 @@ fn gather_stone(sim: &mut Simulation, id: AgentId) {
         )
     };
     let mut qty = 0;
+    let params = sim.storage;
     if ok {
         if let Some(a) = sim.agents.get_mut(&id) {
-            qty = a.try_add_item(ItemId::Stone, 1);
+            qty = a.add_to_pockets_or_pack(ItemId::Stone, 1, &params);
         }
         let i = (y * sim.world.width + x) as usize;
         if i < sim.world.minerals.len() {
@@ -504,7 +697,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
     let Some(agent) = sim.agents.get_mut(&id) else {
         return;
     };
-    if !agent.take_item(item, 1) {
+    if !agent.take_item(item, 1) && !agent.take_pack(item, 1) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -598,8 +791,9 @@ fn hunt(sim: &mut Simulation, id: AgentId) {
             .first()
             .map(|s| s.nutrition_milli())
             .unwrap_or(3000);
+        let params = sim.storage;
         if let Some(a) = sim.agents.get_mut(&id) {
-            let _ = a.try_add_item(ItemId::Food(100), 1);
+            let _ = a.add_to_pockets_or_pack(ItemId::Food(100), 1, &params);
         }
         let _ = nutr;
     }
@@ -636,8 +830,9 @@ fn fish(sim: &mut Simulation, id: AgentId) {
     };
     if ok {
         sim.world.add_fish(x, y, -1);
+        let params = sim.storage;
         if let Some(a) = sim.agents.get_mut(&id) {
-            let _ = a.try_add_item(ItemId::Food(101), 1);
+            let _ = a.add_to_pockets_or_pack(ItemId::Food(101), 1, &params);
         }
     }
     push(sim, id, SimEventKind::Fish { success: ok });

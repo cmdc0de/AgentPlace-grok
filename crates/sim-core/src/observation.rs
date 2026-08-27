@@ -82,6 +82,8 @@ pub struct Observation {
     #[serde(default)]
     pub inventory: Vec<InventoryView>,
     #[serde(default)]
+    pub pack: Vec<InventoryView>,
+    #[serde(default)]
     pub allergies: Vec<String>,
     /// Named toxin facts from memory (species ids).
     #[serde(default)]
@@ -112,6 +114,7 @@ impl Default for Observation {
             energy: 0,
             illness_ticks: 0,
             inventory: Vec::new(),
+            pack: Vec::new(),
             allergies: Vec::new(),
             toxins: Vec::new(),
             incentives: Vec::new(),
@@ -246,6 +249,15 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
             qty: *qty,
         })
         .collect();
+    let pack = agent
+        .pack
+        .iter()
+        .filter(|(_, qty)| **qty > 0)
+        .map(|(item, qty)| InventoryView {
+            item: item_display_name(*item, species),
+            qty: *qty,
+        })
+        .collect();
     let mut toxins = Vec::new();
     for mem in &agent.memory {
         if mem.kind != MemoryKind::ToxinFact {
@@ -291,6 +303,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         energy: agent.needs.energy / 100,
         illness_ticks: agent.illness_ticks,
         inventory,
+        pack,
         allergies: agent.personality.allergy_tags.clone(),
         toxins,
         incentives,
@@ -392,10 +405,16 @@ fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) ->
 
 pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let mut legal = vec![PrimaryAction::Wait, PrimaryAction::Rest];
+    let params = sim.storage;
+    let energy = agent.needs.energy;
+    let move_cost = agent.move_cost_milli(&params);
     for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
         let nx = agent.x as i32 + dx;
         let ny = agent.y as i32 + dy;
-        if sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32) {
+        if sim.world.in_bounds(nx, ny)
+            && sim.world.is_land(nx as u32, ny as u32)
+            && energy >= move_cost
+        {
             legal.push(PrimaryAction::MoveRelative { dx, dy });
         }
     }
@@ -447,12 +466,18 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     if can_fish {
         legal.push(PrimaryAction::Fish);
     }
-    for (item, qty) in &agent.inventory {
-        if *qty > 0 {
-            if let ItemId::Food(tag) = item {
-                if *tag >= 100 || !sim.board.blocks_eat(*tag) {
-                    legal.push(PrimaryAction::Eat { item: *item });
-                }
+    let mut eat_seen = Vec::new();
+    for (item, qty) in agent.inventory.iter().chain(agent.pack.iter()) {
+        if *qty == 0 {
+            continue;
+        }
+        if let ItemId::Food(tag) = item {
+            if eat_seen.contains(item) {
+                continue;
+            }
+            if *tag >= 100 || !sim.board.blocks_eat(*tag) {
+                eat_seen.push(*item);
+                legal.push(PrimaryAction::Eat { item: *item });
             }
         }
     }
@@ -501,8 +526,6 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         legal.push(PrimaryAction::Support { proposal_id: p.id });
         legal.push(PrimaryAction::Oppose { proposal_id: p.id });
     }
-    let params = sim.storage;
-    let energy = agent.needs.energy;
     if sim.world.is_land(agent.x, agent.y) {
         let cell = sim
             .world
@@ -510,17 +533,39 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             .get(&(agent.x, agent.y))
             .cloned()
             .unwrap_or_default();
-        for (item, have) in &agent.inventory {
-            if *have == 0 {
+        let mut store_seen = Vec::new();
+        for item in agent
+            .inventory
+            .keys()
+            .chain(agent.pack.keys())
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            if store_seen.contains(&item) {
                 continue;
             }
-            let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
-            if energy >= cost && cell.can_add(*item, 1, &params) {
-                legal.push(PrimaryAction::Store {
-                    item: *item,
-                    qty: 1,
-                });
+            let in_pack = agent.has_basket() && agent.pack.get(&item).copied().unwrap_or(0) > 0;
+            let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
+            if !in_pack && !in_pockets {
+                continue;
             }
+            let haul = if in_pack {
+                params.pack_haul_milli
+            } else {
+                params.haul_milli
+            };
+            let cost = crate::haul::haul_cost_milli(item, 1, haul);
+            if energy < cost || !cell.can_add(item, 1, &params) {
+                continue;
+            }
+            if item == ItemId::Basket
+                && agent.basket_count() <= 1
+                && !can_leave_last_basket(sim, agent, Some((item, 1)))
+            {
+                continue;
+            }
+            store_seen.push(item);
+            legal.push(PrimaryAction::Store { item, qty: 1 });
         }
         for (item, have) in &cell.items {
             if *have == 0 {
@@ -529,6 +574,40 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
             if energy >= cost && agent.inventory_count() < agent.inventory_cap {
                 legal.push(PrimaryAction::Retrieve {
+                    item: *item,
+                    qty: 1,
+                });
+            }
+        }
+    }
+    if agent.has_basket() {
+        for (item, have) in &agent.inventory {
+            if *have == 0 || *item == ItemId::Basket {
+                continue;
+            }
+            let cost = crate::haul::haul_cost_milli(*item, 1, params.pack_haul_milli);
+            if energy >= cost
+                && crate::haul::can_fit(
+                    &agent.pack,
+                    *item,
+                    1,
+                    params.pack_slot_cap,
+                    params.pack_weight_cap_milli,
+                )
+            {
+                legal.push(PrimaryAction::Pack {
+                    item: *item,
+                    qty: 1,
+                });
+            }
+        }
+        for (item, have) in &agent.pack {
+            if *have == 0 {
+                continue;
+            }
+            let cost = crate::haul::haul_cost_milli(*item, 1, params.pack_haul_milli);
+            if energy >= cost && agent.inventory_count() < agent.inventory_cap {
+                legal.push(PrimaryAction::Unpack {
                     item: *item,
                     qty: 1,
                 });
@@ -558,21 +637,61 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         if room == 0 {
             continue;
         }
-        for (item, have) in &agent.inventory {
-            if *have == 0 {
+        let mut xfer_seen = Vec::new();
+        for item in agent
+            .inventory
+            .keys()
+            .chain(agent.pack.keys())
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            if xfer_seen.contains(&item) {
                 continue;
             }
-            let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
-            if energy >= cost {
-                legal.push(PrimaryAction::Transfer {
-                    item: *item,
-                    qty: 1,
-                    to: other.id,
-                });
+            let in_pack = agent.has_basket()
+                && item != ItemId::Basket
+                && agent.pack.get(&item).copied().unwrap_or(0) > 0;
+            let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
+            if !in_pack && !in_pockets {
+                continue;
             }
+            let haul = if in_pack {
+                params.pack_haul_milli
+            } else {
+                params.haul_milli
+            };
+            let cost = crate::haul::haul_cost_milli(item, 1, haul);
+            if energy < cost {
+                continue;
+            }
+            if item == ItemId::Basket
+                && agent.basket_count() <= 1
+                && !can_leave_last_basket(sim, agent, None)
+            {
+                continue;
+            }
+            xfer_seen.push(item);
+            legal.push(PrimaryAction::Transfer {
+                item,
+                qty: 1,
+                to: other.id,
+            });
         }
     }
     legal
+}
+
+fn can_leave_last_basket(
+    sim: &Simulation,
+    agent: &Agent,
+    crate_reserved: Option<(crate::agent::ItemId, u32)>,
+) -> bool {
+    if agent.pack_count() == 0 {
+        return true;
+    }
+    let (_to_pockets, leftover) = agent.split_pack_unload(1);
+    sim.world
+        .crate_can_take(agent.x, agent.y, crate_reserved, &leftover, &sim.storage)
 }
 
 pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {
@@ -691,6 +810,12 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         }
         PrimaryAction::Retrieve { item, qty } => {
             format!("Retrieve {}×{}", item_display_name(*item, species), qty)
+        }
+        PrimaryAction::Pack { item, qty } => {
+            format!("Pack {}×{}", item_display_name(*item, species), qty)
+        }
+        PrimaryAction::Unpack { item, qty } => {
+            format!("Unpack {}×{}", item_display_name(*item, species), qty)
         }
     }
 }

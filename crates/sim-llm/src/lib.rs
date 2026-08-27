@@ -214,6 +214,11 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
         .iter()
         .map(|i| format!("{}×{}", i.item, i.qty))
         .collect();
+    let pack: Vec<String> = obs
+        .pack
+        .iter()
+        .map(|i| format!("{}×{}", i.item, i.qty))
+        .collect();
     let incentives: Vec<String> = obs
         .incentives
         .iter()
@@ -239,6 +244,7 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
         "Agent {} at ({}, {}). Vision {}.\n\
          Needs (0–100): hunger={} thirst={} energy={} illness={}\n\
          Inventory: [{}]\n\
+         Pack: [{}]\n\
          Allergies: [{}]\n\
          Known toxins: [{}]\n\
          Active incentives: [{}]\n\
@@ -248,8 +254,8 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
          Relationships: [{}]\n\
          Heard: [{}]\n\
          Legal primary actions (you MUST pick one of these):\n{}\n\
-         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose|Transfer|Store|Retrieve\",\"target\":\"species, item, or agent id\",\"dx\":0,\"dy\":0,\"qty\":1,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
-         Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent. Drink if thirsty and water is legal; Eat if hungry and food is legal. Store surplus food; Retrieve from a stockpile when hungry.",
+         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose|Transfer|Store|Retrieve|Pack|Unpack\",\"target\":\"species, item, or agent id\",\"dx\":0,\"dy\":0,\"qty\":1,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
+         Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent. Drink if thirsty and water is legal; Eat if hungry and food is legal. Store surplus food; Retrieve from a stockpile when hungry. Pack cargo into a Basket backpack to move cheaper.",
         obs.agent_id.0,
         obs.x,
         obs.y,
@@ -259,6 +265,7 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
         obs.energy,
         illness,
         inventory.join(", "),
+        pack.join(", "),
         obs.allergies.join(", "),
         obs.toxins.join(", "),
         incentives.join(" ; "),

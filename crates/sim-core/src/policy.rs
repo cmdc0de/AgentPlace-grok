@@ -161,10 +161,15 @@ fn choose_primary(
     energy_max: u32,
     agreeableness: u8,
 ) -> (PrimaryAction, &'static str) {
-    // Seek water/food from 75% remaining so default decay drinks before tick-400 death.
+    // Seek water from 75% remaining so default decay drinks before tick-400 death.
     let thirsty = thirst_max > 0 && thirst < thirst_max * 3 / 4;
+    let starving = hunger_max > 0 && hunger < hunger_max / 2;
     let hungry = hunger_max > 0 && hunger < hunger_max * 3 / 4;
     let tired = energy_max > 0 && energy < energy_max / 3;
+    let wants_storage = obs
+        .goals
+        .iter()
+        .any(|g| g.text.to_ascii_lowercase().contains("storage"));
 
     if thirsty {
         if obs.legal.iter().any(|a| matches!(a, PrimaryAction::Drink)) {
@@ -174,17 +179,47 @@ fn choose_primary(
             return (mv, "move");
         }
     }
-    if hungry {
+    // Survival eat/retrieve/gather: always below 50%; below 75% only if no storage goal.
+    if starving || (hungry && !wants_storage) {
+        if let Some(act) = survival_food(obs, rng) {
+            return act;
+        }
+    }
+    if wants_storage {
         for a in &obs.legal {
-            if matches!(a, PrimaryAction::Eat { .. }) {
-                return (a.clone(), "eat");
+            if matches!(
+                a,
+                PrimaryAction::Store {
+                    item: ItemId::Food(_),
+                    ..
+                }
+            ) {
+                return (a.clone(), "store");
+            }
+        }
+        if has_carry_room(obs) {
+            for a in &obs.legal {
+                if matches!(a, PrimaryAction::Gather { species } if *species != 0) {
+                    return (a.clone(), "gather");
+                }
+            }
+            if let Some(mv) = move_toward(obs, rng, |t| t.vegetation != 0) {
+                return (mv, "move");
             }
         }
         for a in &obs.legal {
-            if matches!(a, PrimaryAction::Retrieve { .. }) {
-                return (a.clone(), "retrieve");
+            if matches!(
+                a,
+                PrimaryAction::Pack {
+                    item: ItemId::Food(_),
+                    ..
+                }
+            ) {
+                return (a.clone(), "pack");
             }
         }
+    }
+    if hungry && wants_storage {
         for a in &obs.legal {
             if matches!(a, PrimaryAction::Gather { species } if *species != 0) {
                 return (a.clone(), "gather");
@@ -206,25 +241,21 @@ fn choose_primary(
             return (mv, "move");
         }
     }
-    let surplus = hunger_max > 0 && hunger >= hunger_max * 3 / 4;
-    let wants_storage = obs
-        .goals
-        .iter()
-        .any(|g| g.text.to_ascii_lowercase().contains("storage"));
-    if surplus && wants_storage {
+    if !wants_storage {
         for a in &obs.legal {
             if matches!(
                 a,
-                PrimaryAction::Store {
+                PrimaryAction::Pack {
                     item: ItemId::Food(_),
                     ..
                 }
             ) {
-                return (a.clone(), "store");
+                return (a.clone(), "pack");
             }
         }
     }
-    if surplus && agreeableness >= 40 {
+    let surplus = hunger_max > 0 && hunger >= hunger_max * 3 / 4;
+    if agreeableness >= 40 && (surplus || wants_storage) {
         for a in &obs.legal {
             if matches!(
                 a,
@@ -250,6 +281,44 @@ fn choose_primary(
         return (moves.choose(rng).unwrap().clone(), "move");
     }
     (PrimaryAction::Wait, "wait")
+}
+
+fn survival_food(
+    obs: &Observation,
+    rng: &mut ChaCha20Rng,
+) -> Option<(PrimaryAction, &'static str)> {
+    for a in &obs.legal {
+        if matches!(a, PrimaryAction::Eat { .. }) {
+            return Some((a.clone(), "eat"));
+        }
+    }
+    for a in &obs.legal {
+        if matches!(a, PrimaryAction::Retrieve { .. }) {
+            return Some((a.clone(), "retrieve"));
+        }
+    }
+    for a in &obs.legal {
+        if matches!(a, PrimaryAction::Gather { species } if *species != 0) {
+            return Some((a.clone(), "gather"));
+        }
+    }
+    if let Some(PrimaryAction::Hunt) = obs.legal.iter().find(|a| matches!(a, PrimaryAction::Hunt)) {
+        return Some((PrimaryAction::Hunt, "hunt"));
+    }
+    if let Some(PrimaryAction::Fish) = obs.legal.iter().find(|a| matches!(a, PrimaryAction::Fish)) {
+        return Some((PrimaryAction::Fish, "fish"));
+    }
+    move_toward(obs, rng, |t| {
+        t.vegetation != 0 || t.animals > 0 || t.fish > 0 || !t.stockpile.is_empty()
+    })
+    .map(|mv| (mv, "move"))
+}
+
+fn has_carry_room(obs: &Observation) -> bool {
+    let pockets: u32 = obs.inventory.iter().map(|i| i.qty).sum();
+    let pack: u32 = obs.pack.iter().map(|i| i.qty).sum();
+    let has_basket = obs.inventory.iter().any(|i| i.item == "basket");
+    pockets < 16 || (has_basket && pack < 8)
 }
 
 fn move_toward(

@@ -49,6 +49,8 @@ pub fn legal_names(legal: &[PrimaryAction]) -> Vec<String> {
             PrimaryAction::Transfer { .. } => "Transfer".into(),
             PrimaryAction::Store { .. } => "Store".into(),
             PrimaryAction::Retrieve { .. } => "Retrieve".into(),
+            PrimaryAction::Pack { .. } => "Pack".into(),
+            PrimaryAction::Unpack { .. } => "Unpack".into(),
         })
         .collect()
 }
@@ -106,6 +108,8 @@ pub fn mock_branch_for(primary: &PrimaryAction) -> &'static str {
         PrimaryAction::Transfer { .. } => "transfer",
         PrimaryAction::Store { .. } => "store",
         PrimaryAction::Retrieve { .. } => "retrieve",
+        PrimaryAction::Pack { .. } => "pack",
+        PrimaryAction::Unpack { .. } => "unpack",
     }
 }
 

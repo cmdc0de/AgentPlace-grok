@@ -33,14 +33,21 @@ impl Container {
     }
 
     pub fn can_add(&self, item: ItemId, qty: u32, params: &StorageParams) -> bool {
+        haul::can_fit(
+            &self.items,
+            item,
+            qty,
+            params.slot_cap,
+            params.weight_cap_milli,
+        )
+    }
+
+    /// Insert without cap checks (caller already validated).
+    pub fn add_item(&mut self, item: ItemId, qty: u32) {
         if qty == 0 {
-            return false;
+            return;
         }
-        let slots = self.slot_count().saturating_add(qty);
-        let weight = self
-            .weight_milli()
-            .saturating_add(haul::item_weight_milli(item).saturating_mul(qty));
-        slots <= params.slot_cap && weight <= params.weight_cap_milli
+        *self.items.entry(item).or_insert(0) += qty;
     }
 }
 
@@ -284,6 +291,37 @@ impl World {
             return false;
         }
         *entry.items.entry(item).or_insert(0) += qty;
+        true
+    }
+
+    /// Whether `additions` would fit in this cell's crate after optional reserved items.
+    pub fn crate_can_take(
+        &self,
+        x: u32,
+        y: u32,
+        reserved: Option<(ItemId, u32)>,
+        additions: &[(ItemId, u32)],
+        params: &StorageParams,
+    ) -> bool {
+        if additions.is_empty() {
+            return true;
+        }
+        if !self.is_land(x, y) {
+            return false;
+        }
+        let mut cell = self.stockpile_at(x, y).cloned().unwrap_or_default();
+        if let Some((item, qty)) = reserved {
+            if !cell.can_add(item, qty, params) {
+                return false;
+            }
+            cell.add_item(item, qty);
+        }
+        for (item, qty) in additions {
+            if !cell.can_add(*item, *qty, params) {
+                return false;
+            }
+            cell.add_item(*item, *qty);
+        }
         true
     }
 

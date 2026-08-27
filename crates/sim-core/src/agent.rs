@@ -106,6 +106,9 @@ pub struct Agent {
     pub inventory: BTreeMap<ItemId, u32>,
     #[serde(default)]
     pub inventory_cap: u32,
+    /// Worn Basket pack. Empty unless `has_tool(Basket)`. Trailing `serde default` so M10 ckpts load.
+    #[serde(default)]
+    pub pack: BTreeMap<ItemId, u32>,
     #[serde(default)]
     pub consumption: Consumption,
     #[serde(default)]
@@ -148,6 +151,7 @@ impl Agent {
             personality: Personality::default(),
             inventory: BTreeMap::new(),
             inventory_cap: 16,
+            pack: BTreeMap::new(),
             consumption: Consumption::default(),
             illness_ticks: 0,
             memory: Vec::new(),
@@ -185,6 +189,141 @@ impl Agent {
 
     pub fn inventory_count(&self) -> u32 {
         self.inventory.values().copied().sum()
+    }
+
+    pub fn has_basket(&self) -> bool {
+        self.has_tool(ItemId::Basket)
+    }
+
+    pub fn basket_count(&self) -> u32 {
+        self.inventory.get(&ItemId::Basket).copied().unwrap_or(0)
+    }
+
+    pub fn pack_count(&self) -> u32 {
+        crate::haul::map_slot_count(&self.pack)
+    }
+
+    pub fn pack_weight_milli(&self) -> u32 {
+        crate::haul::map_weight_milli(&self.pack)
+    }
+
+    pub fn pocket_weight_milli(&self) -> u32 {
+        crate::haul::map_weight_milli(&self.inventory)
+    }
+
+    pub fn shows_satchel(&self) -> bool {
+        self.has_basket()
+    }
+
+    pub fn try_add_pack(
+        &mut self,
+        item: ItemId,
+        qty: u32,
+        params: &crate::haul::StorageParams,
+    ) -> u32 {
+        if qty == 0 || item == ItemId::Basket || !self.has_basket() {
+            return 0;
+        }
+        let room_slots = params.pack_slot_cap.saturating_sub(self.pack_count());
+        let room_w = params
+            .pack_weight_cap_milli
+            .saturating_sub(self.pack_weight_milli());
+        let unit = crate::haul::item_weight_milli(item);
+        let by_weight = if unit == 0 { qty } else { room_w / unit };
+        let add = qty.min(room_slots).min(by_weight);
+        if add > 0 {
+            *self.pack.entry(item).or_insert(0) += add;
+        }
+        add
+    }
+
+    pub fn take_pack(&mut self, item: ItemId, qty: u32) -> bool {
+        let Some(have) = self.pack.get_mut(&item) else {
+            return false;
+        };
+        if *have < qty {
+            return false;
+        }
+        *have -= qty;
+        if *have == 0 {
+            self.pack.remove(&item);
+        }
+        true
+    }
+
+    /// Prefer pack when it holds `qty`, else pockets. `None` if neither can pay.
+    pub fn take_from_pack_or_pockets(&mut self, item: ItemId, qty: u32) -> Option<bool> {
+        if item != ItemId::Basket
+            && self.has_basket()
+            && self.pack.get(&item).copied().unwrap_or(0) >= qty
+            && self.take_pack(item, qty)
+        {
+            return Some(true);
+        }
+        if self.take_item(item, qty) {
+            return Some(false);
+        }
+        None
+    }
+
+    pub fn add_to_pockets_or_pack(
+        &mut self,
+        item: ItemId,
+        qty: u32,
+        params: &crate::haul::StorageParams,
+    ) -> u32 {
+        let added = self.try_add_item(item, qty);
+        let rest = qty.saturating_sub(added);
+        if rest == 0 {
+            return added;
+        }
+        added + self.try_add_pack(item, rest, params)
+    }
+
+    pub fn has_carry_room(&self, params: &crate::haul::StorageParams) -> bool {
+        self.inventory_count() < self.inventory_cap
+            || (self.has_basket() && self.pack_count() < params.pack_slot_cap)
+    }
+
+    /// Split pack contents into pocket-bound vs leftover after `extra_pocket_slots` free up.
+    pub fn split_pack_unload(
+        &self,
+        extra_pocket_slots: u32,
+    ) -> (Vec<(ItemId, u32)>, Vec<(ItemId, u32)>) {
+        let mut room = self
+            .inventory_cap
+            .saturating_sub(self.inventory_count())
+            .saturating_add(extra_pocket_slots);
+        let mut to_pockets = Vec::new();
+        let mut leftover = Vec::new();
+        for (item, qty) in &self.pack {
+            if *qty == 0 {
+                continue;
+            }
+            let into = (*qty).min(room);
+            if into > 0 {
+                to_pockets.push((*item, into));
+                room -= into;
+            }
+            if *qty > into {
+                leftover.push((*item, *qty - into));
+            }
+        }
+        (to_pockets, leftover)
+    }
+
+    pub fn move_cost_milli(&self, params: &crate::haul::StorageParams) -> u32 {
+        crate::haul::move_cargo_cost_milli(
+            self.pocket_weight_milli(),
+            if self.has_basket() {
+                self.pack_weight_milli()
+            } else {
+                0
+            },
+            params.haul_milli,
+            params.pack_haul_milli,
+            params.move_step_k_milli,
+        )
     }
 
     pub fn try_add_item(&mut self, item: ItemId, qty: u32) -> u32 {
@@ -251,6 +390,10 @@ impl Agent {
         hasher.update(self.illness_ticks.to_le_bytes());
         hasher.update(self.inventory_cap.to_le_bytes());
         for (item, qty) in &self.inventory {
+            hasher.update(item_tag(*item));
+            hasher.update(qty.to_le_bytes());
+        }
+        for (item, qty) in &self.pack {
             hasher.update(item_tag(*item));
             hasher.update(qty.to_le_bytes());
         }
