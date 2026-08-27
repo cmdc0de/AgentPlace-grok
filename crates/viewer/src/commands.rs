@@ -1,9 +1,113 @@
 //! Closed slash-command set for the viewer console. No GPU / imgui types.
 
+use bevy::prelude::Resource;
 use shared::protocol::ControlVerb;
 use sim_bevy::{SimState, step_once};
-use sim_core::{AgentId, ExperimentConfig, summary_markdown, write_report, write_run_checkpoint};
+use sim_core::{
+    AgentId, ExperimentConfig, Simulation, ckpt_at_or_before, list_checkpoints, summary_markdown,
+    write_report, write_run_checkpoint,
+};
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, Default, Resource)]
+pub struct CkptScrubber {
+    pub dir: Option<PathBuf>,
+    pub ticks: Vec<(u64, PathBuf)>,
+    pub loaded_tick: Option<u64>,
+}
+
+impl CkptScrubber {
+    pub fn discover(path: &Path) -> Self {
+        let dir = if path.is_dir() {
+            path.to_path_buf()
+        } else {
+            path.parent().unwrap_or(Path::new(".")).to_path_buf()
+        };
+        let ticks = list_checkpoints(&dir).unwrap_or_default();
+        let loaded_tick = if path.is_file() {
+            ticks
+                .iter()
+                .find(|(_, p)| *p == path)
+                .map(|(t, _)| *t)
+                .or_else(|| ticks.last().map(|(t, _)| *t))
+        } else {
+            ticks.last().map(|(t, _)| *t)
+        };
+        Self {
+            dir: Some(dir),
+            ticks,
+            loaded_tick,
+        }
+    }
+
+    pub fn refresh(&mut self) {
+        if let Some(dir) = &self.dir {
+            self.ticks = list_checkpoints(dir).unwrap_or_default();
+        }
+    }
+
+    pub fn apply(&mut self, state: &mut SimState, want: u64) -> Result<u64, String> {
+        self.refresh();
+        let dir = self.dir.as_ref().ok_or("no checkpoint directory loaded")?;
+        let path = ckpt_at_or_before(dir, want)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("no checkpoint at or before tick {want}"))?;
+        let listed_tick = self.ticks.iter().find(|(_, p)| *p == path).map(|(t, _)| *t);
+        if let Some(listed) = listed_tick {
+            if self.loaded_tick == Some(listed) && state.sim.tick == listed {
+                return Ok(listed);
+            }
+        }
+        let sim = Simulation::load_checkpoint(&path).map_err(|e| e.to_string())?;
+        let tick = sim.tick;
+        state.sim = sim;
+        state.paused = true;
+        if let Some(id) = state.follow {
+            if !state.sim.agents.contains_key(&id) {
+                state.follow = None;
+            }
+        }
+        self.loaded_tick = Some(tick);
+        Ok(tick)
+    }
+
+    pub fn next(&mut self, state: &mut SimState) -> Result<u64, String> {
+        let cur = self.loaded_tick.unwrap_or(0);
+        let want = self
+            .ticks
+            .iter()
+            .map(|(t, _)| *t)
+            .find(|t| *t > cur)
+            .ok_or("already at last checkpoint")?;
+        self.apply(state, want)
+    }
+
+    pub fn prev(&mut self, state: &mut SimState) -> Result<u64, String> {
+        let cur = self.loaded_tick.unwrap_or(0);
+        let want = self
+            .ticks
+            .iter()
+            .map(|(t, _)| *t)
+            .rev()
+            .find(|t| *t < cur)
+            .ok_or("already at first checkpoint")?;
+        self.apply(state, want)
+    }
+
+    pub fn initial_path(path: &Path) -> Result<PathBuf, String> {
+        if path.is_file() {
+            return Ok(path.to_path_buf());
+        }
+        if path.is_dir() {
+            let ckpts = list_checkpoints(path).map_err(|e| e.to_string())?;
+            return ckpts
+                .last()
+                .map(|(_, p)| p.clone())
+                .ok_or_else(|| format!("no .ckpt files in {}", path.display()));
+        }
+        Err(format!("not a file or directory: {}", path.display()))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiCommand {
@@ -23,6 +127,9 @@ pub enum UiCommand {
     Tick,
     Inject { path: Option<String> },
     Give { id: u64, item: String, qty: u32 },
+    Scrub { tick: u64 },
+    CkptNext,
+    CkptPrev,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -71,7 +178,10 @@ commands:
   /legend  /inspector  /board  /log
   /tick
   /inject PATH     load incentive TOML (needs --allow-control when remote)
-  /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)"
+  /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
+  /scrub TICK      load ckpt at or before TICK (--load DIR, in-process)
+  /ckpt next|prev  adjacent checkpoint in the run directory
+  [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
 }
 
 pub fn parse_command(line: &str) -> Result<UiCommand, String> {
@@ -122,6 +232,17 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
         "inject" => Ok(UiCommand::Inject {
             path: arg.map(|s| s.to_string()),
         }),
+        "scrub" => {
+            let t = arg.ok_or("scrub requires a tick")?;
+            let tick: u64 = t.parse().map_err(|_| format!("bad tick: {t}"))?;
+            Ok(UiCommand::Scrub { tick })
+        }
+        "ckpt" => match arg {
+            Some("next") => Ok(UiCommand::CkptNext),
+            Some("prev") | Some("previous") => Ok(UiCommand::CkptPrev),
+            Some(s) => Err(format!("ckpt expects next|prev, got {s}")),
+            None => Err("ckpt requires next|prev".into()),
+        },
         "give" => {
             let id_s = arg.ok_or("give requires agent id")?;
             let id: u64 = id_s.parse().map_err(|_| format!("bad agent id: {id_s}"))?;
@@ -157,6 +278,7 @@ pub fn run_command(
     state: &mut SimState,
     fog: &mut bool,
     windows: &mut WindowFlags,
+    scrub: &mut CkptScrubber,
 ) -> Vec<String> {
     match cmd {
         UiCommand::Help => vec![help_text().into()],
@@ -284,6 +406,33 @@ pub fn run_command(
                 Err(e) => vec![format!("give error: {e}")],
             }
         }
+        UiCommand::Scrub { tick } => {
+            if state.remote {
+                return vec!["scrub is in-process only (not on the attach wire)".into()];
+            }
+            match scrub.apply(state, tick) {
+                Ok(t) => vec![format!("loaded tick {t}")],
+                Err(e) => vec![format!("scrub error: {e}")],
+            }
+        }
+        UiCommand::CkptNext => {
+            if state.remote {
+                return vec!["ckpt step is in-process only (not on the attach wire)".into()];
+            }
+            match scrub.next(state) {
+                Ok(t) => vec![format!("loaded tick {t}")],
+                Err(e) => vec![format!("ckpt error: {e}")],
+            }
+        }
+        UiCommand::CkptPrev => {
+            if state.remote {
+                return vec!["ckpt step is in-process only (not on the attach wire)".into()];
+            }
+            match scrub.prev(state) {
+                Ok(t) => vec![format!("loaded tick {t}")],
+                Err(e) => vec![format!("ckpt error: {e}")],
+            }
+        }
     }
 }
 
@@ -338,6 +487,82 @@ mod tests {
         assert!(text.contains("/follow"));
         assert!(text.contains("/inject"));
         assert!(text.contains("/give"));
+        assert!(text.contains("/scrub"));
+        assert!(text.contains("/ckpt"));
+    }
+
+    #[test]
+    fn parse_scrub_and_ckpt() {
+        assert_eq!(
+            parse_command("/scrub 40").unwrap(),
+            UiCommand::Scrub { tick: 40 }
+        );
+        assert_eq!(parse_command("/ckpt next").unwrap(), UiCommand::CkptNext);
+        assert_eq!(parse_command("/ckpt prev").unwrap(), UiCommand::CkptPrev);
+        assert_eq!(
+            parse_command("/ckpt previous").unwrap(),
+            UiCommand::CkptPrev
+        );
+        assert!(parse_command("/scrub").unwrap_err().contains("tick"));
+        assert!(parse_command("/ckpt").unwrap_err().contains("next|prev"));
+        assert!(
+            parse_command("/ckpt jump")
+                .unwrap_err()
+                .contains("next|prev")
+        );
+    }
+
+    #[test]
+    fn scrubber_loads_at_or_before_and_steps() {
+        let dir = std::env::temp_dir().join(format!("m14-scrub-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut sim = Simulation::new(default_config_for_tests()).unwrap();
+        sim.run_ticks(2);
+        sim.save_checkpoint(dir.join("run_tick_2.ckpt")).unwrap();
+        let hash2 = sim.state_hash();
+        sim.run_ticks(3);
+        sim.save_checkpoint(dir.join("run_tick_5.ckpt")).unwrap();
+        let latest = CkptScrubber::initial_path(&dir).unwrap();
+        assert!(
+            latest.file_name().unwrap().to_string_lossy().contains("5"),
+            "{latest:?}"
+        );
+        let mut scrub = CkptScrubber::discover(&dir);
+        let mut state = SimState {
+            sim,
+            paused: false,
+            follow: None,
+            remote: false,
+        };
+        let t = scrub.apply(&mut state, 4).unwrap();
+        assert_eq!(t, 2);
+        assert_eq!(state.sim.tick, 2);
+        assert_eq!(state.sim.state_hash(), hash2);
+        assert!(state.paused);
+        let t = scrub.next(&mut state).unwrap();
+        assert_eq!(t, 5);
+        assert_eq!(state.sim.tick, 5);
+        let t = scrub.prev(&mut state).unwrap();
+        assert_eq!(t, 2);
+        let msgs = run_command(
+            UiCommand::Scrub { tick: 0 },
+            &mut state,
+            &mut false,
+            &mut WindowFlags::default(),
+            &mut scrub,
+        );
+        assert!(msgs[0].contains("scrub error"), "{msgs:?}");
+        state.remote = true;
+        let msgs = run_command(
+            UiCommand::Scrub { tick: 5 },
+            &mut state,
+            &mut false,
+            &mut WindowFlags::default(),
+            &mut scrub,
+        );
+        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

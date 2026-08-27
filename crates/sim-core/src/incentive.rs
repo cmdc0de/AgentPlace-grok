@@ -124,7 +124,7 @@ impl IncentiveSchedule {
             }
             if !valid_scope(&inc.applies_to) {
                 return Err(SimError::Config(format!(
-                    "unsupported applies_to {:?} (use all, agent:N, or archetype:name)",
+                    "unsupported applies_to {:?} (use all, agent:N, archetype:name, or supporters_of:proposal_N)",
                     inc.applies_to
                 )));
             }
@@ -144,7 +144,17 @@ fn window(inc: &Incentive, tick: u64) -> bool {
 }
 
 fn valid_scope(s: &str) -> bool {
-    s == "all" || s.starts_with("agent:") || s.starts_with("archetype:")
+    s == "all"
+        || s.starts_with("agent:")
+        || s.starts_with("archetype:")
+        || parse_supporters_of(s).is_some()
+}
+
+/// `supporters_of:proposal_3` or `supporters_of:3` → Some(3).
+fn parse_supporters_of(s: &str) -> Option<u64> {
+    let rest = s.strip_prefix("supporters_of:")?;
+    let rest = rest.strip_prefix("proposal_").unwrap_or(rest);
+    rest.parse().ok()
 }
 
 pub fn in_scope(sim: &Simulation, inc: &Incentive, id: AgentId) -> bool {
@@ -165,6 +175,13 @@ pub fn in_scope(sim: &Simulation, inc: &Incentive, id: AgentId) -> bool {
                 && a.personality.agreeableness == agent.personality.agreeableness
                 && a.personality.perceptiveness == agent.personality.perceptiveness
         });
+    }
+    if let Some(pid) = parse_supporters_of(s) {
+        return sim
+            .board
+            .proposals
+            .iter()
+            .any(|p| p.id == pid && p.supporters.contains(&id));
     }
     false
 }
@@ -474,6 +491,41 @@ visibility = "maybe"
         )
         .unwrap_err();
         assert!(err.to_string().contains("config"), "{err}");
+    }
+
+    #[test]
+    fn parses_supporters_of_scope() {
+        let s = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "c"
+applies_to = "supporters_of:proposal_0"
+"#,
+        )
+        .unwrap();
+        assert_eq!(s.incentives[0].applies_to, "supporters_of:proposal_0");
+        let s2 = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "c"
+applies_to = "supporters_of:3"
+"#,
+        )
+        .unwrap();
+        assert_eq!(s2.incentives[0].applies_to, "supporters_of:3");
+    }
+
+    #[test]
+    fn supporters_of_nope_is_load_error() {
+        let err = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "c"
+applies_to = "supporters_of:nope"
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("applies_to"), "{err}");
     }
 
     #[test]

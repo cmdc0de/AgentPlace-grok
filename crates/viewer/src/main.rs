@@ -4,6 +4,7 @@ mod render;
 mod ui;
 
 use bevy::prelude::*;
+use commands::CkptScrubber;
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
 use sim_bevy::{SimPlugin, SimState, step_once};
@@ -50,6 +51,7 @@ const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
 fn main() {
     let parsed = parse_args();
     let mut net_link = None;
+    let mut scrub = CkptScrubber::default();
     let plugin = match parsed {
         ViewerSource::Config(path) => {
             let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
@@ -67,9 +69,13 @@ fn main() {
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {
-            let sim = Simulation::load_checkpoint(&path).unwrap_or_else(|e| {
+            let load_path = CkptScrubber::initial_path(&path).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
             });
+            let sim = Simulation::load_checkpoint(&load_path).unwrap_or_else(|e| {
+                panic!("failed to load {}: {e}", load_path.display());
+            });
+            scrub = CkptScrubber::discover(&path);
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Connect { url, token } => {
@@ -96,7 +102,8 @@ fn main() {
         ini_filename: Some(ui::imgui_ini_path()),
         ..Default::default()
     })
-    .init_resource::<UiState>();
+    .init_resource::<UiState>()
+    .insert_resource(scrub);
     if let Some(link) = net_link {
         app.insert_resource(link);
     }
@@ -533,6 +540,7 @@ fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
+    mut scrub: ResMut<CkptScrubber>,
     net: Option<Res<net::NetLink>>,
     mut exit: MessageWriter<AppExit>,
 ) {
@@ -589,6 +597,20 @@ fn handle_input(
     }
     if keys.just_pressed(KeyCode::KeyO) {
         ui.fog = !ui.fog;
+    }
+    if !state.remote && scrub.dir.is_some() {
+        if keys.just_pressed(KeyCode::BracketLeft) {
+            match scrub.prev(&mut state) {
+                Ok(t) => ui.scrollback.push(format!("loaded tick {t}")),
+                Err(e) => ui.scrollback.push(format!("ckpt error: {e}")),
+            }
+        }
+        if keys.just_pressed(KeyCode::BracketRight) {
+            match scrub.next(&mut state) {
+                Ok(t) => ui.scrollback.push(format!("loaded tick {t}")),
+                Err(e) => ui.scrollback.push(format!("ckpt error: {e}")),
+            }
+        }
     }
     if keys.just_pressed(KeyCode::KeyF) {
         state.follow = match state.follow {

@@ -631,6 +631,20 @@ pub fn list_checkpoints(dir: impl AsRef<Path>) -> Result<Vec<(u64, std::path::Pa
     Ok(ckpts)
 }
 
+/// Latest checkpoint in `dir` whose tick is `<= want`. None if the directory is empty
+/// or every ckpt is after `want`.
+pub fn ckpt_at_or_before(
+    dir: impl AsRef<Path>,
+    want: u64,
+) -> Result<Option<std::path::PathBuf>, SimError> {
+    let ckpts = list_checkpoints(dir)?;
+    Ok(ckpts
+        .into_iter()
+        .filter(|(tick, _)| *tick <= want)
+        .next_back()
+        .map(|(_, p)| p))
+}
+
 pub fn prune_old_checkpoints(dir: impl AsRef<Path>, keep_last_n: u32) -> Result<(), SimError> {
     if keep_last_n == 0 {
         return Ok(());

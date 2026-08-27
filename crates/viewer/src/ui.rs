@@ -1,6 +1,8 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
-use crate::commands::{WindowFlags, help_text, parse_command, remote_control, run_command};
+use crate::commands::{
+    CkptScrubber, WindowFlags, help_text, parse_command, remote_control, run_command,
+};
 use crate::net::NetLink;
 use bevy::prelude::*;
 use bevy_mod_imgui::prelude::*;
@@ -108,6 +110,7 @@ pub fn imgui_ui(
     mut context: NonSendMut<ImguiContext>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
+    mut scrub: ResMut<CkptScrubber>,
     net: Option<Res<NetLink>>,
 ) {
     record_decisions(&mut state, &mut ui);
@@ -116,7 +119,7 @@ pub fn imgui_ui(
     let net = net.as_deref();
 
     if ui.windows.status {
-        draw_status(imgui_ui, &mut state, &mut ui, net);
+        draw_status(imgui_ui, &mut state, &mut ui, net, &mut scrub);
     }
     if ui.windows.help {
         draw_help(imgui_ui, &mut ui.windows.help);
@@ -140,7 +143,7 @@ pub fn imgui_ui(
         draw_world(imgui_ui, &state, &mut ui.windows.world);
     }
     if ui.windows.console {
-        draw_console(imgui_ui, &mut state, &mut ui, net);
+        draw_console(imgui_ui, &mut state, &mut ui, net, &mut scrub);
     }
 }
 
@@ -170,10 +173,16 @@ fn send_control(net: Option<&NetLink>, msg: ClientMessage) {
     }
 }
 
-fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&NetLink>) {
+fn draw_status(
+    ui: &Ui,
+    state: &mut SimState,
+    us: &mut UiState,
+    net: Option<&NetLink>,
+    scrub: &mut CkptScrubber,
+) {
     ui.window("Status")
         .opened(&mut us.windows.status)
-        .size([420.0, 140.0], Condition::FirstUseEver)
+        .size([420.0, 200.0], Condition::FirstUseEver)
         .position([12.0, 12.0], Condition::FirstUseEver)
         .build(|| {
             let hash = state.sim.state_hash().to_string();
@@ -244,6 +253,41 @@ fn draw_status(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&Net
             ui.same_line();
             if ui.button("Unfollow") {
                 state.follow = None;
+            }
+            if !state.remote && scrub.dir.is_some() {
+                scrub.refresh();
+                if !scrub.ticks.is_empty() {
+                    let lo = scrub.ticks.first().map(|(t, _)| *t as i32).unwrap_or(0);
+                    let hi = scrub.ticks.last().map(|(t, _)| *t as i32).unwrap_or(lo);
+                    let mut want = scrub.loaded_tick.unwrap_or(hi as u64) as i32;
+                    ui.text(format!(
+                        "ckpt {}  {} files  [ ] prev/next",
+                        scrub
+                            .loaded_tick
+                            .map(|t| t.to_string())
+                            .unwrap_or_else(|| "-".into()),
+                        scrub.ticks.len()
+                    ));
+                    if lo < hi && ui.slider("ckpt tick", lo, hi, &mut want) {
+                        match scrub.apply(state, want as u64) {
+                            Ok(t) => us.scrollback.push(format!("loaded tick {t}")),
+                            Err(e) => us.scrollback.push(format!("scrub error: {e}")),
+                        }
+                    }
+                    if ui.button("[ prev") {
+                        match scrub.prev(state) {
+                            Ok(t) => us.scrollback.push(format!("loaded tick {t}")),
+                            Err(e) => us.scrollback.push(format!("ckpt error: {e}")),
+                        }
+                    }
+                    ui.same_line();
+                    if ui.button("next ]") {
+                        match scrub.next(state) {
+                            Ok(t) => us.scrollback.push(format!("loaded tick {t}")),
+                            Err(e) => us.scrollback.push(format!("ckpt error: {e}")),
+                        }
+                    }
+                }
             }
         });
 }
@@ -619,7 +663,13 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
         });
 }
 
-fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&NetLink>) {
+fn draw_console(
+    ui: &Ui,
+    state: &mut SimState,
+    us: &mut UiState,
+    net: Option<&NetLink>,
+    scrub: &mut CkptScrubber,
+) {
     let mut open = us.windows.console;
     ui.window("Console")
         .opened(&mut open)
@@ -668,7 +718,7 @@ fn draw_console(ui: &Ui, state: &mut SimState, us: &mut UiState, net: Option<&Ne
                                 }
                             }
                         }
-                        let msgs = run_command(cmd, state, &mut us.fog, &mut us.windows);
+                        let msgs = run_command(cmd, state, &mut us.fog, &mut us.windows, scrub);
                         us.scrollback.extend(msgs);
                     }
                     Err(e) => us.scrollback.push(e),

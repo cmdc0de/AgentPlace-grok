@@ -1,0 +1,19 @@
+# Coalition food bonus — current supporters of proposal 0 get 1.4× food.
+# Overlay only; not part of ExperimentConfig / state_hash.
+#
+#   sim-cli --incentives configs/incentives/coalition.toml
+#   viewer: /inject configs/incentives/coalition.toml
+#
+# Missing proposal id → empty scope (nobody). One-shots (not used here) still
+# apply only at incentive start. Full fields: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "coalition_food"
+description = "1.4x food for current supporters of proposal 0"
+start_tick = 0
+applies_to = "supporters_of:proposal_0"
+
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4

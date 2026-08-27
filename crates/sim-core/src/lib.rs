@@ -32,8 +32,8 @@ pub use board::{
 };
 pub use checkpoint::{
     CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, agents_markdown, append_events_jsonl,
-    decode_checkpoint, encode_checkpoint, experiment_id, list_checkpoints, summary_markdown,
-    write_run_checkpoint,
+    ckpt_at_or_before, decode_checkpoint, encode_checkpoint, experiment_id, list_checkpoints,
+    summary_markdown, write_run_checkpoint,
 };
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};

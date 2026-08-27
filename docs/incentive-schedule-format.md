@@ -10,7 +10,7 @@ This file is an **overlay**. It is **not** part of `ExperimentConfig` (so it doe
 schedule = "configs/incentives/coop.toml"
 ```
 
-Worked example: [`configs/incentives/coop.toml`](../configs/incentives/coop.toml). Hidden banner example: [`configs/incentives/hidden-bonus.toml`](../configs/incentives/hidden-bonus.toml). Long-term vocabulary: [`memory-goals-incentives-spec.md`](memory-goals-incentives-spec.md) §3 (`type = "visibility_modifier"` as an *effect* and `supporters_of:` are **not** implemented; M12 is the `visibility` *field*).
+Worked example: [`configs/incentives/coop.toml`](../configs/incentives/coop.toml). Hidden banner example: [`configs/incentives/hidden-bonus.toml`](../configs/incentives/hidden-bonus.toml). Coalition targeting: [`configs/incentives/coalition.toml`](../configs/incentives/coalition.toml) (`applies_to = "supporters_of:proposal_N"`, M14). Long-term vocabulary: [`memory-goals-incentives-spec.md`](memory-goals-incentives-spec.md) §3 (`type = "visibility_modifier"` as an *effect* is still a load error; M12 is the `visibility` *field*).
 
 ## File shape
 
@@ -58,8 +58,7 @@ delta = 0.15
 | `all` | Every agent. |
 | `agent:N` | Agent id `N` (e.g. `agent:0`). |
 | `archetype:name` | Agents whose abilities/personality still match that named `[agents.archetypes]` entry. |
-
-`supporters_of:proposal_N` is **not** implemented.
+| `supporters_of:proposal_N` | Agents currently in that proposal’s `supporters` set (also `supporters_of:N`). Missing id → empty scope. `supporters_of:nope` → load error. Per-tick effects follow the live set; one-shots (`goal_injection`, `relationship_delta`, `influence_factor_delta`) still apply only at incentive start. |
 
 ## Effect tables (`[[incentives.effects]]`)
 

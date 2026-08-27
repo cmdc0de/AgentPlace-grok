@@ -1,3 +1,5 @@
+use sim_core::action::PrimaryAction;
+use sim_core::board::StructuredRule;
 use sim_core::event_log::SimEventKind;
 use sim_core::incentive::IncentiveSchedule;
 use sim_core::llm::prompt_hash;
@@ -262,4 +264,89 @@ fn checkpoint_round_trips_schedule() {
     let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
     assert!(loaded.incentive_toml.contains("coop_goal"));
     assert_eq!(loaded.incentives.incentives.len(), 1);
+}
+
+const COALITION: &str = r#"
+[[incentives]]
+id = "coalition_food"
+applies_to = "supporters_of:proposal_0"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#;
+
+#[test]
+fn supporters_of_in_scope_for_supporter_only() {
+    let mut sim = Simulation::new(tiny(0x8020)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "do not eat mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    assert_eq!(sim.board.proposals[0].id, 0);
+    sim.inject_schedule_toml(COALITION).unwrap();
+    sim.run_ticks(1);
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, AgentId(0), "food"),
+        1400
+    );
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, AgentId(1), "food"),
+        1000
+    );
+}
+
+#[test]
+fn supporters_of_missing_proposal_is_empty_scope() {
+    let mut sim = Simulation::new(tiny(0x8021)).unwrap();
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "coalition_food"
+applies_to = "supporters_of:proposal_99"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#,
+    )
+    .unwrap();
+    sim.run_ticks(1);
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, AgentId(0), "food"),
+        1000
+    );
+}
+
+#[test]
+fn supporters_of_nope_is_load_error() {
+    let err = IncentiveSchedule::from_toml_str(
+        r#"
+[[incentives]]
+id = "c"
+applies_to = "supporters_of:nope"
+"#,
+    )
+    .unwrap_err();
+    let s = err.to_string();
+    assert!(s.contains("applies_to") || s.contains("config"), "{s}");
+}
+
+#[test]
+fn coalition_same_seed_same_hash() {
+    let cfg = tiny(0x8022);
+    let mut a = Simulation::new(cfg.clone()).unwrap();
+    let mut b = Simulation::new(cfg).unwrap();
+    a.chooser = sim_core::Chooser::Wait;
+    b.chooser = sim_core::Chooser::Wait;
+    a.inject_schedule_toml(COALITION).unwrap();
+    b.inject_schedule_toml(COALITION).unwrap();
+    a.run_ticks(8);
+    b.run_ticks(8);
+    assert_eq!(a.state_hash(), b.state_hash());
 }

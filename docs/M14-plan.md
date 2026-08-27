@@ -1,7 +1,8 @@
 # M14 — Coalition targeting + checkpoint scrubber
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M13 complete (`docs/M13-plan.md`, git tag `M13`, commit `08bd7ad`)  
+**Walkthrough:** [`M14-test-plan.md`](M14-test-plan.md)  
 **Specs:** `incentive-schedule-format.md` (`applies_to`), `memory-goals-incentives-spec.md` §3, `medium-priority-specs.md` (checkpoints), `M6-plan.md` / `M7-plan.md` (no jump-to-tick without a file)
 
 ## Context
@@ -110,6 +111,8 @@ cargo test -p viewer
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M14-test-plan.md`](M14-test-plan.md).
 
 ```bash
 cargo test -p sim-core

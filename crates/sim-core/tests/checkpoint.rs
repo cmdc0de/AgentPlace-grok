@@ -1,6 +1,6 @@
 use sim_core::{
-    CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, ExperimentConfig, Simulation, decode_checkpoint,
-    encode_checkpoint, write_run_checkpoint,
+    CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, ExperimentConfig, Simulation, ckpt_at_or_before,
+    decode_checkpoint, encode_checkpoint, list_checkpoints, write_run_checkpoint,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -124,5 +124,31 @@ fn write_run_checkpoint_emits_markdown_and_reloads() {
     assert!(agents.contains("## Agent 0"), "{agents}");
     let loaded = Simulation::load_checkpoint(&path).unwrap();
     assert_eq!(loaded.state_hash(), expected);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ckpt_at_or_before_picks_latest_not_after() {
+    let dir =
+        std::env::temp_dir().join(format!("agentplace-m14-ckpt-{}-{}", std::process::id(), 7));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    for tick in [10u64, 40, 80] {
+        std::fs::write(dir.join(format!("run_tick_{tick}.ckpt")), b"x").unwrap();
+    }
+    let listed = list_checkpoints(&dir).unwrap();
+    assert_eq!(listed.len(), 3);
+    let p = ckpt_at_or_before(&dir, 50).unwrap().unwrap();
+    assert!(
+        p.file_name().unwrap().to_string_lossy().contains("40"),
+        "{p:?}"
+    );
+    let p = ckpt_at_or_before(&dir, 80).unwrap().unwrap();
+    assert!(
+        p.file_name().unwrap().to_string_lossy().contains("80"),
+        "{p:?}"
+    );
+    let p = ckpt_at_or_before(&dir, 5).unwrap();
+    assert!(p.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
