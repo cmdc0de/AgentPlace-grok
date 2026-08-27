@@ -80,8 +80,9 @@ Inspector lists **all** active incentives and marks hidden ones. Agent-POV / pro
 | **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
 | **M14** | Done — [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
 | **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
-| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
-| After M16 | Protobuf/TLS; wire Give; second pack; mesh scale-by-fill; reflection; embeddings |
+| **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| **M17** | [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
+| After M17 | Protobuf/TLS; wire Give; second pack; mesh scale-by-fill; reflection; embeddings |
 | Not M12 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

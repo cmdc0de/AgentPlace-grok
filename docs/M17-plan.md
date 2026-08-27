@@ -1,0 +1,144 @@
+# M17 — Meta-rules, join/leave one-shots, event-log timeline
+
+**Status:** planned (not yet implemented)  
+**Depends on:** M16 complete (`docs/M16-plan.md`, git tag `M16`, commit `e530b48`)  
+**Specs:** `memory-goals-incentives-spec.md` §2 (meta-rules), `incentive-schedule-format.md` (one-shots at start), `M14-plan.md` (`supporters_of`), `M6-plan.md` / `M14-plan.md` (viewer log / ckpt scrubber), `M9-plan.md` (Spark `--llm ollama`)
+
+## Context
+
+`allow_meta_rules` already exists on `ExperimentConfig` (default **false**) but Propose cannot carry governance rules. M14 one-shots fire only at incentive start. The viewer scrubs `.ckpt` files, not `{id}_events.jsonl`. Live Ollama on Spark has not been re-checked since the M13–M16 overlay work.
+
+M17 does **not** rewrite postcard, add TLS, wire Give, or bump `PROTOCOL_VERSION`.
+
+## Goal
+
+A researcher can:
+
+1. Set `allow_meta_rules = true` and Propose **closed** structured rules that, when Accepted, change lifetime, threshold, or `[voting] weight|accept` at runtime (not a TOML rewrite).
+2. Use `supporters_of:` incentives whose **one-shots follow join/leave** (late joiners get them; leavers revert influence).
+3. `--load DIR` with an events JSONL: imgui **event tick** slider shows that tick’s lines **without** replacing the sim (ckpt scrubber unchanged).
+4. Run an **overnight live A/B on Spark** (`--llm ollama`, `http://spark-bcce.hlab:11434`, `nemotron3:33b`) so M13–M16 overlays did not silently break the LLM path. CI stays `provider = mock`.
+5. `format_version = 2`, `PROTOCOL_VERSION = 2`. Default `allow_meta_rules = false` ⇒ default hashes unchanged.
+
+## In scope
+
+### A. Meta-rules (opt-in)
+
+`[proposals] allow_meta_rules = true` in the **experiment** TOML (already a field; default false). Do **not** flip shipping `configs/default.toml`.
+
+**New `StructuredRule` variants (append only — do not reorder BanEat / BanGather / MaxGather):**
+
+| Rule | Meaning when **Accepted** |
+|---|---|
+| `SetProposalLifetime { ticks }` | Runtime lifetime for **open** proposals (0 = no expiry) |
+| `SetAcceptanceThreshold { milli }` | Runtime majority threshold; `5000` = 0.50. Clamped `[100, 10000]` (0.01–1.0). **Replaces** the config default; incentive `proposal_threshold_modifier` still **adds** on top |
+| `SetVoteWeight { equal \| influence \| respect }` | Mutates `Simulation.voting.weight` |
+| `SetVoteAccept { majority \| unanimous \| council }` | Mutates `Simulation.voting.accept`. **No** meta-rule to rewrite `council = [...]` this slice |
+
+If `allow_meta_rules = false`, Propose with these types is **illegal** (Wait). Last-wins if several of the same kind are adopted (later `tick_accepted` wins). New variants at the **end** of the enum keep old `.ckpt` loadable. LLM `parse_rule` accepts the new type names; unknown still Wait.
+
+### B. Join/leave one-shots (`supporters_of`)
+
+Per-tick effects already follow `in_scope`. One-shots (`goal_injection`, `relationship_delta`, `influence_factor_delta`) today run only in `start_incentive`.
+
+Keep a `BTreeSet` of agent ids who have **already received** that incentive’s one-shots.
+
+| Event | One-shots |
+|---|---|
+| Incentive **starts** | Current `in_scope` ids (unchanged) |
+| Agent **enters** scope while active | Apply one-shots to that agent |
+| Agent **leaves** scope | **Revert** `influence_factor_delta` only. Goals stay. Relationship deltas stay |
+| Incentive **ends** | Existing end path (revert influence for remaining members) |
+
+Pack “already applied” as `IncentiveState.entries[1]` JSON (`{id: [agent ids]}`). Old ckpts with only `entries[0]`: seed the set from **current** `in_scope` on load. `format_version` stays **2**.
+
+### C. Event-log timeline (display-only)
+
+When `--load DIR` (or a file whose parent has JSONL), discover `{id}_events.jsonl` beside ckpts. Imgui event-tick slider over ticks **present in the JSONL**; selecting a tick **filters the log panel**. Does **not** load a checkpoint. No interpolation. Remote attach: panel hidden. Parse existing `event_to_jsonl`; no new format.
+
+### D. Overnight Spark live A/B (verification, not a feature)
+
+Recipe in `M17-test-plan.md` when implemented. CI never hits the network.
+
+| | Value |
+|---|---|
+| Host | `http://spark-bcce.hlab:11434` (`spark-bcce.halb` does not resolve) |
+| Model | `nemotron3:33b`, `timeout_ms = 120000` |
+| Flag | `--llm ollama` (empty `base_url` still mock) |
+| Overnight size | **4 agents × 40 ticks** two arms. Optional 2×3 smoke first |
+| Arms | **A** overlay omit; **B** `--incentives configs/incentives/coop.toml` |
+| Proof | both `final_tick=40`; decisions JSONL has `prompt_hash`; `--compare` hashes **differ**; not empty-URL mock; `LlmWait` allowed |
+
+Do **not** add extra LLM call types. Mid-run HTTP failure stays `Wait`.
+
+## Out of scope (later)
+
+| Later | What |
+|---|---|
+| After M17 | protobuf/TLS; wire Give; weighted council; `/set respect`; jump-to-tick without a file; meta-rule council membership; revert relationship_delta on leave |
+| Not M17 | Browser; combat; CI Win/mac; extra LLM reflection; `PROTOCOL_VERSION` bump |
+
+## Key decisions
+
+1. Meta-rules are **opt-in** `allow_meta_rules`; closed `StructuredRule` variants appended only.
+2. Adopted meta threshold **replaces** config default; incentive modifier still adds.
+3. Join/leave one-shots: apply on enter; revert **influence only** on leave.
+4. Event timeline is **display-only** JSONL; not a second `--load`.
+5. Spark overnight is **verification**, not a new provider. CI mock.
+6. Do not change shipping `configs/default.toml`.
+7. Mock CI. `PROTOCOL_VERSION = 2`. No new `ControlVerb`.
+
+## Tests (M17 acceptance bar)
+
+| Test | Asserts |
+|---|---|
+| `allow_meta_rules = false` | meta Propose → Wait |
+| meta threshold 0.10, 1 of 3 Support | **Accepted** |
+| meta unanimous, 1 of 3 | **Open** |
+| late Support + `supporters_of` goal/influence | joiner gets one-shots |
+| Oppose after join | influence reverted; goal remains |
+| JSONL tick list | 10/40/80 → want 50 filters 40 |
+| default.toml mock | hashes match pre-M17 |
+| Spark `curl /api/tags` | nemotron reachable (overnight only) |
+| live 4×40 A vs coop B | hashes differ; decisions JSONL present; not mock |
+| `cargo test -p sim-core` | no network |
+
+## PR Plan
+
+### PR 1: Meta-rules
+
+- **Files:** `board.rs` `StructuredRule`, `execute.rs` Propose gate, `llm.rs` parse_rule, governance tests
+
+### PR 2: Join/leave one-shots
+
+- **Files:** `incentive.rs`, checkpoint `IncentiveState.entries[1]`, incentives tests
+
+### PR 3: Event JSONL timeline + Spark recipe
+
+- **Files:** viewer log/commands, helper to list JSONL ticks, this plan + `M17-test-plan.md` overnight section when implemented
+
+## Config / CLI
+
+No new `ControlVerb`. `allow_meta_rules` already on `ExperimentConfig` (hashed when true).
+
+```bash
+cargo test -p sim-core
+cargo test -p viewer
+# overnight: --llm ollama 4×40 A/B on spark-bcce.hlab
+```
+
+## Verification (when implemented)
+
+```bash
+cargo test -p sim-core
+cargo test -p viewer
+```
+
+Expect: meta Propose waits unless flag on; threshold 0.10 kingmakes equal 1-of-3; late `supporters_of` joiners get one-shots; JSONL slider filters log; default mock hashes match. Overnight Spark A/B is the live LLM proof.
+
+## Risks
+
+- **Postcard enum append.** New `StructuredRule` variants must stay at the end.
+- **Double-apply on `--load`.** Seed applied-set from current scope when `entries[1]` is missing.
+- **Overnight cost.** 4×40 not 16×80; 2×3 smoke first.
+- **Do not add `ControlVerb` or extra LLM call types.**

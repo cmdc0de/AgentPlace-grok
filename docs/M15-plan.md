@@ -91,8 +91,9 @@ Board UI: in `respect` mode show `yes_w / need` plus head counts (same as influe
 
 | Later | What |
 |---|---|
-| **M16** | [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
-| After M16 | protobuf/TLS; wire Give; join/leave one-shot tracking; jump-to-tick without a ckpt; event-log timeline; meta-rules |
+| **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
+| **M17** | [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
+| After M17 | protobuf/TLS; wire Give; jump-to-tick without a ckpt |
 | Not M15 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

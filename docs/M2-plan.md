@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M15 are done (tag `M15`). **Current next slice:** [`M16-plan.md`](M16-plan.md) (council/unanimous, `/set`, range-limited board). Later work is listed at the bottom of that file.
+M3–M16 are done (tag `M16`). **Current next slice:** [`M17-plan.md`](M17-plan.md) (meta-rules, join/leave one-shots, event JSONL timeline). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

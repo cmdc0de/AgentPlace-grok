@@ -96,7 +96,8 @@ Researcher imgui **Board** window stays full. Agent-POV 3D fog unchanged (still 
 
 | Later | What |
 |---|---|
-| After M16 | protobuf/TLS; wire Give; join/leave one-shot tracking; jump-to-tick without a ckpt; event-log timeline; meta-rules |
+| **M17** | [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
+| After M17 | protobuf/TLS; wire Give; jump-to-tick without a ckpt |
 | Not M16 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump; `/set respect`; weighted council |
 
 ## Key decisions
