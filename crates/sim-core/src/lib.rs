@@ -40,7 +40,7 @@ pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;
 pub use event_log::{SimEvent, SimEventKind};
 pub use haul::StorageParams;
-pub use incentive::{Incentive, IncentiveSchedule};
+pub use incentive::{Incentive, IncentiveSchedule, IncentiveVisibility};
 pub use llm::{
     ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, ReplayTable, extract_json_payload,
     is_llm_wait_response, parse_choice_json, parse_item,

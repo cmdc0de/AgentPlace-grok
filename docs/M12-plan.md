@@ -1,7 +1,8 @@
 # M12 — Public vs hidden incentives
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M11 complete (`docs/M11-plan.md`, git tag `M11`, commit `128b689`)  
+**Walkthrough:** [`M12-test-plan.md`](M12-test-plan.md)  
 **Specs:** `incentive-schedule-format.md`, `memory-goals-incentives-spec.md` §3 (`visibility_modifier`), `decision-observation-llm-economy-metrics-spec.md` §2 (what Observation may contain)
 
 ## Context
@@ -133,6 +134,8 @@ cargo run -p sim-cli -- --config configs/default.toml \
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M12-test-plan.md`](M12-test-plan.md).
 
 ```bash
 cargo test -p sim-core

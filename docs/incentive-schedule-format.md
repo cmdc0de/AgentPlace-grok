@@ -10,7 +10,7 @@ This file is an **overlay**. It is **not** part of `ExperimentConfig` (so it doe
 schedule = "configs/incentives/coop.toml"
 ```
 
-Worked example: [`configs/incentives/coop.toml`](../configs/incentives/coop.toml). Long-term vocabulary: [`memory-goals-incentives-spec.md`](memory-goals-incentives-spec.md) §3 (`visibility_modifier` and `supporters_of:` are **not** implemented in M8).
+Worked example: [`configs/incentives/coop.toml`](../configs/incentives/coop.toml). Hidden banner example: [`configs/incentives/hidden-bonus.toml`](../configs/incentives/hidden-bonus.toml). Long-term vocabulary: [`memory-goals-incentives-spec.md`](memory-goals-incentives-spec.md) §3 (`type = "visibility_modifier"` as an *effect* and `supporters_of:` are **not** implemented; M12 is the `visibility` *field*).
 
 ## File shape
 
@@ -48,6 +48,7 @@ delta = 0.15
 | `start_tick` | no | `0` | Inclusive. Active when `sim.tick >= start_tick`. |
 | `end_tick` | no | omitted | Inclusive upper bound. Omit for permanent. |
 | `applies_to` | no | `"all"` | Who the effects hit. |
+| `visibility` | no | `"public"` | `"public"` or `"hidden"`. Hidden omits the banner from Observation/prompt; **effects still apply**. Injected goals stay visible. Researcher inspector / `IncentiveApplied` / `--compare` still list the id. Unknown values are a load error. |
 | `effects` | no | `[]` | One or more `[[incentives.effects]]` tables. |
 
 ### `applies_to`
@@ -108,9 +109,9 @@ Applied once when the incentive **starts**.
 | `trust` | no | `0.0` | Applied once at start to every in-scope agent vs every other agent (`0.1` → +10 millipoints). |
 | `affinity` | no | `0.0` | Same scale. |
 
-### Not in M8
+### Not an effect type
 
-`visibility_modifier` — load error if present.
+`type = "visibility_modifier"` is still a **load error**. Use the `visibility` field on `[[incentives]]` instead (`public` / `hidden`). Covert payoff A/B should use mechanical effects without `goal_injection` (goal text remains in Observation even when the banner is hidden).
 
 ## How a file is applied
 

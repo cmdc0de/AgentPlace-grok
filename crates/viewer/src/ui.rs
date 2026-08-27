@@ -364,6 +364,20 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 }
             ));
             ui.separator();
+            ui.text("incentives (researcher)");
+            let mut any_inc = false;
+            for inc in &state.sim.incentives.incentives {
+                if !state.sim.incentive_active.contains(&inc.id) {
+                    continue;
+                }
+                any_inc = true;
+                let tag = if inc.is_hidden() { "hidden" } else { "public" };
+                ui.text(format!("  {} ({tag})", inc.id));
+            }
+            if !any_inc {
+                ui.text("  (none)");
+            }
+            ui.separator();
             ui.text("inventory");
             if a.inventory.is_empty() {
                 ui.text("  (empty)");

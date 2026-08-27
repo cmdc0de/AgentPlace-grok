@@ -1,0 +1,17 @@
+# Covert payoff A/B: mechanical 1.4× food, agent is not told.
+# Twin: same table with visibility = "public" (or omit the field).
+# Do not add goal_injection here — that text would still appear in Observation.
+#
+#   sim-cli --incentives configs/incentives/hidden-bonus.toml
+# Field list: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "hidden_food_bonus"
+description = "1.4× food; agent is not told"
+visibility = "hidden"
+applies_to = "all"
+
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4

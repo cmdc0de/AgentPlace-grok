@@ -88,7 +88,7 @@ pub struct Observation {
     /// Named toxin facts from memory (species ids).
     #[serde(default)]
     pub toxins: Vec<String>,
-    /// Active incentives that `applies_to` this agent. Public this slice.
+    /// Active incentives that `applies_to` this agent and are not `visibility = "hidden"`.
     #[serde(default)]
     pub incentives: Vec<IncentiveView>,
 }
@@ -276,7 +276,11 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         .incentives
         .incentives
         .iter()
-        .filter(|inc| sim.incentive_active.contains(&inc.id) && incentive::in_scope(sim, inc, id))
+        .filter(|inc| {
+            sim.incentive_active.contains(&inc.id)
+                && incentive::in_scope(sim, inc, id)
+                && !inc.is_hidden()
+        })
         .map(|inc| IncentiveView {
             id: inc.id.clone(),
             description: inc.description.clone(),

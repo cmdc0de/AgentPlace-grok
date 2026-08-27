@@ -369,6 +369,18 @@ count = 2
     }
 
     #[test]
+    fn prompt_omits_incentive_when_observation_has_none() {
+        let mut obs = Observation::default();
+        obs.hunger = 40;
+        let p = build_prompt(&obs, &sim_core::species::SpeciesTables::default());
+        assert!(
+            !p.contains("hidden_food_bonus"),
+            "empty Observation.incentives must not invent banners: {p}"
+        );
+        assert!(p.contains("Active incentives: []"), "{p}");
+    }
+
+    #[test]
     fn extract_think_and_reasoning_json() {
         let wrapped = "<think>planning</think>\n```json\n{\"action\":\"Drink\"}\n```";
         let p = extract_json_payload(wrapped);

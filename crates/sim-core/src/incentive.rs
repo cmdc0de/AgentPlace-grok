@@ -20,6 +20,14 @@ pub struct IncentiveSchedule {
     pub incentives: Vec<Incentive>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IncentiveVisibility {
+    #[default]
+    Public,
+    Hidden,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Incentive {
     pub id: String,
@@ -31,8 +39,17 @@ pub struct Incentive {
     pub end_tick: Option<u64>,
     #[serde(default = "default_all")]
     pub applies_to: String,
+    /// Who is *told*. Effects still apply when `hidden`.
+    #[serde(default)]
+    pub visibility: IncentiveVisibility,
     #[serde(default)]
     pub effects: Vec<EffectSpec>,
+}
+
+impl Incentive {
+    pub fn is_hidden(&self) -> bool {
+        self.visibility == IncentiveVisibility::Hidden
+    }
 }
 
 fn default_all() -> String {
@@ -443,5 +460,32 @@ delta = -0.1
         let s = IncentiveSchedule::from_toml_str(toml).unwrap();
         assert_eq!(s.incentives.len(), 1);
         assert_eq!(s.incentives[0].effects.len(), 2);
+        assert_eq!(s.incentives[0].visibility, IncentiveVisibility::Public);
+    }
+
+    #[test]
+    fn unknown_visibility_errors() {
+        let err = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "x"
+visibility = "maybe"
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("config"), "{err}");
+    }
+
+    #[test]
+    fn parses_hidden_visibility() {
+        let s = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "secret"
+visibility = "hidden"
+"#,
+        )
+        .unwrap();
+        assert!(s.incentives[0].is_hidden());
     }
 }

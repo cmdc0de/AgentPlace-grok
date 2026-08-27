@@ -1,5 +1,8 @@
+use sim_core::event_log::SimEventKind;
 use sim_core::incentive::IncentiveSchedule;
-use sim_core::{ExperimentConfig, Simulation};
+use sim_core::llm::prompt_hash;
+use sim_core::observation;
+use sim_core::{AgentId, ExperimentConfig, Simulation};
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -98,6 +101,155 @@ delta = 1.0
     .unwrap_err();
     let s = err.to_string();
     assert!(s.contains("config") || s.contains("unknown"), "{s}");
+}
+
+fn bonus_toml(visibility: &str) -> String {
+    format!(
+        r#"
+[[incentives]]
+id = "food_bonus"
+description = "1.4x food"
+visibility = "{visibility}"
+applies_to = "all"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#
+    )
+}
+
+#[test]
+fn hidden_incentive_omitted_from_observation_effects_still_apply() {
+    let mut sim = Simulation::new(tiny(0x8010)).unwrap();
+    sim.inject_schedule_toml(&bonus_toml("hidden")).unwrap();
+    sim.run_ticks(1);
+    let id = AgentId(0);
+    let obs = observation::build(&sim, id);
+    assert!(
+        !obs.incentives.iter().any(|i| i.id == "food_bonus"),
+        "hidden banner must not appear: {:?}",
+        obs.incentives
+    );
+    assert!(sim.incentive_active.contains("food_bonus"));
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, id, "food"),
+        1400
+    );
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::IncentiveApplied { ref id, .. } if id == "food_bonus"
+    )));
+}
+
+#[test]
+fn public_incentive_appears_in_observation() {
+    let mut sim = Simulation::new(tiny(0x8011)).unwrap();
+    sim.inject_schedule_toml(&bonus_toml("public")).unwrap();
+    sim.run_ticks(1);
+    let obs = observation::build(&sim, AgentId(0));
+    assert!(obs.incentives.iter().any(|i| i.id == "food_bonus"));
+}
+
+#[test]
+fn omitted_visibility_defaults_public() {
+    let mut sim = Simulation::new(tiny(0x8012)).unwrap();
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "food_bonus"
+applies_to = "all"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#,
+    )
+    .unwrap();
+    sim.run_ticks(1);
+    let obs = observation::build(&sim, AgentId(0));
+    assert!(obs.incentives.iter().any(|i| i.id == "food_bonus"));
+}
+
+#[test]
+fn public_vs_hidden_same_effects_same_hash() {
+    let cfg = tiny(0x8013);
+    let mut pub_run = Simulation::new(cfg.clone()).unwrap();
+    let mut hid_run = Simulation::new(cfg).unwrap();
+    pub_run.inject_schedule_toml(&bonus_toml("public")).unwrap();
+    hid_run.inject_schedule_toml(&bonus_toml("hidden")).unwrap();
+    pub_run.run_ticks(20);
+    hid_run.run_ticks(20);
+    assert_eq!(pub_run.state_hash(), hid_run.state_hash());
+    let hp = prompt_hash(&observation::build(&pub_run, AgentId(0)));
+    let hh = prompt_hash(&observation::build(&hid_run, AgentId(0)));
+    assert_ne!(hp, hh, "hidden banner must change prompt_hash");
+}
+
+#[test]
+fn hidden_goal_injection_still_in_observation_goals() {
+    let mut sim = Simulation::new(tiny(0x8014)).unwrap();
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "secret_coop"
+visibility = "hidden"
+applies_to = "all"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "keep the shared storage stocked"
+scope = "personal"
+priority = 0.9
+"#,
+    )
+    .unwrap();
+    let land = sim.world.land_cells()[0];
+    if let Some(a) = sim.agents.get_mut(&AgentId(0)) {
+        a.x = land.0;
+        a.y = land.1;
+        a.inventory.clear();
+        a.try_add_item(sim_core::ItemId::Food(1), 4);
+        a.needs.hunger = sim.config.hunger_max_milli();
+        a.needs.thirst = sim.config.thirst_max_milli();
+        a.needs.energy = sim.config.energy_max_milli();
+        a.personality.agreeableness = 10;
+    }
+    sim.run_ticks(8);
+    let obs = observation::build(&sim, AgentId(0));
+    assert!(
+        !obs.incentives.iter().any(|i| i.id == "secret_coop"),
+        "{:?}",
+        obs.incentives
+    );
+    assert!(
+        obs.goals.iter().any(|g| g.text.contains("shared storage")),
+        "goals={:?}",
+        obs.goals
+    );
+    let stores = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::Store { .. }))
+        .count();
+    assert!(
+        stores >= 1,
+        "mock should still Store, events={:?}",
+        sim.events.events
+    );
+}
+
+#[test]
+fn unknown_visibility_is_load_error() {
+    let err = IncentiveSchedule::from_toml_str(
+        r#"
+[[incentives]]
+id = "x"
+visibility = "maybe"
+"#,
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("config"), "{err}");
 }
 
 #[test]
