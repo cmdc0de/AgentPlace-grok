@@ -1,6 +1,6 @@
 # Multi-Agent Simulation Architecture Specification
 
-> **Current slice:** [`M14-plan.md`](M14-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+> **Current slice:** [`M15-plan.md`](M15-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
 
 **Focus areas in this document**
 - 3D rendering stack recommendation

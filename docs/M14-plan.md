@@ -60,7 +60,8 @@ Helper (sim-core, no Bevy): list ticks in a dir; `ckpt_at_or_before(dir, tick) -
 
 | Later | What |
 |---|---|
-| After M14 | Respect-weighted votes; hide others’ actions/board; protobuf/TLS; `/set`; wire Give; join/leave influence tracking; jump-to-tick without a ckpt; event-log timeline; council/unanimous; meta-rules |
+| **M15** | [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
+| After M15 | `/set`; hide others’ actions/board; protobuf/TLS; wire Give; join/leave influence tracking; jump-to-tick without a ckpt; event-log timeline; council/unanimous; meta-rules |
 | Not M14 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
@@ -70,7 +71,7 @@ Helper (sim-core, no Bevy): list ticks in a dir; `ckpt_at_or_before(dir, tick) -
 3. Scrubber = existing `.ckpt` files only; no interpolation.
 4. Scrub in-process only; no new `ControlVerb`.
 5. Do not change `configs/default.toml` or `coop.toml`.
-6. Respect weights / board fog / protobuf / TLS / `/set` / wire Give → later.
+6. Respect weights → M15. Board fog / protobuf / TLS / `/set` / wire Give → later.
 7. Mock CI. `PROTOCOL_VERSION = 2`.
 
 ## Tests (M14 acceptance bar)
