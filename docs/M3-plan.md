@@ -55,8 +55,9 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 | **M8** | Done — [`M8-plan.md`](M8-plan.md) (incentive A/B + timing + death). |
 | **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts, replay, `--compare`, mock drink-before-death. |
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers. |
-| **M11** | [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack. |
-| Later still | Attack / Flee, seasons, `visibility_modifier`, lie detection, dialects. |
+| **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack. |
+| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives. |
+| Later still | Attack / Flee, seasons, vote weighting, lie detection, dialects. |
 
 ## Key decisions
 

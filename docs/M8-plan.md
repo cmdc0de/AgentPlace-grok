@@ -93,8 +93,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 |---|---|
 | **M9** | Done — [`M9-plan.md`](M9-plan.md) — LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers |
-| **M11** | [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
-| After M11 | Protobuf/TLS; timeline; `visibility_modifier`; vote weighting; `/set`; wire Give; LLM reflection-on-evict |
+| **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
+| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
+| After M12 | Protobuf/TLS; timeline; vote weighting; `/set`; wire Give; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

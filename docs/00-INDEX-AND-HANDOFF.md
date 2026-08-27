@@ -27,7 +27,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M9** | Done (tag `M9`) | [`M9-plan.md`](M9-plan.md), walkthrough [`M9-test-plan.md`](M9-test-plan.md) | LLM prompts (needs + incentives), replay, `--compare`, mock drink-before-death |
 | **M10** | Done (tag `M10`) | [`M10-plan.md`](M10-plan.md), walkthrough [`M10-test-plan.md`](M10-test-plan.md) | Live LLM parse/replay reliability; Transfer/Store containers (weight, energy, 3D marker) |
 | **M11** | Done (tag `M11`) | [`M11-plan.md`](M11-plan.md), walkthrough [`M11-test-plan.md`](M11-test-plan.md) | Mock fills crates; worn Basket backpack; Move haul |
-| After M11 | Not started | listed at the bottom of `M11-plan.md` | `visibility_modifier`, vote weighting, protobuf/TLS, timeline |
+| **M12** | **Planned — next** | [`M12-plan.md`](M12-plan.md) | Public vs hidden incentives (Observation/prompt) |
+| After M12 | Not started | listed at the bottom of `M12-plan.md` | Vote weighting, action/board fog, protobuf/TLS, timeline |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -56,15 +57,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 15 | `M10-plan.md` | Milestone 10 (done, tag `M10`): thinking-model parse + honest replay; Transfer/Store containers |
 | 16 | `M11-plan.md` | Milestone 11 (done, tag `M11`): mock fills crates; Basket backpack; Move haul |
 | 16b | `M11-test-plan.md` | M11 walkthrough (80-tick coop Store, pack, satchel) |
+| 17 | `M12-plan.md` | Milestone 12 (next): public vs hidden incentives |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M11-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M12-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M11-plan.md` / `M11-test-plan.md`. Implement the current milestone; do not expand into items it defers.”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table), then `M12-plan.md`. Implement the current milestone; do not expand into items it defers.”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -92,14 +94,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M11 are done. Later work is listed at the bottom of `M11-plan.md`.
+M1–M11 are done (tag `M11`). Next work is M12.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M11-plan.md.
-M11 is implemented: mock Gather/Store fills crates under the coop storage
-goal; Basket is a worn backpack (8/25); Move costs cargo haul; satchel mesh.
-Next is M12 visibility_modifier. Do not switch to protobuf, add TLS,
-vote weighting, or wire Give.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M12-plan.md.
+Implement M12 (visibility = public|hidden on [[incentives]]; hidden omits
+the banner from Observation/prompt; effects and injected goals still apply;
+researcher still sees hidden). Vote weighting is M13. Do not switch to
+protobuf, add TLS, hide others' actions/board, or wire Give.
 CI stays provider=mock with no network.
 ```
 

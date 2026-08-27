@@ -86,8 +86,9 @@ cost = qty * unit_weight_milli * haul_milli / 1000
 
 | Later | What |
 |---|---|
-| **M11** | [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack; Move haul |
-| After M11 | Protobuf / JSON envelope; TLS/`wss`; timeline; `visibility_modifier`; vote weighting; `/set`; wire Give; reflection-on-evict; embeddings; mesh scale-by-fill |
+| **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack; Move haul |
+| **M12** | [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
+| After M12 | Protobuf / JSON envelope; TLS/`wss`; timeline; vote weighting; `/set`; wire Give; reflection-on-evict; embeddings; mesh scale-by-fill |
 | Not M10 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

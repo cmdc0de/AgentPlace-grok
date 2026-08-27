@@ -1,0 +1,148 @@
+# M12 — Public vs hidden incentives
+
+**Status:** planned (not yet implemented)  
+**Depends on:** M11 complete (`docs/M11-plan.md`, git tag `M11`, commit `128b689`)  
+**Specs:** `incentive-schedule-format.md`, `memory-goals-incentives-spec.md` §3 (`visibility_modifier`), `decision-observation-llm-economy-metrics-spec.md` §2 (what Observation may contain)
+
+## Context
+
+M9 put every in-scope incentive into `Observation.incentives` and the LLM “Active incentives” line. M11 made the coop **goal** actually fill crates. There is still no way to run “the bonus is on, but the agent is not told.”
+
+The long-term spec lists `visibility_modifier` as an **effect type** that gates who can see whose actions or proposals. That broader fog-of-governance wait. This slice is the experimental control that M8/M9 already named: **public vs hidden incentive banners**.
+
+M12 does **not** rewrite postcard, add TLS, timeline, vote weighting, `/set`, or wire Give.
+
+## Goal
+
+A researcher can:
+
+1. Set `visibility = "hidden"` on an `[[incentives]]` table and have **effects still apply**, while `Observation.incentives` and the LLM prompt **omit** that id.
+2. Keep injected **goals** in Observation/prompt (hidden coop still Stores under the M11 mock).
+3. Still **see** hidden incentives as the researcher (inspector, `IncentiveApplied`, `--compare` active set).
+4. Same-seed mock, same effects, public vs hidden → **same `state_hash`**. CI stays `provider = mock`. `format_version = 2`, `PROTOCOL_VERSION = 2`.
+
+## In scope
+
+### A. `visibility` field
+
+On each `[[incentives]]` table (overlay, not `ExperimentConfig`):
+
+```toml
+visibility = "public"   # default; omit = public (M11)
+# visibility = "hidden"
+```
+
+Unknown values are a **load error**. Do **not** add `type = "visibility_modifier"` (that stays a load error). Visibility is **who is told**, not a mechanical effect.
+
+Do not change `configs/incentives/coop.toml` (stays public so M11 crate-fill holds).
+
+### B. Agent knowledge vs mechanics
+
+| Surface | Hidden incentive |
+|---|---|
+| Effects (resource, influence, memory, threshold, relationship, **goal_injection**) | Still apply |
+| `Observation.incentives` / LLM “Active incentives” | **Omitted** even if `applies_to` this agent |
+| Injected `Goal` in Observation / prompt | **Still listed** |
+| Mock storage policy | Unchanged (reads `obs.goals`) |
+| `IncentiveApplied`, checkpoints, `--compare` active incentives, viewer inspector | Researcher **still sees** (tag hidden) |
+| Mock `state_hash` (same effects, public vs hidden) | **Equal** |
+| LLM `prompt_hash` | **Differs** |
+
+Covert payoff A/B uses `resource_multiplier` **without** `goal_injection` (see example file). Goal text is an internal drive, not the incentive banner.
+
+### C. Example overlay
+
+New `configs/incentives/hidden-bonus.toml`:
+
+```toml
+[[incentives]]
+id = "hidden_food_bonus"
+description = "1.4× food; agent is not told"
+visibility = "hidden"
+applies_to = "all"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+```
+
+A public twin (same effects, `visibility = "public"`) is enough to A/B knowledge, not payoffs.
+
+### D. Viewer
+
+Inspector lists **all** active incentives and marks hidden ones. Agent-POV / prompt dump omits hidden banners. Fog-of-war is unchanged.
+
+## Out of scope (later)
+
+| Later | What |
+|---|---|
+| **M13** | Vote weighting (influence/status vs one-agent-one-vote) |
+| After M12 | Hide others’ actions/board (spec’s broader `visibility_modifier`); `supporters_of:proposal_N`; protobuf/TLS; timeline; `/set`; wire Give; second pack; mesh scale-by-fill; reflection; embeddings |
+| Not M12 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
+
+## Key decisions
+
+1. **Field** `visibility = "public"|"hidden"` on `[[incentives]]`, default public.
+2. **Hidden omits the banner** from Observation/prompt; **effects still apply**.
+3. **Injected goals stay** in Observation.
+4. **Researcher surfaces still show** hidden incentives.
+5. Mock public vs hidden, same effects → **same hash**.
+6. **Do not change `coop.toml`.**
+7. **Vote weighting / action-fog / protobuf / TLS / timeline / `/set` / wire Give → later.**
+8. Mock CI. No new `ControlVerb`.
+
+## Tests (M12 acceptance bar)
+
+| Test | Asserts |
+|---|---|
+| Omit / `public` | same Observation.incentives as M11 |
+| `hidden` + in-scope | effects on; that id **not** in Observation.incentives |
+| Hidden `goal_injection` | goal still in Observation.goals; mock still Stores |
+| Same seed, public vs hidden, mock, same effects | **same `state_hash`** |
+| Prompt | hidden id absent from `build_prompt`; public id present |
+| Load error | `visibility = "maybe"` fails parse |
+| `cargo test -p sim-core` | no network |
+
+## PR Plan
+
+### PR 1: Parse + Observation filter
+
+- **Files:** `incentive.rs`, `observation.rs`, tests
+- **Changes:** `visibility` field; skip hidden in `Observation.incentives`; hash-equal public vs hidden mock.
+
+### PR 2: Prompt, inspector, example overlay
+
+- **Files:** `sim-llm` prompt (already driven by Observation), viewer `ui.rs`, `configs/incentives/hidden-bonus.toml`
+- **Changes:** hidden tagged in inspector; example schedule.
+
+### PR 3: README + docs
+
+- **Files:** README, this plan status when implemented, `incentive-schedule-format.md` (replace “load error if present”)
+
+## Config / CLI
+
+No new `ExperimentConfig` postcard fields.
+
+```bash
+cargo test -p sim-core
+cargo test -p sim-llm
+cargo test -p sim-cli --test ab
+# when implemented:
+cargo run -p sim-cli -- --config configs/default.toml \
+  --incentives configs/incentives/hidden-bonus.toml --ticks 40 --llm mock --quiet
+```
+
+## Verification (when implemented)
+
+```bash
+cargo test -p sim-core
+cargo test -p sim-llm
+```
+
+Expect: hidden id absent from Observation/prompt; same-seed mock hashes match public twin; `coop.toml` 80-tick crate-fill unchanged.
+
+## Risks
+
+- **Leaking via goals.** Hidden `goal_injection` still shows the goal text. Document it; covert A/B should use mechanical effects only.
+- **Mock hash equality.** If anything hashes Observation.incentives into `state_hash`, public vs hidden will diverge — do not add that.
+- **Do not add `ControlVerb` or vote weights** in this slice.
