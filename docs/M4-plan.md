@@ -88,7 +88,8 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store containers |
 | **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack |
 | **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
-| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| **M14** | [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
 | Later | Meta-rules, Attack/Flee, dialects, lie detection, respect-weighted voting |
 
 Do not pull incentives into M4. The A/B loop needs a working board and a readable food report first.

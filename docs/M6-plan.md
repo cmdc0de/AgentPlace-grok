@@ -67,8 +67,9 @@ No `/set`, `/give`, `/inject`. Those wait for M8.
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — LLM parse/replay; Transfer/Store; `/give` |
 | **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket backpack; satchel mesh |
 | **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives |
-| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
-| Later | Timeline scrubber, metrics charts, browser imgui, live embeddings, `/set` |
+| **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes |
+| **M14** | [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
+| Later | Metrics charts, browser imgui, live embeddings, `/set` |
 
 ## Key decisions
 

@@ -57,7 +57,8 @@ Same seed + mock LLM ⇒ same `state_hash`. Live LLM is optional and not a CI re
 | **M10** | Done — [`M10-plan.md`](M10-plan.md) — thinking-model parse + honest replay; Transfer/Store containers. |
 | **M11** | Done — [`M11-plan.md`](M11-plan.md) — mock fills crates; Basket is worn backpack. |
 | **M12** | Done — [`M12-plan.md`](M12-plan.md) — public vs hidden incentives. |
-| **M13** | [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes. |
+| **M13** | Done — [`M13-plan.md`](M13-plan.md) — opt-in influence-weighted votes. |
+| **M14** | [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber. |
 | Later still | Attack / Flee, seasons, respect weights, lie detection, dialects. |
 
 ## Key decisions
