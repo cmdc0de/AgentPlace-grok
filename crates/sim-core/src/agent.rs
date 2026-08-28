@@ -208,23 +208,43 @@ impl Agent {
         self.inventory.get(&ItemId::Backpack).copied().unwrap_or(0)
     }
 
-    pub fn has_pack(&self) -> bool {
-        self.has_backpack() || self.has_basket()
+    pub fn worn_baskets(&self, params: &crate::haul::StorageParams) -> u32 {
+        self.basket_count().min(params.max_worn_baskets)
+    }
+
+    pub fn worn_backpacks(&self, params: &crate::haul::StorageParams) -> u32 {
+        self.backpack_count().min(params.max_worn_backpacks)
+    }
+
+    pub fn has_pack(&self, params: &crate::haul::StorageParams) -> bool {
+        self.worn_baskets(params) > 0 || self.worn_backpacks(params) > 0
     }
 
     pub fn is_pack_carrier(item: ItemId) -> bool {
         matches!(item, ItemId::Basket | ItemId::Backpack)
     }
 
+    pub fn worn_pack_caps_for(
+        basket_count: u32,
+        backpack_count: u32,
+        params: &crate::haul::StorageParams,
+    ) -> (u32, u32) {
+        let worn_baskets = basket_count.min(params.max_worn_baskets);
+        let worn_backpacks = backpack_count.min(params.max_worn_backpacks);
+        (
+            worn_baskets
+                .saturating_mul(params.pack_slot_cap)
+                .saturating_add(worn_backpacks.saturating_mul(crate::haul::BACKPACK_SLOT_CAP)),
+            worn_baskets
+                .saturating_mul(params.pack_weight_cap_milli)
+                .saturating_add(
+                    worn_backpacks.saturating_mul(crate::haul::BACKPACK_WEIGHT_CAP_MILLI),
+                ),
+        )
+    }
+
     pub fn worn_pack_caps(&self, params: &crate::haul::StorageParams) -> (u32, u32) {
-        if self.has_backpack() {
-            (
-                crate::haul::BACKPACK_SLOT_CAP,
-                crate::haul::BACKPACK_WEIGHT_CAP_MILLI,
-            )
-        } else {
-            (params.pack_slot_cap, params.pack_weight_cap_milli)
-        }
+        Self::worn_pack_caps_for(self.basket_count(), self.backpack_count(), params)
     }
 
     pub fn pack_count(&self) -> u32 {
@@ -239,8 +259,8 @@ impl Agent {
         crate::haul::map_weight_milli(&self.inventory)
     }
 
-    pub fn shows_satchel(&self) -> bool {
-        self.has_pack()
+    pub fn shows_satchel(&self, params: &crate::haul::StorageParams) -> bool {
+        self.has_pack(params)
     }
 
     pub fn try_add_pack(
@@ -249,7 +269,7 @@ impl Agent {
         qty: u32,
         params: &crate::haul::StorageParams,
     ) -> u32 {
-        if qty == 0 || Self::is_pack_carrier(item) || !self.has_pack() {
+        if qty == 0 || Self::is_pack_carrier(item) || !self.has_pack(params) {
             return 0;
         }
         let (slot_cap, weight_cap) = self.worn_pack_caps(params);
@@ -281,7 +301,6 @@ impl Agent {
     /// Prefer pack when it holds `qty`, else pockets. `None` if neither can pay.
     pub fn take_from_pack_or_pockets(&mut self, item: ItemId, qty: u32) -> Option<bool> {
         if !Self::is_pack_carrier(item)
-            && self.has_pack()
             && self.pack.get(&item).copied().unwrap_or(0) >= qty
             && self.take_pack(item, qty)
         {
@@ -309,7 +328,7 @@ impl Agent {
 
     pub fn has_carry_room(&self, params: &crate::haul::StorageParams) -> bool {
         self.inventory_count() < self.inventory_cap
-            || (self.has_pack() && {
+            || (self.has_pack(params) && {
                 let (slot_cap, _) = self.worn_pack_caps(params);
                 self.pack_count() < slot_cap
             })

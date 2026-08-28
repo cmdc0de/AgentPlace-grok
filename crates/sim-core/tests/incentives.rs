@@ -422,6 +422,143 @@ fn supporters_of_join_gets_oneshots_leave_reverts_influence() {
     );
 }
 
+const ONESHOT_REL: &str = r#"
+[[incentives]]
+id = "coalition_boost"
+applies_to = "supporters_of:proposal_0"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "back the coalition"
+scope = "personal"
+priority = 0.8
+[[incentives.effects]]
+type = "influence_factor_delta"
+delta = 0.15
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 0.50
+toward = "agent:0"
+"#;
+
+#[test]
+fn supporters_of_join_leave_reverts_relationship_delta() {
+    let mut sim = Simulation::new(tiny(0x8031)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.config.proposals.default_acceptance_threshold = 1.0;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "do not eat mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    sim.inject_schedule_toml(ONESHOT_REL).unwrap();
+    sim.run_ticks(1);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(1),
+        &PrimaryAction::Support { proposal_id: 0 },
+    );
+    sim.run_ticks(1);
+    let after_join = sim
+        .agents
+        .get(&AgentId(1))
+        .unwrap()
+        .relationships
+        .get(&AgentId(0))
+        .map(|r| r.respect)
+        .unwrap_or(0);
+    assert!(
+        after_join >= 50,
+        "join should apply relationship_delta respect, got {after_join}"
+    );
+    let decay = sim.config.influence_decay_milli() as i16;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(1),
+        &PrimaryAction::Oppose { proposal_id: 0 },
+    );
+    sim.run_ticks(1);
+    let after_leave = sim
+        .agents
+        .get(&AgentId(1))
+        .unwrap()
+        .relationships
+        .get(&AgentId(0))
+        .map(|r| r.respect)
+        .unwrap_or(0);
+    let decayed = (after_join - decay).max(0);
+    assert_eq!(
+        after_leave,
+        decayed.saturating_sub(50),
+        "leave should subtract original respect milli (after_join={after_join})"
+    );
+    assert!(
+        sim.agents
+            .get(&AgentId(1))
+            .unwrap()
+            .goals
+            .iter()
+            .any(|g| g.text == "back the coalition"),
+        "goals stay on leave"
+    );
+}
+
+#[test]
+fn incentive_end_reverts_influence_and_relationship_delta() {
+    let mut sim = Simulation::new(tiny(0x8032)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "boost"
+start_tick = 0
+end_tick = 1
+applies_to = "all"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "stay allied"
+scope = "personal"
+priority = 0.8
+[[incentives.effects]]
+type = "influence_factor_delta"
+delta = 0.15
+[[incentives.effects]]
+type = "relationship_delta"
+respect = 0.50
+toward = "agent:0"
+"#,
+    )
+    .unwrap();
+    sim.run_ticks(1);
+    let base = sim.config.influence_milli();
+    let a1 = sim.agents.get(&AgentId(1)).unwrap();
+    assert_eq!(a1.influence_factor, base + 15);
+    let after_start = a1
+        .relationships
+        .get(&AgentId(0))
+        .map(|r| r.respect)
+        .unwrap_or(0);
+    assert_eq!(after_start, 50);
+    assert!(a1.goals.iter().any(|g| g.text == "stay allied"));
+    let decay = sim.config.influence_decay_milli() as i16;
+    sim.run_ticks(1);
+    let a1 = sim.agents.get(&AgentId(1)).unwrap();
+    assert_eq!(a1.influence_factor, base);
+    let after_end = a1
+        .relationships
+        .get(&AgentId(0))
+        .map(|r| r.respect)
+        .unwrap_or(0);
+    let decayed = (after_start - decay).max(0);
+    assert_eq!(after_end, decayed.saturating_sub(50));
+    assert!(
+        a1.goals.iter().any(|g| g.text == "stay allied"),
+        "goals stay on incentive end"
+    );
+}
+
 #[test]
 fn coalition_same_seed_same_hash() {
     let cfg = tiny(0x8022);

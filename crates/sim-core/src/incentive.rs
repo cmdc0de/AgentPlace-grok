@@ -419,29 +419,14 @@ fn apply_oneshots(sim: &mut Simulation, inc: &Incentive, ids: &[AgentId], expand
                 let dt = (*trust * 100.0).round() as i16;
                 let da = (*affinity * 100.0).round() as i16;
                 let dr = (*respect * 100.0).round() as i16;
-                let toward_id = parse_toward(toward).ok().flatten();
-                let ids = ids.to_vec();
-                let others: Vec<AgentId> = if let Some(t) = toward_id {
-                    if sim.agents.contains_key(&t) {
-                        vec![t]
-                    } else {
-                        Vec::new()
-                    }
-                } else {
-                    sim.agents.keys().copied().collect()
-                };
-                for id in &ids {
-                    for other in &others {
-                        if other == id {
-                            continue;
-                        }
-                        if let Some(a) = sim.agents.get_mut(id) {
-                            let row = a.relationships.entry(*other).or_default();
-                            row.trust = row.trust.saturating_add(dt).clamp(REL_MIN, REL_MAX);
-                            row.affinity = row.affinity.saturating_add(da).clamp(REL_MIN, REL_MAX);
-                            row.respect = row.respect.saturating_add(dr).clamp(REL_MIN, REL_MAX);
-                            row.last_interaction_tick = sim.tick;
-                        }
+                let tick = sim.tick;
+                for (id, other) in oneshot_relationship_pairs(sim, toward, ids) {
+                    if let Some(a) = sim.agents.get_mut(&id) {
+                        let row = a.relationships.entry(other).or_default();
+                        row.trust = row.trust.saturating_add(dt).clamp(REL_MIN, REL_MAX);
+                        row.affinity = row.affinity.saturating_add(da).clamp(REL_MIN, REL_MAX);
+                        row.respect = row.respect.saturating_add(dr).clamp(REL_MIN, REL_MAX);
+                        row.last_interaction_tick = tick;
                     }
                 }
             }
@@ -467,30 +452,71 @@ fn end_incentive(sim: &mut Simulation, id: &str) {
         return;
     };
     let ids = scoped_ids(sim, &inc);
-    for e in &inc.effects {
-        if let EffectSpec::InfluenceFactorDelta { delta } = e {
-            let d = (*delta * 100.0).round() as i32;
-            for aid in &ids {
-                if let Some(a) = sim.agents.get_mut(aid) {
-                    let v = a.influence_factor as i32 - d;
-                    a.influence_factor = v.clamp(0, 10_000) as u32;
-                }
-            }
-        }
-    }
+    revert_oneshots(sim, &inc, &ids);
     sim.incentive_oneshot.remove(id);
 }
 
-fn revert_influence(sim: &mut Simulation, inc: &Incentive, ids: &[AgentId]) {
+fn oneshot_relationship_pairs(
+    sim: &Simulation,
+    toward: &str,
+    ids: &[AgentId],
+) -> Vec<(AgentId, AgentId)> {
+    let toward_id = parse_toward(toward).ok().flatten();
+    let others: Vec<AgentId> = if let Some(t) = toward_id {
+        if sim.agents.contains_key(&t) {
+            vec![t]
+        } else {
+            Vec::new()
+        }
+    } else {
+        sim.agents.keys().copied().collect()
+    };
+    let mut pairs = Vec::new();
+    for id in ids {
+        for other in &others {
+            if other != id {
+                pairs.push((*id, *other));
+            }
+        }
+    }
+    pairs
+}
+
+fn revert_oneshots(sim: &mut Simulation, inc: &Incentive, ids: &[AgentId]) {
     for e in &inc.effects {
-        if let EffectSpec::InfluenceFactorDelta { delta } = e {
-            let d = (*delta * 100.0).round() as i32;
-            for aid in ids {
-                if let Some(a) = sim.agents.get_mut(aid) {
-                    let v = a.influence_factor as i32 - d;
-                    a.influence_factor = v.clamp(0, 10_000) as u32;
+        match e {
+            EffectSpec::InfluenceFactorDelta { delta } => {
+                let d = (*delta * 100.0).round() as i32;
+                for aid in ids {
+                    if let Some(a) = sim.agents.get_mut(aid) {
+                        let v = a.influence_factor as i32 - d;
+                        a.influence_factor = v.clamp(0, 10_000) as u32;
+                    }
                 }
             }
+            EffectSpec::RelationshipDelta {
+                trust,
+                affinity,
+                respect,
+                toward,
+            } => {
+                let dt = (*trust * 100.0).round() as i16;
+                let da = (*affinity * 100.0).round() as i16;
+                let dr = (*respect * 100.0).round() as i16;
+                let pairs = oneshot_relationship_pairs(sim, toward, ids);
+                for (id, other) in pairs {
+                    let Some(a) = sim.agents.get_mut(&id) else {
+                        continue;
+                    };
+                    let Some(row) = a.relationships.get_mut(&other) else {
+                        continue;
+                    };
+                    row.trust = row.trust.saturating_sub(dt).clamp(REL_MIN, REL_MAX);
+                    row.affinity = row.affinity.saturating_sub(da).clamp(REL_MIN, REL_MAX);
+                    row.respect = row.respect.saturating_sub(dr).clamp(REL_MIN, REL_MAX);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -510,7 +536,7 @@ fn sync_oneshot_membership(sim: &mut Simulation) {
         let joined: Vec<AgentId> = current.difference(&done).copied().collect();
         let left: Vec<AgentId> = done.difference(&current).copied().collect();
         apply_oneshots(sim, inc, &joined, false);
-        revert_influence(sim, inc, &left);
+        revert_oneshots(sim, inc, &left);
         sim.incentive_oneshot.insert(inc.id.clone(), current);
     }
 }

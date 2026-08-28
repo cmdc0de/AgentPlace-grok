@@ -102,7 +102,9 @@ fn source_haul(sim: &Simulation, id: AgentId, item: ItemId) -> u32 {
     let Some(a) = sim.agents.get(&id) else {
         return sim.storage.haul_milli;
     };
-    if !Agent::is_pack_carrier(item) && a.has_pack() && a.pack.get(&item).copied().unwrap_or(0) > 0
+    if !Agent::is_pack_carrier(item)
+        && a.has_pack(&sim.storage)
+        && a.pack.get(&item).copied().unwrap_or(0) > 0
     {
         sim.storage.pack_haul_milli
     } else {
@@ -114,7 +116,7 @@ fn unload_pack_after_last_basket(sim: &mut Simulation, id: AgentId) -> bool {
     let Some(agent) = sim.agents.get(&id) else {
         return false;
     };
-    if agent.has_pack() {
+    if agent.has_pack(&sim.storage) {
         let (slots, w) = agent.worn_pack_caps(&sim.storage);
         return agent.pack_count() <= slots && agent.pack_weight_milli() <= w;
     }
@@ -166,7 +168,7 @@ fn pack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
-    if !agent.has_pack() || agent.inventory.get(&item).copied().unwrap_or(0) < qty {
+    if !agent.has_pack(&sim.storage) || agent.inventory.get(&item).copied().unwrap_or(0) < qty {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -200,7 +202,7 @@ fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
-    if !agent.has_pack() || agent.pack.get(&item).copied().unwrap_or(0) < qty {
+    if !agent.has_pack(&sim.storage) || agent.pack.get(&item).copied().unwrap_or(0) < qty {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -246,18 +248,10 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
         return;
     }
     if Agent::is_pack_carrier(item)
-        && ((item == ItemId::Basket && sender.basket_count() <= moved)
-            || (item == ItemId::Backpack && sender.backpack_count() <= moved))
+        && !crate::observation::can_drop_worn_carrier(sim, sender, item, moved, None)
     {
-        let leftover = sender.split_pack_unload(moved).1;
-        if !leftover.is_empty()
-            && !sim
-                .world
-                .crate_can_take(sender.x, sender.y, None, &leftover, &sim.storage)
-        {
-            push(sim, id, SimEventKind::Wait);
-            return;
-        }
+        push(sim, id, SimEventKind::Wait);
+        return;
     }
     let haul = source_haul(sim, id, item);
     let cost = crate::haul::haul_cost_milli(item, moved, haul);
@@ -319,17 +313,10 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         return;
     }
     if Agent::is_pack_carrier(item)
-        && ((item == ItemId::Basket && agent.basket_count() <= qty)
-            || (item == ItemId::Backpack && agent.backpack_count() <= qty))
+        && !crate::observation::can_drop_worn_carrier(sim, agent, item, qty, Some((item, qty)))
     {
-        let leftover = agent.split_pack_unload(qty).1;
-        if !sim
-            .world
-            .crate_can_take(x, y, Some((item, qty)), &leftover, &sim.storage)
-        {
-            push(sim, id, SimEventKind::Wait);
-            return;
-        }
+        push(sim, id, SimEventKind::Wait);
+        return;
     }
     let params = sim.storage;
     if !sim.world.try_store(x, y, item, qty, &params) {

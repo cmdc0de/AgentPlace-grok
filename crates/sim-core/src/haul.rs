@@ -1,7 +1,9 @@
 //! Item weight and haul energy. Overlay-overridable constants; not ExperimentConfig.
 
 use crate::agent::ItemId;
+use crate::error::SimError;
 use crate::species::f64_to_milli;
+use serde::Deserialize;
 use std::collections::BTreeMap;
 
 /// Default land-cell crate item-count cap.
@@ -32,6 +34,10 @@ pub struct StorageParams {
     pub pack_weight_cap_milli: u32,
     pub pack_haul_milli: u32,
     pub move_step_k_milli: u32,
+    /// How many Basket items count as worn pack. Omit overlay = 1. 0 = cargo only.
+    pub max_worn_baskets: u32,
+    /// How many Backpack items count as worn pack. Omit overlay = 1. 0 = cargo only.
+    pub max_worn_backpacks: u32,
 }
 
 impl Default for StorageParams {
@@ -44,6 +50,8 @@ impl Default for StorageParams {
             pack_weight_cap_milli: PACK_WEIGHT_CAP_MILLI,
             pack_haul_milli: PACK_HAUL_MILLI,
             move_step_k_milli: MOVE_STEP_K_MILLI,
+            max_worn_baskets: 1,
+            max_worn_backpacks: 1,
         }
     }
 }
@@ -56,6 +64,52 @@ impl StorageParams {
             haul_milli: f64_to_milli(haul).max(1),
             ..Self::default()
         }
+    }
+
+    /// Read `[storage]` from an experiment TOML. Unknown tables ignored.
+    /// `max_worn_baskets` / `max_worn_backpacks` omit = 1. Negative / non-integer → error.
+    pub fn from_config_toml(s: &str) -> Result<Self, SimError> {
+        #[derive(Default, Deserialize)]
+        struct Slice {
+            #[serde(default)]
+            storage: Table,
+        }
+        #[derive(Default, Deserialize)]
+        struct Table {
+            slot_cap: Option<u32>,
+            weight_cap: Option<f64>,
+            haul: Option<f64>,
+            max_worn_baskets: Option<toml::Value>,
+            max_worn_backpacks: Option<toml::Value>,
+        }
+        let slice: Slice = toml::from_str(s).unwrap_or_default();
+        let mut p = Self::default();
+        if let Some(n) = slice.storage.slot_cap {
+            p.slot_cap = n.max(1);
+        }
+        if let Some(w) = slice.storage.weight_cap {
+            p.weight_cap_milli = f64_to_milli(w).max(1);
+        }
+        if let Some(h) = slice.storage.haul {
+            p.haul_milli = f64_to_milli(h).max(1);
+        }
+        if let Some(v) = slice.storage.max_worn_baskets {
+            p.max_worn_baskets = parse_max_worn(&v, "max_worn_baskets")?;
+        }
+        if let Some(v) = slice.storage.max_worn_backpacks {
+            p.max_worn_backpacks = parse_max_worn(&v, "max_worn_backpacks")?;
+        }
+        Ok(p)
+    }
+}
+
+fn parse_max_worn(v: &toml::Value, name: &str) -> Result<u32, SimError> {
+    match v {
+        toml::Value::Integer(n) if *n >= 0 && *n <= i64::from(u32::MAX) => Ok(*n as u32),
+        toml::Value::Integer(_) => Err(SimError::Config(format!("{name} must be >= 0"))),
+        _ => Err(SimError::Config(format!(
+            "{name} must be a non-negative integer"
+        ))),
     }
 }
 
@@ -152,5 +206,16 @@ mod tests {
         let packed =
             move_cargo_cost_milli(0, food_w, HAUL_MILLI, PACK_HAUL_MILLI, MOVE_STEP_K_MILLI);
         assert!(packed < loose, "packed={packed} loose={loose}");
+    }
+
+    #[test]
+    fn omit_max_worn_defaults_to_one() {
+        let p = StorageParams::from_config_toml("").unwrap();
+        assert_eq!(p.max_worn_baskets, 1);
+        assert_eq!(p.max_worn_backpacks, 1);
+        let p = StorageParams::from_config_toml("[storage]\nslot_cap = 8\n").unwrap();
+        assert_eq!(p.max_worn_baskets, 1);
+        assert_eq!(p.max_worn_backpacks, 1);
+        assert_eq!(p.slot_cap, 8);
     }
 }

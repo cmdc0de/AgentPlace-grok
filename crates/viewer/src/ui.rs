@@ -434,14 +434,15 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 }
             }
             ui.separator();
-            if a.has_basket() {
-                let params = state.sim.storage;
+            let params = state.sim.storage;
+            if a.has_pack(&params) {
+                let (slots, w) = a.worn_pack_caps(&params);
                 ui.text(format!(
                     "pack slots {}/{}  weight {:.1}/{}",
                     a.pack_count(),
-                    params.pack_slot_cap,
+                    slots,
                     a.pack_weight_milli() as f32 / 100.0,
-                    params.pack_weight_cap_milli / 100
+                    w / 100
                 ));
                 if a.pack.is_empty() {
                     ui.text("  (empty)");
@@ -454,7 +455,7 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                     }
                 }
             } else {
-                ui.text("pack: (no basket)");
+                ui.text("pack: (none)");
             }
             ui.separator();
             if let Some(c) = state.sim.world.stockpile_at(a.x, a.y) {

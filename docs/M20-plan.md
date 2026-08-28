@@ -1,7 +1,8 @@
 # M20 — Revert relationship_delta on leave, stacked worn packs, attach safety net
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M19 complete (`docs/M19-plan.md`, git tag `M19`, commit `92e408d`)  
+**Walkthrough:** [`M20-test-plan.md`](M20-test-plan.md)  
 **Specs:** `incentive-schedule-format.md` (one-shots), `M17-plan.md` (leave reverts influence only), `M19-plan.md` (one worn pack; Backpack replaces Basket), `M7-plan.md` (TCP/WS attach)
 
 ## Context
@@ -126,7 +127,7 @@ Not a protocol feature. On **implement**:
 
 ### PR 3: Attach safety net
 
-- **Files:** `implement-m` SKILL.md §0, this plan + `M20-test-plan.md` when implemented
+- **Files:** `implement-m` SKILL.md §0, this plan + `M20-test-plan.md`
 
 ## Config / CLI
 
@@ -139,9 +140,9 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-## Verification (when implemented)
+## Verification
 
-Walkthrough: `docs/M20-test-plan.md` (written at implement).
+Walkthrough: [`M20-test-plan.md`](M20-test-plan.md).
 
 ```bash
 cargo test -p sim-core

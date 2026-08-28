@@ -142,24 +142,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let listen = server::merge_listen(&net, &listen);
     let overlay = overlay::OverlayFile::from_path(&config_path);
-    if overlay.storage.slot_cap.is_some()
-        || overlay.storage.weight_cap.is_some()
-        || overlay.storage.haul.is_some()
-    {
-        let mut p = sim.storage;
-        if let Some(n) = overlay.storage.slot_cap {
-            p.slot_cap = n.max(1);
-        }
-        if let Some(w) = overlay.storage.weight_cap {
-            p.weight_cap_milli = sim_core::species::f64_to_milli(w).max(1);
-        }
-        if let Some(h) = overlay.storage.haul {
-            p.haul_milli = sim_core::species::f64_to_milli(h).max(1);
-        }
-        sim.storage = p;
-    }
     {
         let text = std::fs::read_to_string(&config_path).unwrap_or_default();
+        sim.storage = sim_core::StorageParams::from_config_toml(&text)?;
         sim.voting = sim_core::VotingParams::from_config_toml(&text)?;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {

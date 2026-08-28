@@ -567,11 +567,11 @@ fn last_basket_overflow_refuses_transfer() {
 fn satchel_helper_tracks_basket() {
     let mut sim = Simulation::new(tiny(0xA116)).unwrap();
     let id = AgentId(0);
-    assert!(!sim.agents.get(&id).unwrap().shows_satchel());
+    assert!(!sim.agents.get(&id).unwrap().shows_satchel(&sim.storage));
     if let Some(a) = sim.agents.get_mut(&id) {
         a.try_add_item(ItemId::Basket, 1);
     }
-    assert!(sim.agents.get(&id).unwrap().shows_satchel());
+    assert!(sim.agents.get(&id).unwrap().shows_satchel(&sim.storage));
     assert_eq!(markers::marker_satchel().name, "satchel");
     assert_ne!(
         markers::marker_satchel().rgb,
@@ -696,4 +696,131 @@ fn backpack_holds_twelve_basket_holds_eight() {
     }
     assert_eq!(pack.agents.get(&id).unwrap().pack_count(), 12);
     assert_eq!(basket.agents.get(&id).unwrap().pack_count(), 8);
+}
+
+#[test]
+fn omit_max_worn_both_packs_twenty_slots() {
+    let mut sim = Simulation::new(tiny(0xA119)).unwrap();
+    let id = AgentId(0);
+    park_on_land(&mut sim, id);
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.inventory.clear();
+        a.inventory_cap = 20;
+        a.try_add_item(ItemId::Basket, 1);
+        a.try_add_item(ItemId::Backpack, 1);
+    }
+    let (slots, w) = sim.agents.get(&id).unwrap().worn_pack_caps(&sim.storage);
+    assert_eq!(slots, 20);
+    assert_eq!(w, 6_500);
+}
+
+#[test]
+fn two_worn_baskets_hold_sixteen() {
+    let mut sim = Simulation::new(tiny(0xA11A)).unwrap();
+    sim.storage.max_worn_baskets = 2;
+    let id = AgentId(0);
+    park_on_land(&mut sim, id);
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.inventory.clear();
+        a.inventory_cap = 20;
+        a.try_add_item(ItemId::Basket, 2);
+        a.try_add_item(ItemId::Food(1), 16);
+        a.needs.energy = sim.config.energy_max_milli();
+    }
+    let (slots, w) = sim.agents.get(&id).unwrap().worn_pack_caps(&sim.storage);
+    assert_eq!(slots, 16);
+    assert_eq!(w, 5_000);
+    for _ in 0..16 {
+        execute_primary(
+            &mut sim,
+            id,
+            &PrimaryAction::Pack {
+                item: ItemId::Food(1),
+                qty: 1,
+            },
+        );
+    }
+    assert_eq!(sim.agents.get(&id).unwrap().pack_count(), 16);
+}
+
+#[test]
+fn max_worn_backpacks_zero_is_cargo_only() {
+    let mut sim = Simulation::new(tiny(0xA11B)).unwrap();
+    sim.storage.max_worn_backpacks = 0;
+    let id = AgentId(0);
+    park_on_land(&mut sim, id);
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.inventory.clear();
+        a.try_add_item(ItemId::Backpack, 1);
+        a.try_add_item(ItemId::Food(1), 4);
+        a.needs.energy = sim.config.energy_max_milli();
+    }
+    assert!(!sim.agents.get(&id).unwrap().has_pack(&sim.storage));
+    let (slots, w) = sim.agents.get(&id).unwrap().worn_pack_caps(&sim.storage);
+    assert_eq!(slots, 0);
+    assert_eq!(w, 0);
+    let obs = observation::build(&sim, id);
+    assert!(!obs.legal.iter().any(|act| matches!(
+        act,
+        PrimaryAction::Pack {
+            item: ItemId::Food(1),
+            ..
+        }
+    )));
+}
+
+#[test]
+fn max_worn_baskets_negative_is_load_error() {
+    let err = sim_core::StorageParams::from_config_toml("[storage]\nmax_worn_baskets = -1\n")
+        .unwrap_err();
+    let s = err.to_string();
+    assert!(s.contains("max_worn") || s.contains("config"), "{s}");
+    let err = sim_core::StorageParams::from_config_toml("[storage]\nmax_worn_baskets = 1.5\n")
+        .unwrap_err();
+    let s = err.to_string();
+    assert!(s.contains("integer") || s.contains("config"), "{s}");
+}
+
+#[test]
+fn last_basket_with_backpack_over_twelve_refuses() {
+    let mut sim = Simulation::new(tiny(0xA11C)).unwrap();
+    let a = AgentId(0);
+    let b = AgentId(1);
+    park_adjacent(&mut sim, a, b);
+    let params = sim.storage;
+    let energy_max = sim.config.energy_max_milli();
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.inventory.clear();
+        ag.inventory_cap = 20;
+        ag.try_add_item(ItemId::Backpack, 1);
+        ag.try_add_item(ItemId::Basket, 1);
+        ag.needs.energy = energy_max;
+        for _ in 0..13 {
+            ag.try_add_pack(ItemId::Food(1), 1, &params);
+        }
+    }
+    assert_eq!(sim.agents.get(&a).unwrap().pack_count(), 13);
+    let obs = observation::build(&sim, a);
+    assert!(
+        !obs.legal.iter().any(|act| matches!(
+            act,
+            PrimaryAction::Transfer {
+                item: ItemId::Basket,
+                ..
+            }
+        )),
+        "dropping Basket must refuse when pack exceeds Backpack caps, legal={:?}",
+        obs.legal
+    );
+    assert!(
+        !obs.legal.iter().any(|act| matches!(
+            act,
+            PrimaryAction::Store {
+                item: ItemId::Basket,
+                ..
+            }
+        )),
+        "Store last Basket must refuse when pack exceeds Backpack caps, legal={:?}",
+        obs.legal
+    );
 }

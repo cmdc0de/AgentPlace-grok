@@ -605,7 +605,8 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if store_seen.contains(&item) {
                 continue;
             }
-            let in_pack = agent.has_pack() && agent.pack.get(&item).copied().unwrap_or(0) > 0;
+            let in_pack =
+                agent.has_pack(&params) && agent.pack.get(&item).copied().unwrap_or(0) > 0;
             let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
             if !in_pack && !in_pockets {
                 continue;
@@ -620,9 +621,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             if Agent::is_pack_carrier(item)
-                && ((item == ItemId::Basket && agent.basket_count() <= 1)
-                    || (item == ItemId::Backpack && agent.backpack_count() <= 1))
-                && !can_leave_last_worn(sim, agent, item, Some((item, 1)))
+                && !can_drop_worn_carrier(sim, agent, item, 1, Some((item, 1)))
             {
                 continue;
             }
@@ -642,7 +641,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
     }
-    if agent.has_pack() {
+    if agent.has_pack(&params) {
         let (slot_cap, weight_cap) = agent.worn_pack_caps(&params);
         for (item, have) in &agent.inventory {
             if *have == 0 || Agent::is_pack_carrier(*item) {
@@ -703,7 +702,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if xfer_seen.contains(&item) {
                 continue;
             }
-            let in_pack = agent.has_pack()
+            let in_pack = agent.has_pack(&params)
                 && !Agent::is_pack_carrier(item)
                 && agent.pack.get(&item).copied().unwrap_or(0) > 0;
             let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
@@ -719,11 +718,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if energy < cost {
                 continue;
             }
-            if Agent::is_pack_carrier(item)
-                && ((item == ItemId::Basket && agent.basket_count() <= 1)
-                    || (item == ItemId::Backpack && agent.backpack_count() <= 1))
-                && !can_leave_last_worn(sim, agent, item, None)
-            {
+            if Agent::is_pack_carrier(item) && !can_drop_worn_carrier(sim, agent, item, 1, None) {
                 continue;
             }
             xfer_seen.push(item);
@@ -737,26 +732,36 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     legal
 }
 
-fn can_leave_last_worn(
+pub(crate) fn can_drop_worn_carrier(
     sim: &Simulation,
     agent: &Agent,
     removing: ItemId,
+    qty: u32,
     crate_reserved: Option<(crate::agent::ItemId, u32)>,
 ) -> bool {
+    if !Agent::is_pack_carrier(removing) {
+        return true;
+    }
+    let mut baskets = agent.basket_count();
+    let mut backpacks = agent.backpack_count();
+    match removing {
+        ItemId::Basket => baskets = baskets.saturating_sub(qty),
+        ItemId::Backpack => backpacks = backpacks.saturating_sub(qty),
+        _ => {}
+    }
+    let (slots, w) = Agent::worn_pack_caps_for(baskets, backpacks, &sim.storage);
+    if slots > 0 || w > 0 {
+        return agent.pack_count() <= slots && agent.pack_weight_milli() <= w;
+    }
     if agent.pack_count() == 0 {
         return true;
     }
-    let still_pack = match removing {
-        ItemId::Basket => agent.backpack_count() > 0 || agent.basket_count() > 1,
-        ItemId::Backpack => agent.basket_count() > 0 || agent.backpack_count() > 1,
-        _ => agent.has_pack(),
-    };
-    if still_pack {
-        return true;
-    }
-    let (_to_pockets, leftover) = agent.split_pack_unload(1);
-    sim.world
-        .crate_can_take(agent.x, agent.y, crate_reserved, &leftover, &sim.storage)
+    let extra = if crate_reserved.is_some() { 1 } else { qty };
+    let leftover = agent.split_pack_unload(extra).1;
+    leftover.is_empty()
+        || sim
+            .world
+            .crate_can_take(agent.x, agent.y, crate_reserved, &leftover, &sim.storage)
 }
 
 pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {

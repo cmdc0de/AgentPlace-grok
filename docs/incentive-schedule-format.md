@@ -58,7 +58,7 @@ delta = 0.15
 | `all` | Every agent. |
 | `agent:N` | Agent id `N` (e.g. `agent:0`). |
 | `archetype:name` | Agents whose abilities/personality still match that named `[agents.archetypes]` entry. |
-| `supporters_of:proposal_N` | Agents currently in that proposal’s `supporters` set (also `supporters_of:N`). Missing id → empty scope. `supporters_of:nope` → load error. Per-tick effects follow the live set; one-shots (`goal_injection`, `relationship_delta`, `influence_factor_delta`) still apply only at incentive start. |
+| `supporters_of:proposal_N` | Agents currently in that proposal’s `supporters` set (also `supporters_of:N`). Missing id → empty scope. `supporters_of:nope` → load error. Per-tick effects follow the live set; one-shots (`goal_injection`, `relationship_delta`, `influence_factor_delta`) apply on start/join. Leave and incentive end revert influence and relationship_delta; goals stay. |
 
 ## Effect tables (`[[incentives.effects]]`)
 
@@ -76,7 +76,7 @@ Every effect **must** have `type`. Extra unknown types are a load error.
 
 | Field | Required | Notes |
 |---|---|---|
-| `delta` | yes | Added to `influence_factor` while active (`0.15` → +15 millipoints). Reverted when the incentive ends. |
+| `delta` | yes | Added to `influence_factor` while active (`0.15` → +15 millipoints). Reverted on **leave** and when the incentive **ends**. |
 
 ### `memory_importance_boost`
 
@@ -108,7 +108,7 @@ Applied once when the incentive **starts**.
 | `trust` | no | `0.0` | Applied once at start to every in-scope agent vs every other agent (`0.1` → +10 millipoints). |
 | `affinity` | no | `0.0` | Same scale. |
 | `respect` | no | `0.0` | Same scale (`70.0` → +7000). |
-| `toward` | no | `""` | Omit / empty = every other agent. `toward = "agent:N"` = that id only (skip self). `toward = "nope"` is a load error. Missing agent at start is a no-op for that edge. |
+| `toward` | no | `""` | Omit / empty = every other agent. `toward = "agent:N"` = that id only (skip self). `toward = "nope"` is a load error. Missing agent at start is a no-op for that edge. **Leave** and incentive **end** subtract the original milli (same `toward` set, clamp `REL_MIN`/`REL_MAX`). Missing row on revert is a no-op. Goals stay. |
 
 ### Not an effect type
 

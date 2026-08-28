@@ -48,6 +48,7 @@ struct SatchelVisual {
 }
 
 const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
+const BACKPACK_OFFSET: Vec3 = Vec3::new(-0.18, 0.22, -0.12);
 
 fn main() {
     let parsed = parse_args();
@@ -63,6 +64,9 @@ fn main() {
             });
             let mut sim = Simulation::new(config).unwrap_or_else(|e| {
                 panic!("failed to start sim: {e}");
+            });
+            sim.storage = sim_core::StorageParams::from_config_toml(&text).unwrap_or_else(|e| {
+                panic!("failed to parse [storage]: {e}");
             });
             sim.voting = sim_core::VotingParams::from_config_toml(&text).unwrap_or_else(|e| {
                 panic!("failed to parse [voting]: {e}");
@@ -310,7 +314,8 @@ fn setup_scene(
             AgentVisual { id: agent.id },
             Visibility::default(),
         ));
-        if agent.shows_satchel() {
+        let params = state.sim.storage;
+        if agent.worn_baskets(&params) > 0 {
             spawn_satchel(
                 &mut commands,
                 &mut meshes,
@@ -319,7 +324,19 @@ fn setup_scene(
                 agent.id,
                 agent.x,
                 agent.y,
-                agent.has_backpack(),
+                false,
+            );
+        }
+        if agent.worn_backpacks(&params) > 0 {
+            spawn_satchel(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                world,
+                agent.id,
+                agent.x,
+                agent.y,
+                true,
             );
         }
     }
@@ -449,7 +466,12 @@ fn spawn_satchel(
         perceptual_roughness: 0.7,
         ..default()
     });
-    let pos = agent_world_pos(world, x, y) + SATCHEL_OFFSET;
+    let pos = agent_world_pos(world, x, y)
+        + if backpack {
+            BACKPACK_OFFSET
+        } else {
+            SATCHEL_OFFSET
+        };
     let size = if backpack {
         Cuboid::new(0.22, 0.26, 0.16)
     } else {
@@ -471,23 +493,25 @@ fn sync_satchel_markers(
     state: Res<SimState>,
     existing: Query<(Entity, &SatchelVisual)>,
 ) {
-    let live: std::collections::BTreeMap<AgentId, bool> = state
-        .sim
-        .agents
-        .values()
-        .filter(|a| a.shows_satchel())
-        .map(|a| (a.id, a.has_backpack()))
-        .collect();
-    let have: std::collections::BTreeMap<AgentId, bool> =
+    let params = state.sim.storage;
+    let mut live: std::collections::BTreeSet<(AgentId, bool)> = std::collections::BTreeSet::new();
+    for a in state.sim.agents.values() {
+        if a.worn_baskets(&params) > 0 {
+            live.insert((a.id, false));
+        }
+        if a.worn_backpacks(&params) > 0 {
+            live.insert((a.id, true));
+        }
+    }
+    let have: std::collections::BTreeSet<(AgentId, bool)> =
         existing.iter().map(|(_, v)| (v.id, v.backpack)).collect();
     for (e, v) in existing.iter() {
-        let mismatch = live.get(&v.id).copied() != Some(v.backpack);
-        if !live.contains_key(&v.id) || mismatch {
+        if !live.contains(&(v.id, v.backpack)) {
             commands.entity(e).despawn();
         }
     }
     for (id, backpack) in live {
-        if have.get(&id) == Some(&backpack) {
+        if have.contains(&(id, backpack)) {
             continue;
         }
         let Some(agent) = state.sim.agents.get(&id) else {
@@ -676,8 +700,12 @@ fn sync_agent_transforms(
     }
     for (visual, mut transform) in &mut satchels {
         if let Some(agent) = state.sim.agents.get(&visual.id) {
-            transform.translation =
-                agent_world_pos(&state.sim.world, agent.x, agent.y) + SATCHEL_OFFSET;
+            transform.translation = agent_world_pos(&state.sim.world, agent.x, agent.y)
+                + if visual.backpack {
+                    BACKPACK_OFFSET
+                } else {
+                    SATCHEL_OFFSET
+                };
         }
     }
 }
