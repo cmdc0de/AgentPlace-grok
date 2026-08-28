@@ -41,6 +41,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut compare: Vec<PathBuf> = Vec::new();
     let mut csv = false;
     let mut connect: Option<String> = None;
+    let mut start_paused = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -97,6 +98,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             "--allow-control" => allow_control = true,
+            "--start-paused" => start_paused = true,
             "--token" => {
                 i += 1;
                 token = Some(args.get(i).ok_or("--token requires a value")?.clone());
@@ -157,6 +159,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         token = Some(net.token.clone());
     }
     let listen = server::merge_listen(&net, &listen);
+    if start_paused {
+        if listen.is_empty() {
+            return Err("--start-paused requires --listen".into());
+        }
+        if !allow_control {
+            return Err("--start-paused requires --allow-control".into());
+        }
+    }
     let overlay = overlay::OverlayFile::from_path(&config_path);
     {
         let text = std::fs::read_to_string(&config_path).unwrap_or_default();
@@ -211,6 +221,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ticks: n,
             listen,
             allow_control,
+            start_paused,
             token,
             quiet,
             out_dir,
@@ -334,7 +345,7 @@ Usage:
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
-          [--allow-control] [--token SECRET]
+          [--allow-control] [--start-paused] [--token SECRET]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -350,7 +361,8 @@ Options:
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
       --connect URL         Read-only log tail (Welcome/Tick hashes). Not with --listen
-      --allow-control       Accept pause/play/step/save/report/summarize/scrub from clients
+      --allow-control       Accept pause/play/step/save/report/summarize/scrub/give/ckpt/events from clients
+      --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
       --incentives PATH     Apply incentive TOML from tick 0
       --inject PATH         Replace schedule (typical with --load)

@@ -37,7 +37,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M19** | Done (tag `M19`) | [`M19-plan.md`](M19-plan.md), walkthrough [`M19-test-plan.md`](M19-test-plan.md) | SetCouncilTally meta-rule, `/set respect`, backpack + crate scale-by-fill |
 | **M20** | Done (tag `M20`) | [`M20-plan.md`](M20-plan.md), walkthrough [`M20-test-plan.md`](M20-test-plan.md) | Revert relationship_delta on leave, stacked worn packs, attach safety net |
 | **M21** | Done (tag `M21`) | [`M21-plan.md`](M21-plan.md), walkthrough [`M21-test-plan.md`](M21-test-plan.md) | Pack fill scale, sim-cli --connect, jump-to-tick on the wire |
-| **M22** | Planned — next | [`M22-plan.md`](M22-plan.md) | Wire Give, remote /ckpt and /events |
+| **M22** | Done (tag `M22`) | [`M22-plan.md`](M22-plan.md), walkthrough [`M22-test-plan.md`](M22-test-plan.md) | Wire Give, remote /ckpt and /events |
 | After M22 | Not started | listed at the bottom of `M22-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -56,6 +56,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 4c | `needs-and-survival.md` | Hunger / thirst / energy: millipoints, decay, mock “hungry” cutoffs, refill actions |
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
+| 6b | `missing-features.md` | Open researcher gaps found in use (not After-M later-table) |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
 | 9 | `M4-plan.md` | Milestone 4 (done): public board, adopted rules, food-economy report |
@@ -87,7 +88,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 25b | `M20-test-plan.md` | M20 walkthrough (relationship leave/end, stacked packs, attach net) |
 | 26 | `M21-plan.md` | Milestone 21 (done, tag `M21`): pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | 26b | `M21-test-plan.md` | M21 walkthrough (pack fill, `--connect`, remote `/scrub`) |
-| 27 | `M22-plan.md` | Milestone 22 (planned): wire Give, remote /ckpt and /events |
+| 27 | `M22-plan.md` | Milestone 22 (done, tag `M22`): wire Give, remote /ckpt and /events |
+| 27b | `M22-test-plan.md` | M22 walkthrough (wire Give, remote `/ckpt`, `/events`) |
 
 ---
 
@@ -96,7 +98,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M22-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M22 is planned, not implemented; do not expand into items it defers (protobuf/TLS).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M22 is implemented; later work is listed at the bottom of `M22-plan.md`. Do not expand into items it defers (protobuf/TLS).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -124,13 +126,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M21 are done (tag `M21`). **Next:** [`M22-plan.md`](M22-plan.md) (planned, not implemented). Later work is listed at the bottom of that file.
+M1–M22 are done (tag `M22`). Later work is listed at the bottom of [`M22-plan.md`](M22-plan.md).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M22-plan.md.
-M22 is planned (wire Give; remote /ckpt and /events; PROTOCOL_VERSION=4).
-Do not implement until asked. Do not add protobuf or TLS. CI stays
-provider=mock with no network.
+M22 is implemented (wire Give; remote /ckpt and /events;
+PROTOCOL_VERSION=4). Later work is at the bottom of that file. Do not
+add protobuf or TLS. CI stays provider=mock with no network.
 ```
 
 ---

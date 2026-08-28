@@ -1,7 +1,8 @@
 # M22 — Wire Give, remote /ckpt and /events
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M21 complete (`docs/M21-plan.md`, git tag `M21`, commit `3389e47`)  
+**Walkthrough:** [`M22-test-plan.md`](M22-test-plan.md)  
 **Specs:** `M10-plan.md` (in-process `/give`), `M18-plan.md` (`/ckpt` file-to-file), `M17-plan.md` (`/events` JSONL display-only), `M21-plan.md` (remote `/scrub`; `/ckpt` `/events` still refuse)
 
 ## Context
@@ -18,6 +19,7 @@ A researcher can:
 2. `/ckpt next` and `/ckpt prev` load the **adjacent `.ckpt` file** on the server checkpoint dir (file-to-file, not catch-up). `/scrub` unchanged.
 3. `/events TICK` returns that tick’s JSONL lines from the server `{id}_events.jsonl` (**display-only**; does not replace the sim).
 4. CI stays `provider = mock`. `format_version = 2`. **`PROTOCOL_VERSION = 4`**. Shipping `default.toml` / `coop.toml` unchanged ⇒ default **sim hashes** unchanged.
+5. Attached viewer **Status** shows the live server tick/hash from each `Tick` (MF-1). 3D/world still snapshot-throttled (~200 ms).
 
 ## In scope
 
@@ -65,6 +67,10 @@ Events(u64)
 
 Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Viewer scrollback shows them. No Snapshot.
 
+### D. Attach HUD live tick (MF-1)
+
+`--connect` Status line uses a live clock updated on every `ServerMessage::Tick` in the IO thread (not dropped when the Bevy channel is full). HUD tick + short hash come from that clock. 3D/world still refresh from Snapshot (~200 ms). In-process viewer unchanged (`state.sim.tick`).
+
 ## Out of scope (later)
 
 | Later | What |
@@ -95,6 +101,7 @@ Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Vi
 | Events, no JSONL | Error |
 | Events with JSONL at tick T | ReportReady contains those lines; sim tick/hash unchanged |
 | remote `/set` | still refused |
+| HUD status tick when attached | live Tick clock, not last Snapshot |
 | default.toml mock | hashes match pre-M22 (`70e5204d…` at 2 ticks) |
 | `cargo test -p sim-core` / `-p viewer` / `-p sim-cli --test net` / `-p shared` | no network |
 
@@ -121,16 +128,16 @@ No overlay keys. No shipping TOML change. No new `ExperimentConfig` postcard fie
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
   --out-dir /tmp/m22 --checkpoint-every 2 \
-  --listen tcp://127.0.0.1:9000 --allow-control --llm mock --quiet
+  --listen tcp://127.0.0.1:9000 --allow-control --start-paused --llm mock --quiet
 cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 # /give 0 berry_bush 1
 # /ckpt prev   /ckpt next
 # /events 2
 ```
 
-## Verification (when implemented)
+## Verification
 
-Walkthrough: `docs/M22-test-plan.md` (written at implement).
+Walkthrough: [`M22-test-plan.md`](M22-test-plan.md).
 
 ```bash
 cargo test -p sim-core

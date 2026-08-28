@@ -237,12 +237,12 @@ commands:
   /legend  /inspector  /board  /log
   /tick
   /inject PATH     load incentive TOML (needs --allow-control when remote)
-  /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
+  /give ID ITEM QTY   pockets; hash-sensitive (in-process or remote --allow-control)
   /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
   /set ID respect TOWARD N   respect edge 0–100 (in-process)
-  /events TICK     filter log to JSONL tick at or before TICK (display-only)
+  /events TICK     JSONL tick at or before TICK (display-only; remote --allow-control)
   /scrub TICK      load ckpt at or before TICK, then tick forward (in-process --load DIR; remote --allow-control)
-  /ckpt next|prev  adjacent checkpoint in the run directory
+  /ckpt next|prev  adjacent checkpoint file (in-process --load DIR; remote --allow-control)
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
 }
 
@@ -393,6 +393,14 @@ pub fn remote_control(cmd: &UiCommand) -> Option<ControlVerb> {
         UiCommand::Report { .. } => Some(ControlVerb::Report),
         UiCommand::Summarize => Some(ControlVerb::Summarize),
         UiCommand::Scrub { tick } => Some(ControlVerb::Scrub(*tick)),
+        UiCommand::Give { id, item, qty } => Some(ControlVerb::Give {
+            id: *id,
+            item: item.clone(),
+            qty: *qty,
+        }),
+        UiCommand::CkptNext => Some(ControlVerb::CkptNext),
+        UiCommand::CkptPrev => Some(ControlVerb::CkptPrev),
+        UiCommand::Events { tick } => Some(ControlVerb::Events(*tick)),
         _ => None,
     }
 }
@@ -520,7 +528,7 @@ pub fn run_command(
         }
         UiCommand::Give { id, item, qty } => {
             if state.remote {
-                return vec!["give is in-process only (not on the attach wire)".into()];
+                return vec![format!("give {qty} {item} to {id} sent")];
             }
             let Some(item_id) = sim_core::parse_item(&item, &state.sim.config.world.species) else {
                 return vec![format!("unknown item {item}")];
@@ -541,7 +549,7 @@ pub fn run_command(
         }
         UiCommand::CkptNext => {
             if state.remote {
-                return vec!["ckpt step is in-process only (not on the attach wire)".into()];
+                return vec!["ckpt next sent".into()];
             }
             match scrub.next(state) {
                 Ok(t) => vec![format!("loaded tick {t}")],
@@ -550,7 +558,7 @@ pub fn run_command(
         }
         UiCommand::CkptPrev => {
             if state.remote {
-                return vec!["ckpt step is in-process only (not on the attach wire)".into()];
+                return vec!["ckpt prev sent".into()];
             }
             match scrub.prev(state) {
                 Ok(t) => vec![format!("loaded tick {t}")],
@@ -559,7 +567,7 @@ pub fn run_command(
         }
         UiCommand::Events { tick } => {
             if state.remote {
-                return vec!["events timeline is in-process only (not on the attach wire)".into()];
+                return vec![format!("events {tick} sent")];
             }
             match scrub.filter_events(tick) {
                 Ok(t) => vec![format!("events tick {t}")],

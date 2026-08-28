@@ -5,8 +5,10 @@ use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
 use sim_core::{
-    SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
-    ckpt_at_or_before, experiment_id, summary_markdown, write_report, write_run_checkpoint,
+    AgentId, SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl,
+    append_timing_jsonl, ckpt_at_or_before, experiment_id, find_events_jsonl, jsonl_lines_for_tick,
+    jsonl_tick_at_or_before, list_checkpoints, list_jsonl_ticks, parse_item, summary_markdown,
+    write_report, write_run_checkpoint,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -185,6 +187,123 @@ impl Hub {
                 },
             },
             ControlVerb::Scrub(want) => self.apply_scrub(want),
+            ControlVerb::Give { id, item, qty } => self.apply_give(id, &item, qty),
+            ControlVerb::CkptNext => self.apply_ckpt_step(true),
+            ControlVerb::CkptPrev => self.apply_ckpt_step(false),
+            ControlVerb::Events(tick) => self.apply_events(tick),
+        }
+    }
+
+    fn broadcast_snapshot(&self) {
+        if let Ok(snap) = self.snapshot() {
+            for sub in self.subscribers.values() {
+                if sub.subscribed {
+                    let _ = sub.tx.send(snap.clone());
+                }
+            }
+        }
+    }
+
+    fn apply_give(&mut self, id: u64, item: &str, qty: u32) -> ServerMessage {
+        let Some(item_id) = parse_item(item, &self.sim.config.world.species) else {
+            return ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: format!("unknown item {item}"),
+            };
+        };
+        match self.sim.give_item(AgentId(id), item_id, qty) {
+            Ok(n) => {
+                self.broadcast_snapshot();
+                ServerMessage::ReportReady {
+                    markdown_or_path: format!("gave {n} {item} to agent {id}"),
+                }
+            }
+            Err(e) => ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: e.to_string(),
+            },
+        }
+    }
+
+    fn apply_ckpt_step(&mut self, next: bool) -> ServerMessage {
+        let dir = self.checkpoint_dir();
+        let ckpts = match list_checkpoints(&dir) {
+            Ok(c) => c,
+            Err(e) => {
+                return ServerMessage::Error {
+                    code: ErrorCode::Internal,
+                    message: e.to_string(),
+                };
+            }
+        };
+        let cur = self.sim.tick;
+        let pick = if next {
+            ckpts.iter().find(|(t, _)| *t > cur)
+        } else {
+            ckpts.iter().rev().find(|(t, _)| *t < cur)
+        };
+        let Some((_, path)) = pick else {
+            return ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: if next {
+                    "already at last checkpoint".into()
+                } else {
+                    "already at first checkpoint".into()
+                },
+            };
+        };
+        match Simulation::load_checkpoint(path) {
+            Ok(sim) => {
+                self.sim = sim;
+                self.last_event = self.sim.events.events.len();
+                self.paused = true;
+                self.broadcast_snapshot();
+                ServerMessage::ReportReady {
+                    markdown_or_path: format!("loaded tick {}", self.sim.tick),
+                }
+            }
+            Err(e) => ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: e.to_string(),
+            },
+        }
+    }
+
+    fn apply_events(&self, want: u64) -> ServerMessage {
+        let dir = self.checkpoint_dir();
+        let Some(path) = find_events_jsonl(&dir) else {
+            return ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: format!("no *_events.jsonl in {}", dir.display()),
+            };
+        };
+        let ticks = match list_jsonl_ticks(&path) {
+            Ok(t) => t,
+            Err(e) => {
+                return ServerMessage::Error {
+                    code: ErrorCode::Internal,
+                    message: e.to_string(),
+                };
+            }
+        };
+        let Some(t) = jsonl_tick_at_or_before(&ticks, want) else {
+            return ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: format!("no event lines at or before tick {want}"),
+            };
+        };
+        match jsonl_lines_for_tick(&path, t) {
+            Ok(lines) if !lines.is_empty() => ServerMessage::ReportReady {
+                markdown_or_path: lines.join("\n"),
+            },
+            Ok(_) => ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: format!("no event lines at tick {t}"),
+            },
+            Err(e) => ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: e.to_string(),
+            },
         }
     }
 
@@ -240,13 +359,7 @@ impl Hub {
             }
         }
         self.paused = true;
-        if let Ok(snap) = self.snapshot() {
-            for sub in self.subscribers.values() {
-                if sub.subscribed {
-                    let _ = sub.tx.send(snap.clone());
-                }
-            }
-        }
+        self.broadcast_snapshot();
         ServerMessage::ReportReady {
             markdown_or_path: format!("scrubbed tick {}", self.sim.tick),
         }
@@ -264,6 +377,7 @@ pub struct ServeOpts {
     pub ticks: u64,
     pub listen: Vec<String>,
     pub allow_control: bool,
+    pub start_paused: bool,
     pub token: Option<String>,
     pub quiet: bool,
     pub out_dir: Option<PathBuf>,
@@ -301,7 +415,7 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
 
     let hub = Arc::new(Mutex::new(Hub {
         sim: opts.sim,
-        paused: false,
+        paused: opts.start_paused,
         allow_control: opts.allow_control,
         token: opts.token,
         jsonl_path,

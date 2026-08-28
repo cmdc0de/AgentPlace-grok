@@ -30,6 +30,10 @@ pub enum ControlVerb {
     Report,
     Summarize,
     Scrub(u64),
+    Give { id: u64, item: String, qty: u32 },
+    CkptNext,
+    CkptPrev,
+    Events(u64),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,6 +178,13 @@ mod tests {
         round_trip_client(ClientMessage::RequestSnapshot);
         round_trip_client(ClientMessage::Control(ControlVerb::Step(3)));
         round_trip_client(ClientMessage::Control(ControlVerb::Scrub(50)));
+        round_trip_client(ClientMessage::Control(ControlVerb::Give {
+            id: 0,
+            item: "berry_bush".into(),
+            qty: 1,
+        }));
+        round_trip_client(ClientMessage::Control(ControlVerb::CkptNext));
+        round_trip_client(ClientMessage::Control(ControlVerb::Events(2)));
         round_trip_client(ClientMessage::InjectIncentive {
             schedule_toml: "[[incentives]]".into(),
         });

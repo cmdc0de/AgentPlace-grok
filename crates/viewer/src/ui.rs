@@ -186,14 +186,14 @@ fn draw_status(
         .position([12.0, 12.0], Condition::FirstUseEver)
         .build(|| {
             let hash = state.sim.state_hash().to_string();
-            let short = if hash.len() >= 12 { &hash[..12] } else { &hash };
+            let (tick, short) = crate::net::status_tick_hash(net, state.sim.tick, &hash);
             let follow = match state.follow {
                 Some(id) => format!("agent {}", id.0),
                 None => "free camera".into(),
             };
             ui.text(format!(
                 "tick {}  {}  follow {follow}  hash {short}",
-                state.sim.tick,
+                tick,
                 if state.paused { "paused" } else { "running" }
             ));
             ui.text(format!(
