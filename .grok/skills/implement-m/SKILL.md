@@ -2,9 +2,9 @@
 name: implement-m
 description: >
   Implement the current AgentPlace-grok milestone from docs/M{N}-plan.md: code
-  the in-scope items, write docs/M{N}-test-plan.md, run the mock tests you can,
-  and retarget README, INDEX, and plan status to implemented. Do not spec the
-  next slice or tag unless asked. Use when the user says “implement M18”,
+  the in-scope items, write docs/M{N}-test-plan.md, run every non-GUI walkthrough
+  test, and retarget README, INDEX, and plan status to implemented. Do not spec
+  the next slice or tag unless asked. Use when the user says “implement M18”,
   “ok implement”, “deliver M17”, /implement-m, or “implement the plan”.
 ---
 
@@ -36,12 +36,15 @@ Work order = the plan’s PR sections, in one working tree (not separate git PRs
 Write `docs/M{N}-test-plan.md` in the recent shape:
 
 - Title `M{N} test plan — see each new feature`; link the plan; `--exact` gotcha; **Success for the slice** paragraph (`format_version` / `PROTOCOL_VERSION` as locked).
-- §0 safety net (`cargo test -p sim-core`, plus `-p viewer` / `-p sim-cli` if this slice touched them).
+- §0 safety net (`cargo test -p sim-core`, plus `-p viewer` / `-p sim-cli` if this slice touched them; plus `cargo test -p sim-cli --test net` and `cargo test -p shared` — TCP/WS loopback — every deliver).
 - One numbered section per in-scope item: exact `cargo test` lines, success table, `sim-cli` / viewer commands a researcher can **read**.
 - Live/overnight recipes as copy-paste commands. **Do not run** them unless the user asked.
 - Next-slice line: `M{N+1}-plan.md` if it exists, else later work at the bottom of `M{N}-plan.md`.
+- **Execution record:** every non-GUI walkthrough command actually run, with pass/fail evidence.
 
-Run the mock/CLI steps you can. If a test fails, **fix the code** (do not paper over it in the walkthrough). Viewer/imgui bits that cannot run headless: document as viewer-not-automated.
+**Run every non-GUI line in that walkthrough before you stop.** That means every `cargo test` (package §0, each `--exact` name, `-p sim-cli --test net`, `-p shared`) and every headless `cargo run -p sim-cli` (default hash, `--compare`, inject). `cargo test -- --exact NAME` still takes **one** name — invoke each listed line separately. If a test fails, **fix the code** (do not paper over it in the walkthrough).
+
+Skip only what cannot run headless or needs a live model: imgui/viewer window, overnight Spark / live LLM. Mark those **not run** in the execution record. Do not skip attach loopback, named `--exact` tests, or the default-hash `sim-cli` run.
 
 ## Step 4 — Retarget docs
 
@@ -58,7 +61,7 @@ Do not invent `docs/M{N+1}-plan.md`.
 
 ## Step 5 — Stop
 
-Summarize what shipped and which walkthrough sections were **not** run (live Spark, imgui). Offer commit / push / tag. Do not `/spec` the next slice.
+Summarize what shipped and which walkthrough sections were **not** run (only imgui / live Spark, unless they asked). Offer commit / push / tag. Do not `/spec` the next slice.
 
 ## Commit / tag (if they ask)
 
