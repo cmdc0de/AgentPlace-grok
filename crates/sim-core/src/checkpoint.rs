@@ -308,6 +308,7 @@ impl Simulation {
             meta_threshold_milli: None,
             meta_vote_weight: None,
             meta_vote_accept: None,
+            meta_council: None,
             incentive_oneshot: BTreeMap::new(),
         };
         if let Some(raw) = body.active_incentives.entries.get(1) {

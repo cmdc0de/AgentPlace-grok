@@ -78,18 +78,15 @@ impl CkptScrubber {
 
     pub fn apply(&mut self, state: &mut SimState, want: u64) -> Result<u64, String> {
         self.refresh();
-        let dir = self.dir.as_ref().ok_or("no checkpoint directory loaded")?;
-        let path = ckpt_at_or_before(dir, want)
+        let dir = self.dir.clone().ok_or("no checkpoint directory loaded")?;
+        if state.sim.tick == want {
+            self.loaded_tick = Some(want);
+            return Ok(want);
+        }
+        let path = ckpt_at_or_before(&dir, want)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("no checkpoint at or before tick {want}"))?;
-        let listed_tick = self.ticks.iter().find(|(_, p)| *p == path).map(|(t, _)| *t);
-        if let Some(listed) = listed_tick {
-            if self.loaded_tick == Some(listed) && state.sim.tick == listed {
-                return Ok(listed);
-            }
-        }
         let sim = Simulation::load_checkpoint(&path).map_err(|e| e.to_string())?;
-        let tick = sim.tick;
         state.sim = sim;
         state.paused = true;
         if let Some(id) = state.follow {
@@ -97,8 +94,13 @@ impl CkptScrubber {
                 state.follow = None;
             }
         }
-        self.loaded_tick = Some(tick);
-        Ok(tick)
+        while state.sim.tick < want {
+            if !state.sim.tick() {
+                break;
+            }
+        }
+        self.loaded_tick = Some(state.sim.tick);
+        Ok(state.sim.tick)
     }
 
     pub fn next(&mut self, state: &mut SimState) -> Result<u64, String> {
@@ -213,7 +215,7 @@ commands:
   /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
   /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
   /events TICK     filter log to JSONL tick at or before TICK (display-only)
-  /scrub TICK      load ckpt at or before TICK (--load DIR, in-process)
+  /scrub TICK      load ckpt at or before TICK, then tick forward to TICK (--load DIR, in-process)
   /ckpt next|prev  adjacent checkpoint in the run directory
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
 }
@@ -609,15 +611,17 @@ mod tests {
             remote: false,
         };
         let t = scrub.apply(&mut state, 4).unwrap();
-        assert_eq!(t, 2);
-        assert_eq!(state.sim.tick, 2);
-        assert_eq!(state.sim.state_hash(), hash2);
+        assert_eq!(t, 4);
+        assert_eq!(state.sim.tick, 4);
         assert!(state.paused);
+        assert_ne!(state.sim.state_hash(), hash2);
         let t = scrub.next(&mut state).unwrap();
         assert_eq!(t, 5);
         assert_eq!(state.sim.tick, 5);
         let t = scrub.prev(&mut state).unwrap();
         assert_eq!(t, 2);
+        assert_eq!(state.sim.tick, 2);
+        assert_eq!(state.sim.state_hash(), hash2);
         let msgs = run_command(
             UiCommand::Scrub { tick: 0 },
             &mut state,
@@ -635,6 +639,40 @@ mod tests {
             &mut scrub,
         );
         assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scrubber_catches_up_between_ckpts() {
+        let dir = std::env::temp_dir().join(format!("m18-scrub-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut sim = Simulation::new(default_config_for_tests()).unwrap();
+        sim.run_ticks(2);
+        sim.save_checkpoint(dir.join("run_tick_2.ckpt")).unwrap();
+        sim.tick();
+        let hash3 = sim.state_hash();
+        let events3 = sim.events.events.len();
+        sim.tick();
+        sim.save_checkpoint(dir.join("run_tick_4.ckpt")).unwrap();
+        let mut scrub = CkptScrubber::discover(&dir);
+        let mut state = SimState {
+            sim,
+            paused: false,
+            follow: None,
+            remote: false,
+        };
+        let t = scrub.apply(&mut state, 3).unwrap();
+        assert_eq!(t, 3);
+        assert_eq!(state.sim.tick, 3);
+        assert_eq!(state.sim.state_hash(), hash3);
+        let t2 = scrub.apply(&mut state, 3).unwrap();
+        assert_eq!(t2, 3);
+        assert_eq!(state.sim.state_hash(), hash3);
+        assert_eq!(state.sim.events.events.len(), events3);
+        let t = scrub.next(&mut state).unwrap();
+        assert_eq!(t, 4);
+        assert_eq!(state.sim.tick, 4);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

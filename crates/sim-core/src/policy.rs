@@ -95,7 +95,7 @@ fn choose_governance(
         }
         if let Some(p) = obs.board.iter().find(|p| {
             p.status == ProposalStatus::Open
-                && matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
+                && matches!(&p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if *s == tag)
                 && !p.you_support
         }) {
             return Some((
@@ -104,7 +104,7 @@ fn choose_governance(
             ));
         }
         let already = obs.board.iter().any(|p| {
-            matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == tag)
+            matches!(&p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if *s == tag)
                 && p.status != ProposalStatus::Rejected
                 && p.status != ProposalStatus::Expired
         });
@@ -128,7 +128,7 @@ fn choose_governance(
             if p.status != ProposalStatus::Open || p.you_support {
                 continue;
             }
-            if !matches!(p.rule, Some(StructuredRule::BanEatSpecies { .. })) {
+            if !matches!(&p.rule, Some(StructuredRule::BanEatSpecies { .. })) {
                 continue;
             }
             let Some(author) = p.author else {

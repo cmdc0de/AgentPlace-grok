@@ -6,7 +6,7 @@ use crate::observation::Observation;
 use crate::species::SpeciesTables;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,6 +168,8 @@ struct RuleJson {
     weight: Option<String>,
     #[serde(default)]
     accept: Option<String>,
+    #[serde(default)]
+    council: Option<Vec<u64>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -380,6 +382,21 @@ fn parse_rule(r: &RuleJson, species: &SpeciesTables) -> Option<crate::board::Str
         "setvoteaccept" | "set_vote_accept" => {
             let a = crate::voting::VoteAccept::parse(r.accept.as_deref().unwrap_or("")).ok()?;
             Some(crate::board::StructuredRule::SetVoteAccept { accept: a })
+        }
+        "setcouncil" | "set_council" => {
+            let raw = r.council.as_ref()?;
+            let mut seen = BTreeSet::new();
+            let mut ids = Vec::new();
+            for n in raw {
+                let id = AgentId(*n);
+                if seen.insert(id) {
+                    ids.push(id);
+                }
+            }
+            if ids.is_empty() {
+                return None;
+            }
+            Some(crate::board::StructuredRule::SetCouncil { ids })
         }
         _ => None,
     }

@@ -255,6 +255,7 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
             .map(|r| {
                 let kind = r
                     .rule
+                    .as_ref()
                     .map(|rule| match rule {
                         StructuredRule::BanEatSpecies { species: tag } => {
                             format!("BanEatSpecies({tag})")
@@ -276,6 +277,14 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
                         }
                         StructuredRule::SetVoteAccept { accept } => {
                             format!("SetVoteAccept({})", accept.as_str())
+                        }
+                        StructuredRule::SetCouncil { ids } => {
+                            let list = ids
+                                .iter()
+                                .map(|id| id.0.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",");
+                            format!("SetCouncil([{list}])")
                         }
                     })
                     .unwrap_or_else(|| "text".into());

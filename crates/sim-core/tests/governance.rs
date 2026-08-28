@@ -3,8 +3,8 @@ use sim_core::board::{AdoptedRule, ProposalStatus, StructuredRule};
 use sim_core::event_log::SimEventKind;
 use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::{
-    AgentId, ExperimentConfig, ItemId, Simulation, VoteAccept, VoteWeight, build_report,
-    observation, report_markdown,
+    AgentId, CouncilTally, ExperimentConfig, ItemId, Simulation, VoteAccept, VoteWeight,
+    build_report, observation, report_markdown,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -316,7 +316,7 @@ fn mock_proposes_ban_after_toxic_memory() {
         "expected a Propose from mock policy"
     );
     assert!(sim.board.proposals.iter().any(|p| {
-        matches!(p.rule, Some(StructuredRule::BanEatSpecies { species }) if species == mushroom)
+        matches!(&p.rule, Some(StructuredRule::BanEatSpecies { species }) if *species == mushroom)
     }));
 }
 
@@ -339,6 +339,34 @@ fn parse_propose_json_and_unknown_rule_waits() {
     ));
     let wait = sim_core::parse_choice_json(
         r#"{"action":"Propose","text":"nope","rule":{"kind":"NotARule","species":"mushroom"}}"#,
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    assert!(matches!(wait.primary, PrimaryAction::Wait));
+}
+
+#[test]
+fn parse_set_council_json() {
+    let sim = Simulation::new(tiny_config(0x4D4048)).unwrap();
+    let obs = observation::build(&sim, AgentId(0));
+    let ok = sim_core::parse_choice_json(
+        r#"{"action":"Propose","text":"seat","rule":{"kind":"set_council","council":[0,2,2]}}"#,
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    match ok.primary {
+        PrimaryAction::Propose {
+            rule: Some(StructuredRule::SetCouncil { ids }),
+            ..
+        } => {
+            assert_eq!(ids, vec![AgentId(0), AgentId(2)]);
+        }
+        other => panic!("{other:?}"),
+    }
+    let wait = sim_core::parse_choice_json(
+        r#"{"action":"Propose","text":"seat","rule":{"kind":"set_council","council":[]}}"#,
         &obs.legal,
         &sim.config.world.species,
     )
@@ -621,6 +649,59 @@ fn council_one_oppose_rejects() {
     assert_eq!(sim.board.proposals[0].status, ProposalStatus::Rejected);
 }
 
+fn council3(sim: &mut Simulation) {
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1), AgentId(2)];
+    sim.voting.council_tally = CouncilTally::Majority;
+}
+
+#[test]
+fn council_majority_two_of_three_accepts() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4040)).unwrap();
+    council3(&mut sim);
+    propose_only_agent0(&mut sim);
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+}
+
+#[test]
+fn council_majority_one_of_three_stays_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4041)).unwrap();
+    council3(&mut sim);
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+}
+
+#[test]
+fn council_majority_influence_kingmaker() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4042)).unwrap();
+    council3(&mut sim);
+    sim.voting.weight = VoteWeight::Influence;
+    sim.inject_schedule_toml(KINGMAKER).unwrap();
+    propose_only_agent0(&mut sim);
+    sim.tick();
+    assert_eq!(
+        sim.board.proposals[0].status,
+        ProposalStatus::Accepted,
+        "yes_w should meet council need; inf0={} need={}",
+        sim.vote_weight_of(AgentId(0)),
+        sim.vote_need()
+    );
+}
+
+#[test]
+fn council_unanimous_two_of_three_stays_open() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4043)).unwrap();
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1), AgentId(2)];
+    propose_only_agent0(&mut sim);
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Open);
+}
+
 #[test]
 fn fog_board_omits_far_author() {
     let mut sim = Simulation::new(three_agent_config(0x4D4025)).unwrap();
@@ -771,4 +852,108 @@ fn meta_unanimous_one_of_three_stays_open() {
     sim.tick();
     let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
     assert_eq!(p.status, ProposalStatus::Open);
+}
+
+#[test]
+fn meta_set_council_waits_when_flag_off() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4044)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "new council".into(),
+            rule: Some(StructuredRule::SetCouncil {
+                ids: vec![AgentId(0), AgentId(2)],
+            }),
+        },
+    );
+    assert!(sim.board.proposals.is_empty());
+    assert!(matches!(
+        sim.events.events.last().unwrap().kind,
+        SimEventKind::Wait
+    ));
+}
+
+#[test]
+fn empty_set_council_propose_waits() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4045)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "empty council".into(),
+            rule: Some(StructuredRule::SetCouncil { ids: vec![] }),
+        },
+    );
+    assert!(sim.board.proposals.is_empty());
+    assert!(matches!(
+        sim.events.events.last().unwrap().kind,
+        SimEventKind::Wait
+    ));
+}
+
+#[test]
+fn meta_set_council_roster_then_unanimous() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4046)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1)];
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "seat 0 and 2".into(),
+            rule: Some(StructuredRule::SetCouncil {
+                ids: vec![AgentId(0), AgentId(2)],
+            }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    sim.refresh_meta();
+    assert_eq!(sim.effective_council(), &[AgentId(0), AgentId(2)]);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    support(&mut sim, 2, 1);
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Accepted);
+
+    let mut sim = Simulation::new(three_agent_meta(0x4D4047)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1)];
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "seat 0 and 2".into(),
+            rule: Some(StructuredRule::SetCouncil {
+                ids: vec![AgentId(0), AgentId(2)],
+            }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    sim.tick();
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    oppose(&mut sim, 2, 1);
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Rejected);
 }

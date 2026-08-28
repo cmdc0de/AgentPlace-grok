@@ -377,7 +377,7 @@ fn board_view(sim: &Simulation, ident: u32, agent: &Agent) -> Vec<ProposalView> 
                 status: p.status,
                 support: p.supporters.len() as u32,
                 oppose: p.opposers.len() as u32,
-                rule: p.rule,
+                rule: p.rule.clone(),
                 you_support: p.supporters.contains(&agent.id),
                 you_oppose: p.opposers.contains(&agent.id),
             }

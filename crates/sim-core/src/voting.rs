@@ -62,11 +62,38 @@ impl VoteAccept {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CouncilTally {
+    #[default]
+    Unanimous,
+    Majority,
+}
+
+impl CouncilTally {
+    pub fn parse(s: &str) -> Result<Self, SimError> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "" | "unanimous" => Ok(Self::Unanimous),
+            "majority" => Ok(Self::Majority),
+            other => Err(SimError::Config(format!(
+                "unknown council_tally {other:?} (use unanimous or majority)"
+            ))),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unanimous => "unanimous",
+            Self::Majority => "majority",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VotingParams {
     pub weight: VoteWeight,
     pub accept: VoteAccept,
     pub council: Vec<AgentId>,
+    pub council_tally: CouncilTally,
 }
 
 impl VotingParams {
@@ -101,6 +128,7 @@ impl VotingParams {
             accept: Option<String>,
             #[serde(default)]
             council: Vec<u64>,
+            council_tally: Option<String>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -111,6 +139,14 @@ impl VotingParams {
             p.accept = VoteAccept::parse(&a)?;
         }
         p.council = slice.voting.council.into_iter().map(AgentId).collect();
+        if let Some(t) = slice.voting.council_tally {
+            p.council_tally = CouncilTally::parse(&t)?;
+            if p.accept != VoteAccept::Council {
+                return Err(SimError::Config(
+                    "council_tally requires voting accept = \"council\"".into(),
+                ));
+            }
+        }
         if p.accept == VoteAccept::Council && p.council.is_empty() {
             return Err(SimError::Config(
                 "voting accept = \"council\" requires a non-empty council list".into(),
@@ -191,5 +227,38 @@ mod tests {
     fn unknown_accept_errors() {
         let err = VotingParams::from_config_toml("[voting]\naccept = \"maybe\"\n").unwrap_err();
         assert!(err.to_string().contains("accept"), "{err}");
+    }
+
+    #[test]
+    fn omit_council_tally_is_unanimous() {
+        let p =
+            VotingParams::from_config_toml("[voting]\naccept = \"council\"\ncouncil = [0, 1]\n")
+                .unwrap();
+        assert_eq!(p.council_tally, CouncilTally::Unanimous);
+    }
+
+    #[test]
+    fn config_toml_council_tally_majority() {
+        let p = VotingParams::from_config_toml(
+            "[voting]\naccept = \"council\"\ncouncil = [0, 1, 2]\ncouncil_tally = \"majority\"\n",
+        )
+        .unwrap();
+        assert_eq!(p.council_tally, CouncilTally::Majority);
+    }
+
+    #[test]
+    fn unknown_council_tally_errors() {
+        let err = VotingParams::from_config_toml(
+            "[voting]\naccept = \"council\"\ncouncil = [0]\ncouncil_tally = \"maybe\"\n",
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("council_tally"), "{err}");
+    }
+
+    #[test]
+    fn council_tally_without_council_accept_errors() {
+        let err =
+            VotingParams::from_config_toml("[voting]\ncouncil_tally = \"majority\"\n").unwrap_err();
+        assert!(err.to_string().contains("council_tally"), "{err}");
     }
 }

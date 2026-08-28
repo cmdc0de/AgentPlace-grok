@@ -30,7 +30,7 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Fish => fish(sim, id),
         PrimaryAction::Farm { species } => farm(sim, id, *species),
         PrimaryAction::Craft { recipe } => craft(sim, id, *recipe),
-        PrimaryAction::Propose { text, rule } => propose(sim, id, text, *rule),
+        PrimaryAction::Propose { text, rule } => propose(sim, id, text, rule.clone()),
         PrimaryAction::Support { proposal_id } => vote(sim, id, *proposal_id, true),
         PrimaryAction::Oppose { proposal_id } => vote(sim, id, *proposal_id, false),
         PrimaryAction::Transfer { item, qty, to } => transfer(sim, id, *item, *qty, *to),
@@ -967,10 +967,21 @@ fn propose(
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if rule.is_some_and(|r| r.is_meta()) && !sim.config.proposals.allow_meta_rules {
+    if rule.as_ref().is_some_and(|r| r.is_meta()) && !sim.config.proposals.allow_meta_rules {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    let rule = match rule {
+        Some(crate::board::StructuredRule::SetCouncil { ids }) => {
+            let ids = crate::board::dedupe_ids(ids);
+            if ids.is_empty() {
+                push(sim, id, SimEventKind::Wait);
+                return;
+            }
+            Some(crate::board::StructuredRule::SetCouncil { ids })
+        }
+        other => other,
+    };
     let pid = sim.board.next_id;
     sim.board.next_id += 1;
     let mut supporters = std::collections::BTreeSet::new();

@@ -20,7 +20,7 @@ impl Default for ProposalStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StructuredRule {
     BanEatSpecies { species: u8 },
     BanGatherSpecies { species: u8 },
@@ -29,18 +29,31 @@ pub enum StructuredRule {
     SetAcceptanceThreshold { milli: u32 },
     SetVoteWeight { weight: VoteWeight },
     SetVoteAccept { accept: VoteAccept },
+    SetCouncil { ids: Vec<AgentId> },
 }
 
 impl StructuredRule {
-    pub fn is_meta(self) -> bool {
+    pub fn is_meta(&self) -> bool {
         matches!(
             self,
             Self::SetProposalLifetime { .. }
                 | Self::SetAcceptanceThreshold { .. }
                 | Self::SetVoteWeight { .. }
                 | Self::SetVoteAccept { .. }
+                | Self::SetCouncil { .. }
         )
     }
+}
+
+pub fn dedupe_ids(ids: impl IntoIterator<Item = AgentId>) -> Vec<AgentId> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for id in ids {
+        if seen.insert(id) {
+            out.push(id);
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,7 +164,7 @@ impl PublicBoard {
                     proposal_id: p.id,
                     tick_accepted: tick,
                     text: p.text.clone(),
-                    rule: p.rule,
+                    rule: p.rule.clone(),
                 });
             } else if no >= need {
                 p.status = ProposalStatus::Rejected;
@@ -184,7 +197,7 @@ impl PublicBoard {
                     proposal_id: p.id,
                     tick_accepted: tick,
                     text: p.text.clone(),
-                    rule: p.rule,
+                    rule: p.rule.clone(),
                 });
             } else if living.iter().any(|id| p.opposers.contains(id)) {
                 p.status = ProposalStatus::Rejected;
@@ -196,21 +209,21 @@ impl PublicBoard {
 
     pub fn blocks_eat(&self, species: u8) -> bool {
         self.adopted.iter().any(|r| {
-            matches!(r.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == species)
+            matches!(&r.rule, Some(StructuredRule::BanEatSpecies { species: s }) if *s == species)
         })
     }
 
     pub fn blocks_gather(&self, species: u8) -> bool {
         self.adopted.iter().any(|r| {
-            matches!(r.rule, Some(StructuredRule::BanGatherSpecies { species: s }) if s == species)
+            matches!(&r.rule, Some(StructuredRule::BanGatherSpecies { species: s }) if *s == species)
         })
     }
 
     pub fn max_gather_per_tick(&self) -> Option<u32> {
         self.adopted
             .iter()
-            .filter_map(|r| match r.rule {
-                Some(StructuredRule::MaxGatherPerTick { n }) => Some(n),
+            .filter_map(|r| match &r.rule {
+                Some(StructuredRule::MaxGatherPerTick { n }) => Some(*n),
                 _ => None,
             })
             .min()
@@ -218,7 +231,7 @@ impl PublicBoard {
 
     pub fn has_open_ban_eat(&self, species: u8) -> bool {
         self.open().any(|p| {
-            matches!(p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if s == species)
+            matches!(&p.rule, Some(StructuredRule::BanEatSpecies { species: s }) if *s == species)
         }) || self.blocks_eat(species)
     }
 }
@@ -251,6 +264,13 @@ fn hash_rule(hasher: &mut impl sha2::Digest, rule: Option<&StructuredRule>) {
         Some(StructuredRule::SetVoteAccept { accept }) => {
             hasher.update([7u8]);
             hasher.update(accept.as_str().as_bytes());
+        }
+        Some(StructuredRule::SetCouncil { ids }) => {
+            hasher.update([8u8]);
+            hasher.update((ids.len() as u32).to_le_bytes());
+            for id in ids {
+                hasher.update(id.0.to_le_bytes());
+            }
         }
     }
 }

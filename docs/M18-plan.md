@@ -1,7 +1,8 @@
 # M18 — Weighted council, SetCouncil meta-rule, jump-to-tick catch-up
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M17 complete (`docs/M17-plan.md`, git tag `M17`, commit `4d7112d`)  
+**Walkthrough:** [`M18-test-plan.md`](M18-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (council / weighted-by-status), `M16-plan.md` (council is unanimous among listed living ids), `M17-plan.md` (`SetVoteAccept` cannot rewrite `council = [...]`), `M14-plan.md` (scrubber loads a `.ckpt` at-or-before T; no jump without a file)
 
 ## Context
@@ -150,7 +151,7 @@ cargo test -p viewer
 
 ## Verification (when implemented)
 
-Walkthrough: `docs/M18-test-plan.md` (written at implement).
+Walkthrough: [`M18-test-plan.md`](M18-test-plan.md).
 
 ```bash
 cargo test -p sim-core

@@ -17,7 +17,7 @@ use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
 use crate::seeding::{RngBank, derive_seed, resolve_seed};
 use crate::timing::{self, AgentTiming, TickTiming};
-use crate::voting::{VoteAccept, VoteWeight, VotingParams};
+use crate::voting::{CouncilTally, VoteAccept, VoteWeight, VotingParams};
 use crate::world::World;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -70,6 +70,7 @@ pub struct Simulation {
     pub meta_threshold_milli: Option<u32>,
     pub meta_vote_weight: Option<VoteWeight>,
     pub meta_vote_accept: Option<VoteAccept>,
+    pub meta_council: Option<Vec<AgentId>>,
     /// Incentive id → agents who already received one-shots.
     pub incentive_oneshot: BTreeMap<String, BTreeSet<AgentId>>,
 }
@@ -126,6 +127,7 @@ impl Simulation {
             meta_threshold_milli: None,
             meta_vote_weight: None,
             meta_vote_accept: None,
+            meta_council: None,
             incentive_oneshot: BTreeMap::new(),
         })
     }
@@ -135,19 +137,23 @@ impl Simulation {
         self.meta_threshold_milli = None;
         self.meta_vote_weight = None;
         self.meta_vote_accept = None;
+        self.meta_council = None;
         for r in &self.board.adopted {
-            match r.rule {
+            match &r.rule {
                 Some(crate::board::StructuredRule::SetProposalLifetime { ticks }) => {
-                    self.meta_lifetime = Some(ticks);
+                    self.meta_lifetime = Some(*ticks);
                 }
                 Some(crate::board::StructuredRule::SetAcceptanceThreshold { milli }) => {
-                    self.meta_threshold_milli = Some(milli.clamp(100, 10_000));
+                    self.meta_threshold_milli = Some((*milli).clamp(100, 10_000));
                 }
                 Some(crate::board::StructuredRule::SetVoteWeight { weight }) => {
-                    self.meta_vote_weight = Some(weight);
+                    self.meta_vote_weight = Some(*weight);
                 }
                 Some(crate::board::StructuredRule::SetVoteAccept { accept }) => {
-                    self.meta_vote_accept = Some(accept);
+                    self.meta_vote_accept = Some(*accept);
+                }
+                Some(crate::board::StructuredRule::SetCouncil { ids }) => {
+                    self.meta_council = Some(ids.clone());
                 }
                 _ => {}
             }
@@ -165,6 +171,12 @@ impl Simulation {
 
     pub fn effective_vote_accept(&self) -> VoteAccept {
         self.meta_vote_accept.unwrap_or(self.voting.accept)
+    }
+
+    pub fn effective_council(&self) -> &[AgentId] {
+        self.meta_council
+            .as_deref()
+            .unwrap_or(self.voting.council.as_slice())
     }
 
     pub fn give_item(
@@ -327,13 +339,37 @@ impl Simulation {
             }
             VoteAccept::Council => {
                 let living: Vec<AgentId> = self
-                    .voting
-                    .council
+                    .effective_council()
                     .iter()
                     .copied()
                     .filter(|id| self.agents.contains_key(id))
                     .collect();
-                self.board.tick_stance_complete(&living, life, tick);
+                match self.voting.council_tally {
+                    CouncilTally::Unanimous => {
+                        self.board.tick_stance_complete(&living, life, tick);
+                    }
+                    CouncilTally::Majority => {
+                        let weights = self.vote_weight_map();
+                        let total: u64 = living
+                            .iter()
+                            .map(|id| weights.get(id).copied().unwrap_or(1))
+                            .sum();
+                        let council: BTreeSet<AgentId> = living.iter().copied().collect();
+                        self.board.tick_lifecycle(
+                            total,
+                            |id| {
+                                if council.contains(&id) {
+                                    weights.get(&id).copied().unwrap_or(1)
+                                } else {
+                                    0
+                                }
+                            },
+                            th,
+                            life,
+                            tick,
+                        );
+                    }
+                }
             }
         }
         let board_ns = timing::ns_since(board0);
