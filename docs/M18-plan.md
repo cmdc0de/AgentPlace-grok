@@ -94,8 +94,9 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | Later | What |
 |---|---|
 | **M19** | Done — [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
-| **M20** | [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
-| After M20 | protobuf/TLS; wire Give; jump-to-tick on the wire |
+| **M20** | Done — [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
+| **M21** | [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
+| After M21 | protobuf/TLS; wire Give; extra LLM reflection/embeddings |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

@@ -86,8 +86,9 @@ Not a protocol feature. On **implement**:
 
 | Later | What |
 |---|---|
-| After M20 | protobuf/TLS; wire Give; jump-to-tick on the wire |
-| Not M20 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
+| **M21** | [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
+| After M21 | protobuf/TLS; wire Give; extra LLM reflection/embeddings |
+| Not M20 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings |
 
 ## Key decisions
 

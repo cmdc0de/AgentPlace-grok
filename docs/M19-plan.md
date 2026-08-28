@@ -91,8 +91,9 @@ Do **not** change shipping `configs/default.toml`.
 
 | Later | What |
 |---|---|
-| **M20** | [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
-| After M20 | protobuf/TLS; wire Give; jump-to-tick on the wire |
+| **M20** | Done — [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
+| **M21** | [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
+| After M21 | protobuf/TLS; wire Give; extra LLM reflection/embeddings |
 | Not M19 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
