@@ -1,7 +1,7 @@
 //! Public proposal board and adopted rules.
 
 use crate::agent::AgentId;
-use crate::voting::{VoteAccept, VoteWeight};
+use crate::voting::{CouncilTally, VoteAccept, VoteWeight};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -30,6 +30,7 @@ pub enum StructuredRule {
     SetVoteWeight { weight: VoteWeight },
     SetVoteAccept { accept: VoteAccept },
     SetCouncil { ids: Vec<AgentId> },
+    SetCouncilTally { tally: CouncilTally },
 }
 
 impl StructuredRule {
@@ -41,6 +42,7 @@ impl StructuredRule {
                 | Self::SetVoteWeight { .. }
                 | Self::SetVoteAccept { .. }
                 | Self::SetCouncil { .. }
+                | Self::SetCouncilTally { .. }
         )
     }
 }
@@ -271,6 +273,10 @@ fn hash_rule(hasher: &mut impl sha2::Digest, rule: Option<&StructuredRule>) {
             for id in ids {
                 hasher.update(id.0.to_le_bytes());
             }
+        }
+        Some(StructuredRule::SetCouncilTally { tally }) => {
+            hasher.update([9u8]);
+            hasher.update(tally.as_str().as_bytes());
         }
     }
 }

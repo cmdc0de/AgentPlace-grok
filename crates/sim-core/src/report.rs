@@ -286,6 +286,9 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
                                 .join(",");
                             format!("SetCouncil([{list}])")
                         }
+                        StructuredRule::SetCouncilTally { tally } => {
+                            format!("SetCouncilTally({})", tally.as_str())
+                        }
                     })
                     .unwrap_or_else(|| "text".into());
                 format!("#{} {kind}: {}", r.proposal_id, r.text)
@@ -323,6 +326,7 @@ fn item_name(item: ItemId, species: &SpeciesTables) -> String {
         ItemId::Basket => "basket".into(),
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
+        ItemId::Backpack => "backpack".into(),
     }
 }
 

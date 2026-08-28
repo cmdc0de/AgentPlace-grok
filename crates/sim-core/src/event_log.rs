@@ -256,6 +256,7 @@ fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
         ItemId::Basket => hasher.update([4u8]),
         ItemId::Spear => hasher.update([5u8]),
         ItemId::FishingRod => hasher.update([6u8]),
+        ItemId::Backpack => hasher.update([7u8]),
     }
 }
 

@@ -957,3 +957,128 @@ fn meta_set_council_roster_then_unanimous() {
     let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
     assert_eq!(p.status, ProposalStatus::Rejected);
 }
+
+#[test]
+fn meta_set_council_tally_waits_when_flag_off() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4050)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "majority council".into(),
+            rule: Some(StructuredRule::SetCouncilTally {
+                tally: CouncilTally::Majority,
+            }),
+        },
+    );
+    assert!(sim.board.proposals.is_empty());
+    assert!(matches!(
+        sim.events.events.last().unwrap().kind,
+        SimEventKind::Wait
+    ));
+}
+
+#[test]
+fn meta_set_council_tally_majority_two_of_three_accepts() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4051)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1), AgentId(2)];
+    sim.voting.council_tally = CouncilTally::Unanimous;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "majority council".into(),
+            rule: Some(StructuredRule::SetCouncilTally {
+                tally: CouncilTally::Majority,
+            }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    support(&mut sim, 2, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    sim.refresh_meta();
+    assert_eq!(sim.effective_council_tally(), CouncilTally::Majority);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    support(&mut sim, 1, 1);
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Accepted);
+}
+
+#[test]
+fn meta_set_council_tally_unanimous_two_of_three_open() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4052)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.voting.accept = VoteAccept::Council;
+    sim.voting.council = vec![AgentId(0), AgentId(1), AgentId(2)];
+    sim.voting.council_tally = CouncilTally::Majority;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "unanimous council".into(),
+            rule: Some(StructuredRule::SetCouncilTally {
+                tally: CouncilTally::Unanimous,
+            }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    support(&mut sim, 1, 1);
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Open);
+}
+
+#[test]
+fn parse_set_council_tally_json() {
+    let sim = Simulation::new(tiny_config(0x4D4053)).unwrap();
+    let obs = observation::build(&sim, AgentId(0));
+    let ok = sim_core::parse_choice_json(
+        r#"{"action":"Propose","text":"tally","rule":{"kind":"set_council_tally","tally":"majority"}}"#,
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    match ok.primary {
+        PrimaryAction::Propose {
+            rule: Some(StructuredRule::SetCouncilTally { tally }),
+            ..
+        } => assert_eq!(tally, CouncilTally::Majority),
+        other => panic!("{other:?}"),
+    }
+    let wait = sim_core::parse_choice_json(
+        r#"{"action":"Propose","text":"tally","rule":{"kind":"set_council_tally","tally":"nope"}}"#,
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    assert!(matches!(wait.primary, PrimaryAction::Wait));
+    let missing = sim_core::parse_choice_json(
+        r#"{"action":"Propose","text":"tally","rule":{"kind":"set_council_tally"}}"#,
+        &obs.legal,
+        &sim.config.world.species,
+    )
+    .unwrap();
+    assert!(matches!(missing.primary, PrimaryAction::Wait));
+}

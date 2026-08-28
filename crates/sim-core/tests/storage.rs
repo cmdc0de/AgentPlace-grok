@@ -644,3 +644,56 @@ fn pack_over_weight_cap_illegal() {
         }
     )));
 }
+
+#[test]
+fn backpack_holds_twelve_basket_holds_eight() {
+    let mut pack = Simulation::new(tiny(0xA118)).unwrap();
+    let mut basket = Simulation::new(tiny(0xA118)).unwrap();
+    let id = AgentId(0);
+    park_on_land(&mut pack, id);
+    park_on_land(&mut basket, id);
+    if let Some(a) = pack.agents.get_mut(&id) {
+        a.inventory.clear();
+        a.try_add_item(ItemId::Backpack, 1);
+        a.try_add_item(ItemId::Food(1), 12);
+        a.needs.energy = pack.config.energy_max_milli();
+    }
+    if let Some(a) = basket.agents.get_mut(&id) {
+        a.inventory.clear();
+        a.try_add_item(ItemId::Basket, 1);
+        a.try_add_item(ItemId::Food(1), 12);
+        a.needs.energy = basket.config.energy_max_milli();
+    }
+    let (bs, bw) = pack.agents.get(&id).unwrap().worn_pack_caps(&pack.storage);
+    assert_eq!(bs, 12);
+    assert_eq!(bw, 4_000);
+    let (ks, kw) = basket
+        .agents
+        .get(&id)
+        .unwrap()
+        .worn_pack_caps(&basket.storage);
+    assert_eq!(ks, 8);
+    assert_eq!(kw, 2_500);
+    for _ in 0..12 {
+        execute_primary(
+            &mut pack,
+            id,
+            &PrimaryAction::Pack {
+                item: ItemId::Food(1),
+                qty: 1,
+            },
+        );
+    }
+    for _ in 0..12 {
+        execute_primary(
+            &mut basket,
+            id,
+            &PrimaryAction::Pack {
+                item: ItemId::Food(1),
+                qty: 1,
+            },
+        );
+    }
+    assert_eq!(pack.agents.get(&id).unwrap().pack_count(), 12);
+    assert_eq!(basket.agents.get(&id).unwrap().pack_count(), 8);
+}

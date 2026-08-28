@@ -559,6 +559,11 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             recipe: Recipe::FishingRod,
         });
     }
+    if can_craft(agent, Recipe::Backpack) {
+        legal.push(PrimaryAction::Craft {
+            recipe: Recipe::Backpack,
+        });
+    }
     if sim.board.author_open_count(agent.id)
         < sim.config.proposals.max_open_proposals_per_agent as usize
     {
@@ -600,7 +605,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if store_seen.contains(&item) {
                 continue;
             }
-            let in_pack = agent.has_basket() && agent.pack.get(&item).copied().unwrap_or(0) > 0;
+            let in_pack = agent.has_pack() && agent.pack.get(&item).copied().unwrap_or(0) > 0;
             let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
             if !in_pack && !in_pockets {
                 continue;
@@ -614,9 +619,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if energy < cost || !cell.can_add(item, 1, &params) {
                 continue;
             }
-            if item == ItemId::Basket
-                && agent.basket_count() <= 1
-                && !can_leave_last_basket(sim, agent, Some((item, 1)))
+            if Agent::is_pack_carrier(item)
+                && ((item == ItemId::Basket && agent.basket_count() <= 1)
+                    || (item == ItemId::Backpack && agent.backpack_count() <= 1))
+                && !can_leave_last_worn(sim, agent, item, Some((item, 1)))
             {
                 continue;
             }
@@ -636,21 +642,14 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
     }
-    if agent.has_basket() {
+    if agent.has_pack() {
+        let (slot_cap, weight_cap) = agent.worn_pack_caps(&params);
         for (item, have) in &agent.inventory {
-            if *have == 0 || *item == ItemId::Basket {
+            if *have == 0 || Agent::is_pack_carrier(*item) {
                 continue;
             }
             let cost = crate::haul::haul_cost_milli(*item, 1, params.pack_haul_milli);
-            if energy >= cost
-                && crate::haul::can_fit(
-                    &agent.pack,
-                    *item,
-                    1,
-                    params.pack_slot_cap,
-                    params.pack_weight_cap_milli,
-                )
-            {
+            if energy >= cost && crate::haul::can_fit(&agent.pack, *item, 1, slot_cap, weight_cap) {
                 legal.push(PrimaryAction::Pack {
                     item: *item,
                     qty: 1,
@@ -704,8 +703,8 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if xfer_seen.contains(&item) {
                 continue;
             }
-            let in_pack = agent.has_basket()
-                && item != ItemId::Basket
+            let in_pack = agent.has_pack()
+                && !Agent::is_pack_carrier(item)
                 && agent.pack.get(&item).copied().unwrap_or(0) > 0;
             let in_pockets = agent.inventory.get(&item).copied().unwrap_or(0) > 0;
             if !in_pack && !in_pockets {
@@ -720,9 +719,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if energy < cost {
                 continue;
             }
-            if item == ItemId::Basket
-                && agent.basket_count() <= 1
-                && !can_leave_last_basket(sim, agent, None)
+            if Agent::is_pack_carrier(item)
+                && ((item == ItemId::Basket && agent.basket_count() <= 1)
+                    || (item == ItemId::Backpack && agent.backpack_count() <= 1))
+                && !can_leave_last_worn(sim, agent, item, None)
             {
                 continue;
             }
@@ -737,12 +737,21 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     legal
 }
 
-fn can_leave_last_basket(
+fn can_leave_last_worn(
     sim: &Simulation,
     agent: &Agent,
+    removing: ItemId,
     crate_reserved: Option<(crate::agent::ItemId, u32)>,
 ) -> bool {
     if agent.pack_count() == 0 {
+        return true;
+    }
+    let still_pack = match removing {
+        ItemId::Basket => agent.backpack_count() > 0 || agent.basket_count() > 1,
+        ItemId::Backpack => agent.basket_count() > 0 || agent.backpack_count() > 1,
+        _ => agent.has_pack(),
+    };
+    if still_pack {
         return true;
     }
     let (_to_pockets, leftover) = agent.split_pack_unload(1);
@@ -761,6 +770,7 @@ pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {
             agent.inventory.get(&ItemId::Wood).copied().unwrap_or(0) >= 1
                 && agent.inventory.get(&ItemId::Fiber).copied().unwrap_or(0) >= 1
         }
+        Recipe::Backpack => agent.inventory.get(&ItemId::Fiber).copied().unwrap_or(0) >= 4,
     }
 }
 
@@ -816,6 +826,7 @@ pub fn item_display_name(item: ItemId, species: &SpeciesTables) -> String {
         ItemId::Basket => "basket".into(),
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
+        ItemId::Backpack => "backpack".into(),
     }
 }
 
@@ -841,6 +852,7 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
                 Recipe::Basket => "basket",
                 Recipe::Spear => "spear",
                 Recipe::FishingRod => "fishing_rod",
+                Recipe::Backpack => "backpack",
             };
             format!("Craft {name}")
         }

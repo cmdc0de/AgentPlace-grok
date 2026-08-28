@@ -102,6 +102,15 @@ pub fn marker_satchel() -> MarkerSpec {
     }
 }
 
+/// Worn Backpack: slightly larger/darker than Basket satchel.
+pub fn marker_backpack() -> MarkerSpec {
+    MarkerSpec {
+        shape: MarkerShape::Cube,
+        rgb: [64, 38, 20],
+        name: "backpack",
+    }
+}
+
 pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
     vec![
         ("land", MarkerShape::Cube, [56, 107, 41]),
@@ -117,6 +126,7 @@ pub fn legend_entries() -> Vec<(&'static str, MarkerShape, [u8; 3])> {
         ("mineral", MarkerShape::Cube, [140, 133, 122]),
         ("stockpile", MarkerShape::Cube, [140, 97, 46]),
         ("satchel", MarkerShape::Cube, [89, 56, 31]),
+        ("backpack", MarkerShape::Cube, [64, 38, 20]),
         ("agent", MarkerShape::Capsule, [180, 80, 160]),
     ]
 }

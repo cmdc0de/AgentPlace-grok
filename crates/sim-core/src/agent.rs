@@ -14,6 +14,7 @@ pub enum ItemId {
     Basket,
     Spear,
     FishingRod,
+    Backpack,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -199,6 +200,33 @@ impl Agent {
         self.inventory.get(&ItemId::Basket).copied().unwrap_or(0)
     }
 
+    pub fn has_backpack(&self) -> bool {
+        self.has_tool(ItemId::Backpack)
+    }
+
+    pub fn backpack_count(&self) -> u32 {
+        self.inventory.get(&ItemId::Backpack).copied().unwrap_or(0)
+    }
+
+    pub fn has_pack(&self) -> bool {
+        self.has_backpack() || self.has_basket()
+    }
+
+    pub fn is_pack_carrier(item: ItemId) -> bool {
+        matches!(item, ItemId::Basket | ItemId::Backpack)
+    }
+
+    pub fn worn_pack_caps(&self, params: &crate::haul::StorageParams) -> (u32, u32) {
+        if self.has_backpack() {
+            (
+                crate::haul::BACKPACK_SLOT_CAP,
+                crate::haul::BACKPACK_WEIGHT_CAP_MILLI,
+            )
+        } else {
+            (params.pack_slot_cap, params.pack_weight_cap_milli)
+        }
+    }
+
     pub fn pack_count(&self) -> u32 {
         crate::haul::map_slot_count(&self.pack)
     }
@@ -212,7 +240,7 @@ impl Agent {
     }
 
     pub fn shows_satchel(&self) -> bool {
-        self.has_basket()
+        self.has_pack()
     }
 
     pub fn try_add_pack(
@@ -221,13 +249,12 @@ impl Agent {
         qty: u32,
         params: &crate::haul::StorageParams,
     ) -> u32 {
-        if qty == 0 || item == ItemId::Basket || !self.has_basket() {
+        if qty == 0 || Self::is_pack_carrier(item) || !self.has_pack() {
             return 0;
         }
-        let room_slots = params.pack_slot_cap.saturating_sub(self.pack_count());
-        let room_w = params
-            .pack_weight_cap_milli
-            .saturating_sub(self.pack_weight_milli());
+        let (slot_cap, weight_cap) = self.worn_pack_caps(params);
+        let room_slots = slot_cap.saturating_sub(self.pack_count());
+        let room_w = weight_cap.saturating_sub(self.pack_weight_milli());
         let unit = crate::haul::item_weight_milli(item);
         let by_weight = if unit == 0 { qty } else { room_w / unit };
         let add = qty.min(room_slots).min(by_weight);
@@ -253,8 +280,8 @@ impl Agent {
 
     /// Prefer pack when it holds `qty`, else pockets. `None` if neither can pay.
     pub fn take_from_pack_or_pockets(&mut self, item: ItemId, qty: u32) -> Option<bool> {
-        if item != ItemId::Basket
-            && self.has_basket()
+        if !Self::is_pack_carrier(item)
+            && self.has_pack()
             && self.pack.get(&item).copied().unwrap_or(0) >= qty
             && self.take_pack(item, qty)
         {
@@ -282,7 +309,10 @@ impl Agent {
 
     pub fn has_carry_room(&self, params: &crate::haul::StorageParams) -> bool {
         self.inventory_count() < self.inventory_cap
-            || (self.has_basket() && self.pack_count() < params.pack_slot_cap)
+            || (self.has_pack() && {
+                let (slot_cap, _) = self.worn_pack_caps(params);
+                self.pack_count() < slot_cap
+            })
     }
 
     /// Split pack contents into pocket-bound vs leftover after `extra_pocket_slots` free up.
@@ -427,6 +457,7 @@ fn item_tag(item: ItemId) -> [u8; 2] {
         ItemId::Basket => [5, 0],
         ItemId::Spear => [6, 0],
         ItemId::FishingRod => [7, 0],
+        ItemId::Backpack => [8, 0],
     }
 }
 

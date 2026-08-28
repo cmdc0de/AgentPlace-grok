@@ -64,6 +64,7 @@ pub enum Recipe {
     Basket,
     Spear,
     FishingRod,
+    Backpack,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

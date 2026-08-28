@@ -144,24 +144,49 @@ impl CkptScrubber {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiCommand {
     Help,
-    Report { dir: Option<String> },
+    Report {
+        dir: Option<String>,
+    },
     Summarize,
-    Save { path: Option<String> },
-    Follow { id: Option<u64> },
+    Save {
+        path: Option<String>,
+    },
+    Follow {
+        id: Option<u64>,
+    },
     Pause,
     Play,
-    Step { n: u32 },
-    Fog { on: Option<bool> },
+    Step {
+        n: u32,
+    },
+    Fog {
+        on: Option<bool>,
+    },
     ToggleLegend,
     ToggleInspector,
     ToggleBoard,
     ToggleLog,
     Tick,
-    Inject { path: Option<String> },
-    Give { id: u64, item: String, qty: u32 },
-    Set { id: u64, field: String, value: u32 },
-    Events { tick: u64 },
-    Scrub { tick: u64 },
+    Inject {
+        path: Option<String>,
+    },
+    Give {
+        id: u64,
+        item: String,
+        qty: u32,
+    },
+    Set {
+        id: u64,
+        field: String,
+        toward: Option<u64>,
+        value: u32,
+    },
+    Events {
+        tick: u64,
+    },
+    Scrub {
+        tick: u64,
+    },
     CkptNext,
     CkptPrev,
 }
@@ -214,10 +239,19 @@ commands:
   /inject PATH     load incentive TOML (needs --allow-control when remote)
   /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
   /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
+  /set ID respect TOWARD N   respect edge 0–100 (in-process)
   /events TICK     filter log to JSONL tick at or before TICK (display-only)
   /scrub TICK      load ckpt at or before TICK, then tick forward to TICK (--load DIR, in-process)
   /ckpt next|prev  adjacent checkpoint in the run directory
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
+}
+
+/// Crate mesh scale: lerp 0.40..1.00 by max(slots/16, weight/80).
+pub fn crate_fill_scale(slots_used: u32, weight_milli: u32) -> f32 {
+    let slot_f = slots_used as f32 / sim_core::haul::SLOT_CAP as f32;
+    let w_f = weight_milli as f32 / sim_core::haul::WEIGHT_CAP_MILLI as f32;
+    let fill = slot_f.max(w_f).clamp(0.0, 1.0);
+    0.40 + 0.60 * fill
 }
 
 pub fn parse_command(line: &str) -> Result<UiCommand, String> {
@@ -303,11 +337,29 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
             let id: u64 = id_s.parse().map_err(|_| format!("bad agent id: {id_s}"))?;
             let field = parts
                 .next()
-                .ok_or("set requires field (hunger|thirst|energy|influence)")?
+                .ok_or("set requires field (hunger|thirst|energy|influence|respect)")?
                 .to_ascii_lowercase();
-            let v = parts.next().ok_or("set requires a value 0–100")?;
-            let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
-            Ok(UiCommand::Set { id, field, value })
+            if field == "respect" {
+                let t = parts.next().ok_or("set respect requires toward agent id")?;
+                let v = parts.next().ok_or("set respect requires toward agent id")?;
+                let toward: u64 = t.parse().map_err(|_| format!("bad toward id: {t}"))?;
+                let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
+                Ok(UiCommand::Set {
+                    id,
+                    field,
+                    toward: Some(toward),
+                    value,
+                })
+            } else {
+                let v = parts.next().ok_or("set requires a value 0–100")?;
+                let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
+                Ok(UiCommand::Set {
+                    id,
+                    field,
+                    toward: None,
+                    value,
+                })
+            }
         }
         other => Err(format!("unknown: /{other}  (try /help)")),
     }
@@ -494,16 +546,36 @@ pub fn run_command(
                 Err(e) => vec![format!("events error: {e}")],
             }
         }
-        UiCommand::Set { id, field, value } => {
+        UiCommand::Set {
+            id,
+            field,
+            toward,
+            value,
+        } => {
             if state.remote {
                 return vec!["set is in-process only (not on the attach wire)".into()];
             }
-            match state
-                .sim
-                .set_display_field(sim_core::AgentId(id), &field, value)
-            {
-                Ok(milli) => vec![format!("set agent {id} {field}={value} ({milli} milli)")],
-                Err(e) => vec![format!("set error: {e}")],
+            if field == "respect" {
+                let Some(toward) = toward else {
+                    return vec!["set respect requires toward agent id".into()];
+                };
+                match state
+                    .sim
+                    .set_respect(sim_core::AgentId(id), sim_core::AgentId(toward), value)
+                {
+                    Ok(milli) => vec![format!(
+                        "set agent {id} respect toward {toward}={value} ({milli} milli)"
+                    )],
+                    Err(e) => vec![format!("set error: {e}")],
+                }
+            } else {
+                match state
+                    .sim
+                    .set_display_field(sim_core::AgentId(id), &field, value)
+                {
+                    Ok(milli) => vec![format!("set agent {id} {field}={value} ({milli} milli)")],
+                    Err(e) => vec![format!("set error: {e}")],
+                }
             }
         }
     }
@@ -702,6 +774,7 @@ mod tests {
             UiCommand::Set {
                 id: 0,
                 field: "hunger".into(),
+                toward: None,
                 value: 50
             }
         );
@@ -727,6 +800,7 @@ mod tests {
             UiCommand::Set {
                 id: 0,
                 field: "hunger".into(),
+                toward: None,
                 value: 10,
             },
             &mut state,
@@ -735,6 +809,70 @@ mod tests {
             &mut CkptScrubber::default(),
         );
         assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+    }
+
+    #[test]
+    fn parse_set_respect() {
+        assert_eq!(
+            parse_command("/set 0 respect 1 50").unwrap(),
+            UiCommand::Set {
+                id: 0,
+                field: "respect".into(),
+                toward: Some(1),
+                value: 50
+            }
+        );
+        assert!(
+            parse_command("/set 0 respect 50")
+                .unwrap_err()
+                .contains("toward"),
+            "missing toward must error"
+        );
+        let mut sim = Simulation::new(default_config_for_tests()).unwrap();
+        let before = sim.state_hash();
+        let milli = sim
+            .set_respect(sim_core::AgentId(0), sim_core::AgentId(1), 50)
+            .unwrap();
+        assert_eq!(milli, 5000);
+        assert_eq!(
+            sim.agents
+                .get(&sim_core::AgentId(0))
+                .unwrap()
+                .relationships
+                .get(&sim_core::AgentId(1))
+                .unwrap()
+                .respect,
+            5000
+        );
+        assert_ne!(before, sim.state_hash());
+        let mut state = SimState {
+            sim,
+            paused: true,
+            follow: None,
+            remote: true,
+        };
+        let msgs = run_command(
+            UiCommand::Set {
+                id: 0,
+                field: "respect".into(),
+                toward: Some(1),
+                value: 10,
+            },
+            &mut state,
+            &mut false,
+            &mut WindowFlags::default(),
+            &mut CkptScrubber::default(),
+        );
+        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+    }
+
+    #[test]
+    fn crate_fill_scale_one_item_smaller_than_full() {
+        let one = crate_fill_scale(1, 50);
+        let full = crate_fill_scale(16, 8_000);
+        assert!(one < full, "{one} vs {full}");
+        assert!((full - 1.0).abs() < f32::EPSILON);
+        assert!((crate_fill_scale(0, 0) - 0.40).abs() < 1e-5);
     }
 
     #[test]

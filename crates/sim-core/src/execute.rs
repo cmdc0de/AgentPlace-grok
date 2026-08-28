@@ -1,5 +1,5 @@
 use crate::action::{PrimaryAction, Recipe};
-use crate::agent::{AgentId, ItemId};
+use crate::agent::{Agent, AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
 use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
 use crate::observation::neighbors4;
@@ -102,7 +102,8 @@ fn source_haul(sim: &Simulation, id: AgentId, item: ItemId) -> u32 {
     let Some(a) = sim.agents.get(&id) else {
         return sim.storage.haul_milli;
     };
-    if item != ItemId::Basket && a.has_basket() && a.pack.get(&item).copied().unwrap_or(0) > 0 {
+    if !Agent::is_pack_carrier(item) && a.has_pack() && a.pack.get(&item).copied().unwrap_or(0) > 0
+    {
         sim.storage.pack_haul_milli
     } else {
         sim.storage.haul_milli
@@ -113,7 +114,11 @@ fn unload_pack_after_last_basket(sim: &mut Simulation, id: AgentId) -> bool {
     let Some(agent) = sim.agents.get(&id) else {
         return false;
     };
-    if agent.has_basket() || agent.pack_count() == 0 {
+    if agent.has_pack() {
+        let (slots, w) = agent.worn_pack_caps(&sim.storage);
+        return agent.pack_count() <= slots && agent.pack_weight_milli() <= w;
+    }
+    if agent.pack_count() == 0 {
         return true;
     }
     let (to_pockets, leftover) = agent.split_pack_unload(0);
@@ -154,25 +159,20 @@ fn unload_pack_after_last_basket(sim: &mut Simulation, id: AgentId) -> bool {
 }
 
 fn pack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
-    if item == ItemId::Basket {
+    if Agent::is_pack_carrier(item) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
-    if !agent.has_basket() || agent.inventory.get(&item).copied().unwrap_or(0) < qty {
+    if !agent.has_pack() || agent.inventory.get(&item).copied().unwrap_or(0) < qty {
         push(sim, id, SimEventKind::Wait);
         return;
     }
     let params = sim.storage;
-    if !crate::haul::can_fit(
-        &agent.pack,
-        item,
-        qty,
-        params.pack_slot_cap,
-        params.pack_weight_cap_milli,
-    ) {
+    let (slot_cap, weight_cap) = agent.worn_pack_caps(&params);
+    if !crate::haul::can_fit(&agent.pack, item, qty, slot_cap, weight_cap) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -200,7 +200,7 @@ fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
-    if !agent.has_basket() || agent.pack.get(&item).copied().unwrap_or(0) < qty {
+    if !agent.has_pack() || agent.pack.get(&item).copied().unwrap_or(0) < qty {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -245,7 +245,10 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if item == ItemId::Basket && sender.basket_count() <= moved {
+    if Agent::is_pack_carrier(item)
+        && ((item == ItemId::Basket && sender.basket_count() <= moved)
+            || (item == ItemId::Backpack && sender.backpack_count() <= moved))
+    {
         let leftover = sender.split_pack_unload(moved).1;
         if !leftover.is_empty()
             && !sim
@@ -271,7 +274,7 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if item == ItemId::Basket && !unload_pack_after_last_basket(sim, id) {
+    if Agent::is_pack_carrier(item) && !unload_pack_after_last_basket(sim, id) {
         if let Some(a) = sim.agents.get_mut(&id) {
             a.try_add_item(item, moved);
         }
@@ -315,7 +318,10 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if item == ItemId::Basket && agent.basket_count() <= qty {
+    if Agent::is_pack_carrier(item)
+        && ((item == ItemId::Basket && agent.basket_count() <= qty)
+            || (item == ItemId::Backpack && agent.backpack_count() <= qty))
+    {
         let leftover = agent.split_pack_unload(qty).1;
         if !sim
             .world
@@ -347,7 +353,7 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if item == ItemId::Basket && !unload_pack_after_last_basket(sim, id) {
+    if Agent::is_pack_carrier(item) && !unload_pack_after_last_basket(sim, id) {
         if let Some(a) = sim.agents.get_mut(&id) {
             a.try_add_item(item, qty);
         }
@@ -892,6 +898,7 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     };
     let (need, out) = match recipe {
         Recipe::Basket => (vec![(ItemId::Fiber, 2)], ItemId::Basket),
+        Recipe::Backpack => (vec![(ItemId::Fiber, 4)], ItemId::Backpack),
         Recipe::Spear => (vec![(ItemId::Wood, 1), (ItemId::Stone, 1)], ItemId::Spear),
         Recipe::FishingRod => (
             vec![(ItemId::Wood, 1), (ItemId::Fiber, 1)],

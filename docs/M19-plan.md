@@ -1,7 +1,8 @@
 # M19 — SetCouncilTally meta-rule, `/set respect`, backpack + crate scale-by-fill
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M18 complete (`docs/M18-plan.md`, git tag `M18`, commit `938fe35`)  
+**Walkthrough:** [`M19-test-plan.md`](M19-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (council / meta-rules), `M18-plan.md` (`council_tally` overlay only), `M16-plan.md` (`/set` deferred respect), `M11-plan.md` (one Basket pack; crate mesh fixed size)
 
 ## Context
@@ -145,7 +146,7 @@ cargo test -p viewer
 
 ## Verification (when implemented)
 
-Walkthrough: `docs/M19-test-plan.md` (written at implement).
+Walkthrough: [`M19-test-plan.md`](M19-test-plan.md).
 
 ```bash
 cargo test -p sim-core

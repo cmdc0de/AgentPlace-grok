@@ -71,6 +71,7 @@ pub struct Simulation {
     pub meta_vote_weight: Option<VoteWeight>,
     pub meta_vote_accept: Option<VoteAccept>,
     pub meta_council: Option<Vec<AgentId>>,
+    pub meta_council_tally: Option<CouncilTally>,
     /// Incentive id → agents who already received one-shots.
     pub incentive_oneshot: BTreeMap<String, BTreeSet<AgentId>>,
 }
@@ -128,6 +129,7 @@ impl Simulation {
             meta_vote_weight: None,
             meta_vote_accept: None,
             meta_council: None,
+            meta_council_tally: None,
             incentive_oneshot: BTreeMap::new(),
         })
     }
@@ -138,6 +140,7 @@ impl Simulation {
         self.meta_vote_weight = None;
         self.meta_vote_accept = None;
         self.meta_council = None;
+        self.meta_council_tally = None;
         for r in &self.board.adopted {
             match &r.rule {
                 Some(crate::board::StructuredRule::SetProposalLifetime { ticks }) => {
@@ -154,6 +157,9 @@ impl Simulation {
                 }
                 Some(crate::board::StructuredRule::SetCouncil { ids }) => {
                     self.meta_council = Some(ids.clone());
+                }
+                Some(crate::board::StructuredRule::SetCouncilTally { tally }) => {
+                    self.meta_council_tally = Some(*tally);
                 }
                 _ => {}
             }
@@ -177,6 +183,10 @@ impl Simulation {
         self.meta_council
             .as_deref()
             .unwrap_or(self.voting.council.as_slice())
+    }
+
+    pub fn effective_council_tally(&self) -> CouncilTally {
+        self.meta_council_tally.unwrap_or(self.voting.council_tally)
     }
 
     pub fn give_item(
@@ -218,10 +228,32 @@ impl Simulation {
             "influence" => agent.influence_factor = milli,
             other => {
                 return Err(SimError::Config(format!(
-                    "unknown set field {other:?} (use hunger, thirst, energy, or influence)"
+                    "unknown set field {other:?} (use hunger, thirst, energy, influence, or respect)"
                 )));
             }
         }
+        Ok(milli)
+    }
+
+    /// Display 0–100 → millipoints `N * 100` on the `id → toward` respect edge.
+    pub fn set_respect(
+        &mut self,
+        id: crate::agent::AgentId,
+        toward: crate::agent::AgentId,
+        display: u32,
+    ) -> Result<u32, SimError> {
+        let milli = display.saturating_mul(100).min(10_000);
+        if !self.agents.contains_key(&id) {
+            return Err(SimError::Config(format!("no agent {}", id.0)));
+        }
+        if !self.agents.contains_key(&toward) {
+            return Err(SimError::Config(format!("no agent {}", toward.0)));
+        }
+        let Some(agent) = self.agents.get_mut(&id) else {
+            return Err(SimError::Config(format!("no agent {}", id.0)));
+        };
+        let row = agent.relationships.entry(toward).or_default();
+        row.respect = milli as i16;
         Ok(milli)
     }
 
@@ -344,7 +376,7 @@ impl Simulation {
                     .copied()
                     .filter(|id| self.agents.contains_key(id))
                     .collect();
-                match self.voting.council_tally {
+                match self.effective_council_tally() {
                     CouncilTally::Unanimous => {
                         self.board.tick_stance_complete(&living, life, tick);
                     }

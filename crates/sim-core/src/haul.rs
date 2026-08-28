@@ -14,6 +14,10 @@ pub const HAUL_MILLI: u32 = 40;
 pub const PACK_SLOT_CAP: u32 = 8;
 /// Pack weight cap (25.0 display).
 pub const PACK_WEIGHT_CAP_MILLI: u32 = 2_500;
+/// Worn Backpack: 12 slots.
+pub const BACKPACK_SLOT_CAP: u32 = 12;
+/// Backpack weight cap (40.0 display).
+pub const BACKPACK_WEIGHT_CAP_MILLI: u32 = 4_000;
 /// Pack haul multiplier 0.1 display → millipoints.
 pub const PACK_HAUL_MILLI: u32 = 10;
 /// Move step factor ≈ 0.05 display per cell.
@@ -62,7 +66,7 @@ pub fn item_weight_milli(item: ItemId) -> u32 {
         ItemId::Fiber => 40,
         ItemId::Wood => 150,
         ItemId::Stone => 300,
-        ItemId::Basket | ItemId::Spear | ItemId::FishingRod => 200,
+        ItemId::Basket | ItemId::Spear | ItemId::FishingRod | ItemId::Backpack => 200,
     }
 }
 

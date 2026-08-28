@@ -170,6 +170,8 @@ struct RuleJson {
     accept: Option<String>,
     #[serde(default)]
     council: Option<Vec<u64>>,
+    #[serde(default)]
+    tally: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -231,6 +233,7 @@ pub fn parse_choice_json(
                 .unwrap_or("spear");
             let recipe = match recipe {
                 "basket" => Recipe::Basket,
+                "backpack" => Recipe::Backpack,
                 "fishing_rod" | "rod" => Recipe::FishingRod,
                 _ => Recipe::Spear,
             };
@@ -398,6 +401,14 @@ fn parse_rule(r: &RuleJson, species: &SpeciesTables) -> Option<crate::board::Str
             }
             Some(crate::board::StructuredRule::SetCouncil { ids })
         }
+        "setcounciltally" | "set_council_tally" => {
+            let raw = r.tally.as_deref()?.trim();
+            if raw.is_empty() {
+                return None;
+            }
+            let t = crate::voting::CouncilTally::parse(raw).ok()?;
+            Some(crate::board::StructuredRule::SetCouncilTally { tally: t })
+        }
         _ => None,
     }
 }
@@ -426,6 +437,7 @@ pub fn parse_item(s: &str, species: &SpeciesTables) -> Option<ItemId> {
         "fiber" => Some(ItemId::Fiber),
         "stone" => Some(ItemId::Stone),
         "basket" => Some(ItemId::Basket),
+        "backpack" => Some(ItemId::Backpack),
         "spear" => Some(ItemId::Spear),
         "fishing_rod" => Some(ItemId::FishingRod),
         "hare" | "meat" => Some(ItemId::Food(100)),

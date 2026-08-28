@@ -4,7 +4,7 @@ mod render;
 mod ui;
 
 use bevy::prelude::*;
-use commands::CkptScrubber;
+use commands::{CkptScrubber, crate_fill_scale};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
 use sim_bevy::{SimPlugin, SimState, step_once};
@@ -44,6 +44,7 @@ struct StockpileVisual {
 #[derive(Component)]
 struct SatchelVisual {
     id: AgentId,
+    backpack: bool,
 }
 
 const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
@@ -276,6 +277,7 @@ fn setup_scene(
                     world,
                     x,
                     y,
+                    stockpile_scale(world, x, y),
                 );
             }
             if world.has_mineral(x, y) {
@@ -317,6 +319,7 @@ fn setup_scene(
                 agent.id,
                 agent.x,
                 agent.y,
+                agent.has_backpack(),
             );
         }
     }
@@ -347,6 +350,7 @@ fn spawn_stockpile(
     world: &sim_core::World,
     x: u32,
     y: u32,
+    scale: f32,
 ) {
     let spec = markers::marker_stockpile();
     let pos = resource_world_pos(world, x, y, 0.28);
@@ -367,11 +371,18 @@ fn spawn_stockpile(
     commands.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(mat),
-        Transform::from_translation(pos),
+        Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
         WorldMarker { x, y },
         StockpileVisual { x, y },
         Visibility::default(),
     ));
+}
+
+fn stockpile_scale(world: &sim_core::World, x: u32, y: u32) -> f32 {
+    match world.stockpile_at(x, y) {
+        Some(c) => crate_fill_scale(c.slot_count(), c.weight_milli()),
+        None => 0.40,
+    }
 }
 
 fn sync_stockpile_markers(
@@ -379,7 +390,7 @@ fn sync_stockpile_markers(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     state: Res<SimState>,
-    existing: Query<(Entity, &StockpileVisual)>,
+    mut existing: Query<(Entity, &StockpileVisual, &mut Transform)>,
 ) {
     let live: std::collections::BTreeSet<(u32, u32)> = state
         .sim
@@ -390,10 +401,13 @@ fn sync_stockpile_markers(
         .map(|(k, _)| *k)
         .collect();
     let have: std::collections::BTreeSet<(u32, u32)> =
-        existing.iter().map(|(_, v)| (v.x, v.y)).collect();
-    for (e, v) in existing.iter() {
+        existing.iter().map(|(_, v, _)| (v.x, v.y)).collect();
+    for (e, v, mut tf) in existing.iter_mut() {
         if !live.contains(&(v.x, v.y)) {
             commands.entity(e).despawn();
+        } else {
+            let s = stockpile_scale(&state.sim.world, v.x, v.y);
+            tf.scale = Vec3::splat(s);
         }
     }
     let mut cache = std::collections::HashMap::new();
@@ -409,6 +423,7 @@ fn sync_stockpile_markers(
             &state.sim.world,
             x,
             y,
+            stockpile_scale(&state.sim.world, x, y),
         );
     }
 }
@@ -421,8 +436,13 @@ fn spawn_satchel(
     id: AgentId,
     x: u32,
     y: u32,
+    backpack: bool,
 ) {
-    let spec = markers::marker_satchel();
+    let spec = if backpack {
+        markers::marker_backpack()
+    } else {
+        markers::marker_satchel()
+    };
     let [r, g, b] = markers::rgb_f32(spec.rgb);
     let mat = materials.add(StandardMaterial {
         base_color: Color::srgb(r, g, b),
@@ -430,11 +450,16 @@ fn spawn_satchel(
         ..default()
     });
     let pos = agent_world_pos(world, x, y) + SATCHEL_OFFSET;
+    let size = if backpack {
+        Cuboid::new(0.22, 0.26, 0.16)
+    } else {
+        Cuboid::new(0.16, 0.18, 0.12)
+    };
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(0.16, 0.18, 0.12))),
+        Mesh3d(meshes.add(size)),
         MeshMaterial3d(mat),
         Transform::from_translation(pos),
-        SatchelVisual { id },
+        SatchelVisual { id, backpack },
         Visibility::default(),
     ));
 }
@@ -446,21 +471,23 @@ fn sync_satchel_markers(
     state: Res<SimState>,
     existing: Query<(Entity, &SatchelVisual)>,
 ) {
-    let live: std::collections::BTreeSet<AgentId> = state
+    let live: std::collections::BTreeMap<AgentId, bool> = state
         .sim
         .agents
         .values()
         .filter(|a| a.shows_satchel())
-        .map(|a| a.id)
+        .map(|a| (a.id, a.has_backpack()))
         .collect();
-    let have: std::collections::BTreeSet<AgentId> = existing.iter().map(|(_, v)| v.id).collect();
+    let have: std::collections::BTreeMap<AgentId, bool> =
+        existing.iter().map(|(_, v)| (v.id, v.backpack)).collect();
     for (e, v) in existing.iter() {
-        if !live.contains(&v.id) {
+        let mismatch = live.get(&v.id).copied() != Some(v.backpack);
+        if !live.contains_key(&v.id) || mismatch {
             commands.entity(e).despawn();
         }
     }
-    for id in live {
-        if have.contains(&id) {
+    for (id, backpack) in live {
+        if have.get(&id) == Some(&backpack) {
             continue;
         }
         let Some(agent) = state.sim.agents.get(&id) else {
@@ -474,6 +501,7 @@ fn sync_satchel_markers(
             id,
             agent.x,
             agent.y,
+            backpack,
         );
     }
 }
