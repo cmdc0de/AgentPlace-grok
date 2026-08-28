@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M18 are done (tag `M18`). **Current next slice:** [`M19-plan.md`](M19-plan.md) (SetCouncilTally, `/set respect`, backpack + crate scale-by-fill). Later work is listed at the bottom of that file.
+M3–M19 are done (tag `M19`). **Current next slice:** [`M20-plan.md`](M20-plan.md) (revert relationship_delta on leave, stacked worn packs, attach safety net). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

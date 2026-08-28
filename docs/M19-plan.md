@@ -91,7 +91,8 @@ Do **not** change shipping `configs/default.toml`.
 
 | Later | What |
 |---|---|
-| After M19 | protobuf/TLS; wire Give; revert relationship_delta on leave; jump-to-tick on the wire; two worn packs at once |
+| **M20** | [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
+| After M20 | protobuf/TLS; wire Give; jump-to-tick on the wire |
 | Not M19 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
