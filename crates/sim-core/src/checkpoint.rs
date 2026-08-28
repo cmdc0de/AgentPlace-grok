@@ -227,10 +227,20 @@ impl Simulation {
             events: self.events.events.clone(),
             public_board: board_to_wire(self),
             active_incentives: IncentiveState {
-                entries: if self.incentive_toml.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![self.incentive_toml.clone()]
+                entries: {
+                    let mut e = Vec::new();
+                    if !self.incentive_toml.is_empty() || !self.incentive_oneshot.is_empty() {
+                        e.push(self.incentive_toml.clone());
+                    }
+                    if !self.incentive_oneshot.is_empty() {
+                        let map: BTreeMap<String, Vec<u64>> = self
+                            .incentive_oneshot
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.iter().map(|id| id.0).collect()))
+                            .collect();
+                        e.push(serde_json::to_string(&map).unwrap_or_default());
+                    }
+                    e
                 },
             },
             metrics: MetricsState::default(),
@@ -274,7 +284,7 @@ impl Simulation {
             crate::incentive::IncentiveSchedule::from_toml_str(&incentive_toml).unwrap_or_default()
         };
         let incentive_active = crate::incentive::reconstruct_active(&body.events);
-        Ok(Self {
+        let mut sim = Self {
             config,
             tick: body.tick,
             world: body.world,
@@ -294,7 +304,32 @@ impl Simulation {
             last_tick_timing: None,
             storage: crate::haul::StorageParams::default(),
             voting: crate::voting::VotingParams::default(),
-        })
+            meta_lifetime: None,
+            meta_threshold_milli: None,
+            meta_vote_weight: None,
+            meta_vote_accept: None,
+            incentive_oneshot: BTreeMap::new(),
+        };
+        if let Some(raw) = body.active_incentives.entries.get(1) {
+            if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {
+                sim.incentive_oneshot = map
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into_iter().map(crate::agent::AgentId).collect()))
+                    .collect();
+            }
+        } else {
+            for inc in &sim.incentives.incentives.clone() {
+                if sim.incentive_active.contains(&inc.id) {
+                    let ids: std::collections::BTreeSet<_> =
+                        crate::incentive::scoped_ids(&sim, inc)
+                            .into_iter()
+                            .collect();
+                    sim.incentive_oneshot.insert(inc.id.clone(), ids);
+                }
+            }
+        }
+        sim.refresh_meta();
+        Ok(sim)
     }
 
     pub fn encode_checkpoint(&self) -> Result<Vec<u8>, SimError> {

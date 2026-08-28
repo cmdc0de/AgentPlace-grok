@@ -265,6 +265,18 @@ pub fn build_report(sim: &Simulation) -> Result<SummaryReport, SimError> {
                         StructuredRule::MaxGatherPerTick { n } => {
                             format!("MaxGatherPerTick({n})")
                         }
+                        StructuredRule::SetProposalLifetime { ticks } => {
+                            format!("SetProposalLifetime({ticks})")
+                        }
+                        StructuredRule::SetAcceptanceThreshold { milli } => {
+                            format!("SetAcceptanceThreshold({milli})")
+                        }
+                        StructuredRule::SetVoteWeight { weight } => {
+                            format!("SetVoteWeight({})", weight.as_str())
+                        }
+                        StructuredRule::SetVoteAccept { accept } => {
+                            format!("SetVoteAccept({})", accept.as_str())
+                        }
                     })
                     .unwrap_or_else(|| "text".into());
                 format!("#{} {kind}: {}", r.proposal_id, r.text)

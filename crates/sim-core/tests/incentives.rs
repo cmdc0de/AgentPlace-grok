@@ -337,6 +337,91 @@ applies_to = "supporters_of:nope"
     assert!(s.contains("applies_to") || s.contains("config"), "{s}");
 }
 
+const ONESHOT: &str = r#"
+[[incentives]]
+id = "coalition_boost"
+applies_to = "supporters_of:proposal_0"
+[[incentives.effects]]
+type = "goal_injection"
+goal_text = "back the coalition"
+scope = "personal"
+priority = 0.8
+[[incentives.effects]]
+type = "influence_factor_delta"
+delta = 0.15
+"#;
+
+#[test]
+fn supporters_of_join_gets_oneshots_leave_reverts_influence() {
+    let mut sim = Simulation::new(tiny(0x8030)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim.config.proposals.default_acceptance_threshold = 1.0;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "do not eat mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    sim.inject_schedule_toml(ONESHOT).unwrap();
+    sim.run_ticks(1);
+    let base = sim.config.influence_milli();
+    let g0 = sim
+        .agents
+        .get(&AgentId(0))
+        .unwrap()
+        .goals
+        .iter()
+        .any(|g| g.text == "back the coalition");
+    assert!(g0);
+    assert_eq!(
+        sim.agents.get(&AgentId(0)).unwrap().influence_factor,
+        base + 15
+    );
+    assert!(
+        !sim.agents
+            .get(&AgentId(1))
+            .unwrap()
+            .goals
+            .iter()
+            .any(|g| g.text == "back the coalition")
+    );
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(1),
+        &PrimaryAction::Support { proposal_id: 0 },
+    );
+    sim.run_ticks(1);
+    assert!(
+        sim.agents
+            .get(&AgentId(1))
+            .unwrap()
+            .goals
+            .iter()
+            .any(|g| g.text == "back the coalition")
+    );
+    assert_eq!(
+        sim.agents.get(&AgentId(1)).unwrap().influence_factor,
+        base + 15
+    );
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(1),
+        &PrimaryAction::Oppose { proposal_id: 0 },
+    );
+    sim.run_ticks(1);
+    assert_eq!(sim.agents.get(&AgentId(1)).unwrap().influence_factor, base);
+    assert!(
+        sim.agents
+            .get(&AgentId(1))
+            .unwrap()
+            .goals
+            .iter()
+            .any(|g| g.text == "back the coalition")
+    );
+}
+
 #[test]
 fn coalition_same_seed_same_hash() {
     let cfg = tiny(0x8022);

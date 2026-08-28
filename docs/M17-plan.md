@@ -1,7 +1,8 @@
 # M17 — Meta-rules, join/leave one-shots, event-log timeline
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M16 complete (`docs/M16-plan.md`, git tag `M16`, commit `e530b48`)  
+**Walkthrough:** [`M17-test-plan.md`](M17-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` §2 (meta-rules), `incentive-schedule-format.md` (one-shots at start), `M14-plan.md` (`supporters_of`), `M6-plan.md` / `M14-plan.md` (viewer log / ckpt scrubber), `M9-plan.md` (Spark `--llm ollama`)
 
 ## Context
@@ -128,6 +129,8 @@ cargo test -p viewer
 ```
 
 ## Verification (when implemented)
+
+Walkthrough: [`M17-test-plan.md`](M17-test-plan.md).
 
 ```bash
 cargo test -p sim-core

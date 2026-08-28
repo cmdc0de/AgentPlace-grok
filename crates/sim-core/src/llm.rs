@@ -160,6 +160,14 @@ struct RuleJson {
     species: Option<serde_json::Value>,
     #[serde(default)]
     n: Option<u32>,
+    #[serde(default)]
+    ticks: Option<u64>,
+    #[serde(default)]
+    milli: Option<u32>,
+    #[serde(default)]
+    weight: Option<String>,
+    #[serde(default)]
+    accept: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -356,6 +364,23 @@ fn parse_rule(r: &RuleJson, species: &SpeciesTables) -> Option<crate::board::Str
         "maxgatherpertick" | "max_gather" => Some(crate::board::StructuredRule::MaxGatherPerTick {
             n: r.n.unwrap_or(1),
         }),
+        "setproposallifetime" | "set_lifetime" => {
+            Some(crate::board::StructuredRule::SetProposalLifetime {
+                ticks: r.ticks.or_else(|| r.n.map(u64::from)).unwrap_or(0),
+            })
+        }
+        "setacceptancethreshold" | "set_threshold" => {
+            let milli = r.milli.or(r.n).unwrap_or(5000).clamp(100, 10_000);
+            Some(crate::board::StructuredRule::SetAcceptanceThreshold { milli })
+        }
+        "setvoteweight" | "set_vote_weight" => {
+            let w = crate::voting::VoteWeight::parse(r.weight.as_deref().unwrap_or("")).ok()?;
+            Some(crate::board::StructuredRule::SetVoteWeight { weight: w })
+        }
+        "setvoteaccept" | "set_vote_accept" => {
+            let a = crate::voting::VoteAccept::parse(r.accept.as_deref().unwrap_or("")).ok()?;
+            Some(crate::board::StructuredRule::SetVoteAccept { accept: a })
+        }
         _ => None,
     }
 }

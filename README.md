@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M16** (`docs/M16-plan.md`). Walkthrough: [`docs/M16-test-plan.md`](docs/M16-test-plan.md).
+Deterministic multi-agent simulation. Current slice: **M17** (`docs/M17-plan.md`). Walkthrough: [`docs/M17-test-plan.md`](docs/M17-test-plan.md).
 
 Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md).
 
@@ -96,7 +96,7 @@ cargo test -p sim-cli --test net
 cargo test -p sim-cli --test ab
 ```
 
-Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Replay JSONL stores raw model text; `{"__llm_wait__":true}` re-emits `LlmWait`. Researcher walkthrough: [`docs/M16-test-plan.md`](docs/M16-test-plan.md). Plan: [`docs/M16-plan.md`](docs/M16-plan.md).
+Optional live LLM (not required for CI). Default `base_url` is `http://spark-bcce.hlab:11434`, model `nemotron3:33b` (`timeout_ms = 120000`). Empty `base_url` ⇒ mock (no invented host). Mid-run HTTP failure is `Wait`, not mock. Replay JSONL stores raw model text; `{"__llm_wait__":true}` re-emits `LlmWait`. Researcher walkthrough: [`docs/M17-test-plan.md`](docs/M17-test-plan.md). Plan: [`docs/M17-plan.md`](docs/M17-plan.md). Overlay `[proposals] allow_meta_rules = true` lets Accepted structured rules set lifetime, threshold, or vote weight/accept. `supporters_of` one-shots follow join/leave (influence reverts on leave). Viewer `/events TICK` filters `{id}_events.jsonl` without loading a ckpt.
 
 Shared land-cell **crates** (slot 16, weight 80): `Store` / `Retrieve` / `Transfer` cost energy ∝ item weight (pack source is cheaper, haul 0.1 vs 0.4). **Basket** is a worn backpack (8 slots, weight 25); `Pack` / `Unpack`; Move pays cargo (`loose × 0.4 × 0.05 + pack × 0.1 × 0.05`). Viewer: brown crate on the cell; darker satchel on the capsule when a Basket is held. `/give ID ITEM QTY` in-process only (hash-sensitive). Mock + coop storage goal **Gathers then Stores** (Eat only below 50% hunger while that goal is on).
 

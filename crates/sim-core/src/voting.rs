@@ -4,7 +4,7 @@ use crate::agent::AgentId;
 use crate::error::SimError;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum VoteWeight {
     #[default]
     Equal,
@@ -33,7 +33,7 @@ impl VoteWeight {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum VoteAccept {
     #[default]
     Majority,

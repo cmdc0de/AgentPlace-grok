@@ -39,7 +39,10 @@ pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, lo
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};
 pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;
-pub use event_log::{SimEvent, SimEventKind};
+pub use event_log::{
+    SimEvent, SimEventKind, find_events_jsonl, jsonl_lines_for_tick, jsonl_tick_at_or_before,
+    list_jsonl_ticks,
+};
 pub use haul::StorageParams;
 pub use incentive::{Incentive, IncentiveSchedule, IncentiveVisibility};
 pub use llm::{

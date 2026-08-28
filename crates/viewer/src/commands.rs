@@ -4,8 +4,9 @@ use bevy::prelude::Resource;
 use shared::protocol::ControlVerb;
 use sim_bevy::{SimState, step_once};
 use sim_core::{
-    AgentId, ExperimentConfig, Simulation, ckpt_at_or_before, list_checkpoints, summary_markdown,
-    write_report, write_run_checkpoint,
+    AgentId, ExperimentConfig, Simulation, ckpt_at_or_before, find_events_jsonl,
+    jsonl_tick_at_or_before, list_checkpoints, list_jsonl_ticks, summary_markdown, write_report,
+    write_run_checkpoint,
 };
 use std::path::{Path, PathBuf};
 
@@ -14,6 +15,9 @@ pub struct CkptScrubber {
     pub dir: Option<PathBuf>,
     pub ticks: Vec<(u64, PathBuf)>,
     pub loaded_tick: Option<u64>,
+    pub events_path: Option<PathBuf>,
+    pub event_ticks: Vec<u64>,
+    pub event_tick: Option<u64>,
 }
 
 impl CkptScrubber {
@@ -33,17 +37,43 @@ impl CkptScrubber {
         } else {
             ticks.last().map(|(t, _)| *t)
         };
+        let events_path = find_events_jsonl(&dir);
+        let event_ticks = events_path
+            .as_ref()
+            .and_then(|p| list_jsonl_ticks(p).ok())
+            .unwrap_or_default();
+        let event_tick = event_ticks.last().copied();
         Self {
             dir: Some(dir),
             ticks,
             loaded_tick,
+            events_path,
+            event_ticks,
+            event_tick,
         }
     }
 
     pub fn refresh(&mut self) {
         if let Some(dir) = &self.dir {
             self.ticks = list_checkpoints(dir).unwrap_or_default();
+            self.events_path = find_events_jsonl(dir);
+            self.event_ticks = self
+                .events_path
+                .as_ref()
+                .and_then(|p| list_jsonl_ticks(p).ok())
+                .unwrap_or_default();
         }
+    }
+
+    pub fn filter_events(&mut self, want: u64) -> Result<u64, String> {
+        self.refresh();
+        if self.events_path.is_none() {
+            return Err("no *_events.jsonl in this directory".into());
+        }
+        let t = jsonl_tick_at_or_before(&self.event_ticks, want)
+            .ok_or_else(|| format!("no event lines at or before tick {want}"))?;
+        self.event_tick = Some(t);
+        Ok(t)
     }
 
     pub fn apply(&mut self, state: &mut SimState, want: u64) -> Result<u64, String> {
@@ -128,6 +158,7 @@ pub enum UiCommand {
     Inject { path: Option<String> },
     Give { id: u64, item: String, qty: u32 },
     Set { id: u64, field: String, value: u32 },
+    Events { tick: u64 },
     Scrub { tick: u64 },
     CkptNext,
     CkptPrev,
@@ -181,6 +212,7 @@ commands:
   /inject PATH     load incentive TOML (needs --allow-control when remote)
   /give ID ITEM QTY   in-process only; hash-sensitive (berry_bush, wood, …)
   /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
+  /events TICK     filter log to JSONL tick at or before TICK (display-only)
   /scrub TICK      load ckpt at or before TICK (--load DIR, in-process)
   /ckpt next|prev  adjacent checkpoint in the run directory
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
@@ -234,6 +266,11 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
         "inject" => Ok(UiCommand::Inject {
             path: arg.map(|s| s.to_string()),
         }),
+        "events" => {
+            let t = arg.ok_or("events requires a tick")?;
+            let tick: u64 = t.parse().map_err(|_| format!("bad tick: {t}"))?;
+            Ok(UiCommand::Events { tick })
+        }
         "scrub" => {
             let t = arg.ok_or("scrub requires a tick")?;
             let tick: u64 = t.parse().map_err(|_| format!("bad tick: {t}"))?;
@@ -446,6 +483,15 @@ pub fn run_command(
                 Err(e) => vec![format!("ckpt error: {e}")],
             }
         }
+        UiCommand::Events { tick } => {
+            if state.remote {
+                return vec!["events timeline is in-process only (not on the attach wire)".into()];
+            }
+            match scrub.filter_events(tick) {
+                Ok(t) => vec![format!("events tick {t}")],
+                Err(e) => vec![format!("events error: {e}")],
+            }
+        }
         UiCommand::Set { id, field, value } => {
             if state.remote {
                 return vec!["set is in-process only (not on the attach wire)".into()];
@@ -513,6 +559,7 @@ mod tests {
         assert!(text.contains("/inject"));
         assert!(text.contains("/give"));
         assert!(text.contains("/set"));
+        assert!(text.contains("/events"));
         assert!(text.contains("/scrub"));
         assert!(text.contains("/ckpt"));
     }
@@ -588,6 +635,25 @@ mod tests {
             &mut scrub,
         );
         assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_events() {
+        assert_eq!(
+            parse_command("/events 40").unwrap(),
+            UiCommand::Events { tick: 40 }
+        );
+        let dir = std::env::temp_dir().join(format!("m17-ev-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("run_events.jsonl"),
+            "{\"tick\":10}\n{\"tick\":40}\n{\"tick\":80}\n",
+        )
+        .unwrap();
+        let mut scrub = CkptScrubber::discover(&dir);
+        assert_eq!(scrub.filter_events(50).unwrap(), 40);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

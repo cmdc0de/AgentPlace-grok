@@ -1,6 +1,8 @@
 use crate::action::Recipe;
 use crate::agent::{AgentId, ItemId};
+use crate::error::SimError;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SimEventKind {
@@ -315,6 +317,47 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::Pack { .. } => "pack",
         SimEventKind::Unpack { .. } => "unpack",
     }
+}
+
+pub fn jsonl_line_tick(line: &str) -> Option<u64> {
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    v.get("tick")?.as_u64()
+}
+
+pub fn list_jsonl_ticks(path: impl AsRef<Path>) -> Result<Vec<u64>, SimError> {
+    let text = std::fs::read_to_string(path)?;
+    let mut ticks: Vec<u64> = text.lines().filter_map(jsonl_line_tick).collect();
+    ticks.sort_unstable();
+    ticks.dedup();
+    Ok(ticks)
+}
+
+pub fn jsonl_tick_at_or_before(ticks: &[u64], want: u64) -> Option<u64> {
+    ticks.iter().copied().filter(|t| *t <= want).next_back()
+}
+
+pub fn find_events_jsonl(dir: impl AsRef<Path>) -> Option<PathBuf> {
+    let dir = dir.as_ref();
+    let mut found: Vec<PathBuf> = Vec::new();
+    let entries = std::fs::read_dir(dir).ok()?;
+    for e in entries.flatten() {
+        let p = e.path();
+        let name = p.file_name()?.to_str()?;
+        if name.ends_with("_events.jsonl") {
+            found.push(p);
+        }
+    }
+    found.sort();
+    found.pop()
+}
+
+pub fn jsonl_lines_for_tick(path: impl AsRef<Path>, tick: u64) -> Result<Vec<String>, SimError> {
+    let text = std::fs::read_to_string(path)?;
+    Ok(text
+        .lines()
+        .filter(|l| jsonl_line_tick(l) == Some(tick))
+        .map(str::to_string)
+        .collect())
 }
 
 pub fn is_primary_kind(kind: &SimEventKind) -> bool {

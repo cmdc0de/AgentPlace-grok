@@ -137,7 +137,7 @@ pub fn imgui_ui(
         draw_board(imgui_ui, &state, &mut ui.windows.board);
     }
     if ui.windows.log {
-        draw_logs(imgui_ui, &state, &mut ui);
+        draw_logs(imgui_ui, &state, &mut ui, &mut scrub);
     }
     if ui.windows.world {
         draw_world(imgui_ui, &state, &mut ui.windows.world);
@@ -585,7 +585,7 @@ fn draw_board(ui: &Ui, state: &SimState, open: &mut bool) {
         });
 }
 
-fn draw_logs(ui: &Ui, state: &SimState, us: &mut UiState) {
+fn draw_logs(ui: &Ui, state: &SimState, us: &mut UiState, scrub: &mut CkptScrubber) {
     ui.window("Logs")
         .opened(&mut us.windows.log)
         .size([420.0, 300.0], Condition::FirstUseEver)
@@ -595,10 +595,44 @@ fn draw_logs(ui: &Ui, state: &SimState, us: &mut UiState) {
                 .build();
             ui.input_text("filter kind", &mut us.event_filter_kind)
                 .build();
+            if !state.remote && !scrub.event_ticks.is_empty() {
+                let lo = *scrub.event_ticks.first().unwrap_or(&0) as i32;
+                let hi = *scrub.event_ticks.last().unwrap_or(&0) as i32;
+                let mut want = scrub.event_tick.unwrap_or(hi as u64) as i32;
+                ui.text(format!(
+                    "jsonl tick {}  {} ticks",
+                    scrub
+                        .event_tick
+                        .map(|t| t.to_string())
+                        .unwrap_or_else(|| "-".into()),
+                    scrub.event_ticks.len()
+                ));
+                if lo < hi && ui.slider("event tick", lo, hi, &mut want) {
+                    let _ = scrub.filter_events(want as u64);
+                }
+            }
             ui.separator();
             ui.text("events");
             let filter_id = us.event_filter_agent.parse::<u64>().ok();
             let kind_f = us.event_filter_kind.to_ascii_lowercase();
+            if !state.remote {
+                if let (Some(path), Some(tick)) = (&scrub.events_path, scrub.event_tick) {
+                    if let Ok(lines) = sim_core::jsonl_lines_for_tick(path, tick) {
+                        for line in lines.iter().rev().take(EVENT_CAP) {
+                            ui.text_wrapped(line);
+                        }
+                        ui.separator();
+                        ui.text("decisions (recent ticks)");
+                        for (tick, recs) in us.decision_ring.iter().rev() {
+                            ui.text(format!("tick {tick}"));
+                            for d in recs {
+                                ui.text(format!("  a{} {}", d.agent, d.policy_branch));
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
             let events = &state.sim.events.events;
             let start = events.len().saturating_sub(EVENT_CAP);
             for e in events.iter().skip(start).rev() {

@@ -967,6 +967,10 @@ fn propose(
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    if rule.is_some_and(|r| r.is_meta()) && !sim.config.proposals.allow_meta_rules {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
     let pid = sim.board.next_id;
     sim.board.next_id += 1;
     let mut supporters = std::collections::BTreeSet::new();

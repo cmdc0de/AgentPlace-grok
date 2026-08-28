@@ -675,3 +675,100 @@ fn identified_agent_has_last_action() {
         .expect("identified neighbor");
     assert_eq!(other.last_action.as_deref(), Some("wait"));
 }
+
+fn three_agent_meta(master_seed: u64) -> ExperimentConfig {
+    let toml = format!(
+        r#"
+master_seed = {master_seed}
+[simulation]
+max_ticks = 10000
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 3
+[proposals]
+default_acceptance_threshold = 0.5
+allow_meta_rules = true
+"#
+    );
+    ExperimentConfig::from_toml_str(&toml).unwrap()
+}
+
+#[test]
+fn meta_propose_waits_when_flag_off() {
+    let mut sim = Simulation::new(three_agent_config(0x4D4030)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "lower threshold".into(),
+            rule: Some(StructuredRule::SetAcceptanceThreshold { milli: 1000 }),
+        },
+    );
+    assert!(sim.board.proposals.is_empty());
+    assert!(matches!(
+        sim.events.events.last().unwrap().kind,
+        SimEventKind::Wait
+    ));
+}
+
+#[test]
+fn meta_threshold_lets_one_of_three_accept() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4031)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "lower threshold".into(),
+            rule: Some(StructuredRule::SetAcceptanceThreshold { milli: 1000 }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Accepted);
+}
+
+#[test]
+fn meta_unanimous_one_of_three_stays_open() {
+    let mut sim = Simulation::new(three_agent_meta(0x4D4032)).unwrap();
+    sim.chooser = sim_core::Chooser::Wait;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "require unanimity".into(),
+            rule: Some(StructuredRule::SetVoteAccept {
+                accept: VoteAccept::Unanimous,
+            }),
+        },
+    );
+    support(&mut sim, 1, 0);
+    sim.tick();
+    assert_eq!(sim.board.proposals[0].status, ProposalStatus::Accepted);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::Propose {
+            text: "ban mushroom".into(),
+            rule: Some(StructuredRule::BanEatSpecies { species: 3 }),
+        },
+    );
+    sim.tick();
+    let p = sim.board.proposals.iter().find(|p| p.id == 1).unwrap();
+    assert_eq!(p.status, ProposalStatus::Open);
+}

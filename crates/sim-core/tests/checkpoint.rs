@@ -1,6 +1,7 @@
 use sim_core::{
     CHECKPOINT_FORMAT_VERSION, CHECKPOINT_MAGIC, ExperimentConfig, Simulation, ckpt_at_or_before,
-    decode_checkpoint, encode_checkpoint, list_checkpoints, write_run_checkpoint,
+    decode_checkpoint, encode_checkpoint, jsonl_tick_at_or_before, list_checkpoints,
+    list_jsonl_ticks, write_run_checkpoint,
 };
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
@@ -150,5 +151,20 @@ fn ckpt_at_or_before_picks_latest_not_after() {
     );
     let p = ckpt_at_or_before(&dir, 5).unwrap();
     assert!(p.is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn jsonl_ticks_at_or_before() {
+    let dir = std::env::temp_dir().join(format!("agentplace-m17-jsonl-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("run_events.jsonl");
+    std::fs::write(&path, "{\"tick\":10}\n{\"tick\":40}\n{\"tick\":80}\n").unwrap();
+    let ticks = list_jsonl_ticks(&path).unwrap();
+    assert_eq!(ticks, vec![10, 40, 80]);
+    assert_eq!(jsonl_tick_at_or_before(&ticks, 50), Some(40));
+    assert_eq!(jsonl_tick_at_or_before(&ticks, 80), Some(80));
+    assert_eq!(jsonl_tick_at_or_before(&ticks, 5), None);
     let _ = std::fs::remove_dir_all(&dir);
 }

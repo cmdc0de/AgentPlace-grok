@@ -1,6 +1,7 @@
 //! Public proposal board and adopted rules.
 
 use crate::agent::AgentId;
+use crate::voting::{VoteAccept, VoteWeight};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -24,6 +25,22 @@ pub enum StructuredRule {
     BanEatSpecies { species: u8 },
     BanGatherSpecies { species: u8 },
     MaxGatherPerTick { n: u32 },
+    SetProposalLifetime { ticks: u64 },
+    SetAcceptanceThreshold { milli: u32 },
+    SetVoteWeight { weight: VoteWeight },
+    SetVoteAccept { accept: VoteAccept },
+}
+
+impl StructuredRule {
+    pub fn is_meta(self) -> bool {
+        matches!(
+            self,
+            Self::SetProposalLifetime { .. }
+                | Self::SetAcceptanceThreshold { .. }
+                | Self::SetVoteWeight { .. }
+                | Self::SetVoteAccept { .. }
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +235,22 @@ fn hash_rule(hasher: &mut impl sha2::Digest, rule: Option<&StructuredRule>) {
         Some(StructuredRule::MaxGatherPerTick { n }) => {
             hasher.update([3u8]);
             hasher.update(n.to_le_bytes());
+        }
+        Some(StructuredRule::SetProposalLifetime { ticks }) => {
+            hasher.update([4u8]);
+            hasher.update(ticks.to_le_bytes());
+        }
+        Some(StructuredRule::SetAcceptanceThreshold { milli }) => {
+            hasher.update([5u8]);
+            hasher.update(milli.to_le_bytes());
+        }
+        Some(StructuredRule::SetVoteWeight { weight }) => {
+            hasher.update([6u8]);
+            hasher.update(weight.as_str().as_bytes());
+        }
+        Some(StructuredRule::SetVoteAccept { accept }) => {
+            hasher.update([7u8]);
+            hasher.update(accept.as_str().as_bytes());
         }
     }
 }

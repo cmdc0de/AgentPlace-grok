@@ -213,7 +213,7 @@ pub fn in_scope(sim: &Simulation, inc: &Incentive, id: AgentId) -> bool {
     false
 }
 
-fn scoped_ids(sim: &Simulation, inc: &Incentive) -> Vec<AgentId> {
+pub(crate) fn scoped_ids(sim: &Simulation, inc: &Incentive) -> Vec<AgentId> {
     sim.agents
         .keys()
         .copied()
@@ -222,7 +222,11 @@ fn scoped_ids(sim: &Simulation, inc: &Incentive) -> Vec<AgentId> {
 }
 
 pub fn proposal_threshold(sim: &Simulation) -> f64 {
-    let mut th = sim.config.proposals.default_acceptance_threshold;
+    let mut th = if let Some(m) = sim.meta_threshold_milli {
+        m as f64 / 10_000.0
+    } else {
+        sim.config.proposals.default_acceptance_threshold
+    };
     for inc in &sim.incentives.incentives {
         if !sim.incentive_active.contains(&inc.id) {
             continue;
@@ -326,6 +330,7 @@ pub fn sync(sim: &mut Simulation) {
             start_incentive(sim, inc);
         }
     }
+    sync_oneshot_membership(sim);
 }
 
 fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
@@ -339,11 +344,17 @@ fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
         },
     });
     let ids = scoped_ids(sim, inc);
+    apply_oneshots(sim, inc, &ids, true);
+    sim.incentive_oneshot
+        .insert(inc.id.clone(), ids.into_iter().collect());
+}
+
+fn apply_oneshots(sim: &mut Simulation, inc: &Incentive, ids: &[AgentId], expand_public: bool) {
     for e in &inc.effects {
         match e {
             EffectSpec::InfluenceFactorDelta { delta } => {
                 let d = (*delta * 100.0).round() as i32;
-                for id in &ids {
+                for id in ids {
                     if let Some(a) = sim.agents.get_mut(id) {
                         let v = a.influence_factor as i32 + d;
                         a.influence_factor = v.clamp(0, 10_000) as u32;
@@ -358,10 +369,10 @@ fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
                 let prio = (*priority * 100.0).round().clamp(0.0, 100.0) as u8;
                 let public = scope.eq_ignore_ascii_case("public");
                 let cap = sim.config.agents.goals.max_personal_goals as usize;
-                let targets: Vec<AgentId> = if public {
+                let targets: Vec<AgentId> = if expand_public && public {
                     sim.agents.keys().copied().collect()
                 } else {
-                    ids.clone()
+                    ids.to_vec()
                 };
                 for id in targets {
                     let Some(a) = sim.agents.get_mut(&id) else {
@@ -409,6 +420,7 @@ fn start_incentive(sim: &mut Simulation, inc: &Incentive) {
                 let da = (*affinity * 100.0).round() as i16;
                 let dr = (*respect * 100.0).round() as i16;
                 let toward_id = parse_toward(toward).ok().flatten();
+                let ids = ids.to_vec();
                 let others: Vec<AgentId> = if let Some(t) = toward_id {
                     if sim.agents.contains_key(&t) {
                         vec![t]
@@ -465,6 +477,41 @@ fn end_incentive(sim: &mut Simulation, id: &str) {
                 }
             }
         }
+    }
+    sim.incentive_oneshot.remove(id);
+}
+
+fn revert_influence(sim: &mut Simulation, inc: &Incentive, ids: &[AgentId]) {
+    for e in &inc.effects {
+        if let EffectSpec::InfluenceFactorDelta { delta } = e {
+            let d = (*delta * 100.0).round() as i32;
+            for aid in ids {
+                if let Some(a) = sim.agents.get_mut(aid) {
+                    let v = a.influence_factor as i32 - d;
+                    a.influence_factor = v.clamp(0, 10_000) as u32;
+                }
+            }
+        }
+    }
+}
+
+fn sync_oneshot_membership(sim: &mut Simulation) {
+    let list = sim.incentives.incentives.clone();
+    for inc in &list {
+        if !sim.incentive_active.contains(&inc.id) {
+            continue;
+        }
+        let current: BTreeSet<AgentId> = scoped_ids(sim, inc).into_iter().collect();
+        let done = sim
+            .incentive_oneshot
+            .get(&inc.id)
+            .cloned()
+            .unwrap_or_default();
+        let joined: Vec<AgentId> = current.difference(&done).copied().collect();
+        let left: Vec<AgentId> = done.difference(&current).copied().collect();
+        apply_oneshots(sim, inc, &joined, false);
+        revert_influence(sim, inc, &left);
+        sim.incentive_oneshot.insert(inc.id.clone(), current);
     }
 }
 

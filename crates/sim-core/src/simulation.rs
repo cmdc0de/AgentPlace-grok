@@ -65,6 +65,13 @@ pub struct Simulation {
     pub storage: StorageParams,
     /// Overlay. Not in ExperimentConfig postcard.
     pub voting: VotingParams,
+    /// Runtime meta-rule overrides (from adopted rules). Not ExperimentConfig.
+    pub meta_lifetime: Option<u64>,
+    pub meta_threshold_milli: Option<u32>,
+    pub meta_vote_weight: Option<VoteWeight>,
+    pub meta_vote_accept: Option<VoteAccept>,
+    /// Incentive id → agents who already received one-shots.
+    pub incentive_oneshot: BTreeMap<String, BTreeSet<AgentId>>,
 }
 
 impl Simulation {
@@ -115,7 +122,49 @@ impl Simulation {
             last_tick_timing: None,
             storage: StorageParams::default(),
             voting: VotingParams::default(),
+            meta_lifetime: None,
+            meta_threshold_milli: None,
+            meta_vote_weight: None,
+            meta_vote_accept: None,
+            incentive_oneshot: BTreeMap::new(),
         })
+    }
+
+    pub fn refresh_meta(&mut self) {
+        self.meta_lifetime = None;
+        self.meta_threshold_milli = None;
+        self.meta_vote_weight = None;
+        self.meta_vote_accept = None;
+        for r in &self.board.adopted {
+            match r.rule {
+                Some(crate::board::StructuredRule::SetProposalLifetime { ticks }) => {
+                    self.meta_lifetime = Some(ticks);
+                }
+                Some(crate::board::StructuredRule::SetAcceptanceThreshold { milli }) => {
+                    self.meta_threshold_milli = Some(milli.clamp(100, 10_000));
+                }
+                Some(crate::board::StructuredRule::SetVoteWeight { weight }) => {
+                    self.meta_vote_weight = Some(weight);
+                }
+                Some(crate::board::StructuredRule::SetVoteAccept { accept }) => {
+                    self.meta_vote_accept = Some(accept);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn effective_lifetime(&self) -> u64 {
+        self.meta_lifetime
+            .unwrap_or(self.config.proposals.proposal_lifetime_ticks)
+    }
+
+    pub fn effective_vote_weight(&self) -> VoteWeight {
+        self.meta_vote_weight.unwrap_or(self.voting.weight)
+    }
+
+    pub fn effective_vote_accept(&self) -> VoteAccept {
+        self.meta_vote_accept.unwrap_or(self.voting.accept)
     }
 
     pub fn give_item(
@@ -176,7 +225,7 @@ impl Simulation {
     }
 
     pub fn vote_weight_of(&self, id: AgentId) -> u64 {
-        match self.voting.weight {
+        match self.effective_vote_weight() {
             VoteWeight::Equal => 1,
             VoteWeight::Influence => self
                 .agents
@@ -256,10 +305,11 @@ impl Simulation {
         self.reap_dead();
         let world_ns = timing::ns_since(world0);
         let board0 = Instant::now();
+        self.refresh_meta();
         let th = incentive::proposal_threshold(self);
-        let life = self.config.proposals.proposal_lifetime_ticks;
+        let life = self.effective_lifetime();
         let tick = self.tick;
-        match self.voting.accept {
+        match self.effective_vote_accept() {
             VoteAccept::Majority => {
                 let weights = self.vote_weight_map();
                 let total: u64 = weights.values().copied().sum();
