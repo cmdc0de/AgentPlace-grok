@@ -76,7 +76,8 @@ Do **not** add extra LLM call types. Mid-run HTTP failure stays `Wait`.
 
 | Later | What |
 |---|---|
-| After M17 | protobuf/TLS; wire Give; weighted council; `/set respect`; jump-to-tick without a file; meta-rule council membership; revert relationship_delta on leave |
+| **M18** | [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| After M18 | protobuf/TLS; wire Give; `/set respect`; revert relationship_delta on leave; meta-rule `council_tally`; jump-to-tick on the wire |
 | Not M17 | Browser; combat; CI Win/mac; extra LLM reflection; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

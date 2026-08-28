@@ -99,8 +99,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M14** | Done — [`M14-plan.md`](M14-plan.md) — coalition targeting + checkpoint scrubber |
 | **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
 | **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
-| **M17** | [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
-| After M17 | Protobuf/TLS; wire Give; LLM reflection-on-evict |
+| **M17** | Done — [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
+| **M18** | [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| After M18 | Protobuf/TLS; wire Give; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions
