@@ -1,0 +1,69 @@
+---
+name: implement-m
+description: >
+  Implement the current AgentPlace-grok milestone from docs/M{N}-plan.md: code
+  the in-scope items, write docs/M{N}-test-plan.md, run the mock tests you can,
+  and retarget README, INDEX, and plan status to implemented. Do not spec the
+  next slice or tag unless asked. Use when the user says “implement M18”,
+  “ok implement”, “deliver M17”, /implement-m, or “implement the plan”.
+---
+
+# Implement the current milestone
+
+Code + walkthrough for **what `docs/M{N}-plan.md` already locked**. Not `/spec`, not tag unless asked.
+
+If the user has not numbered N, N = the INDEX row **Planned — next**. Stop if that plan file is missing (run `/spec` first) or if status is already `implemented`.
+
+Honor standing constraints in `.grok/skills/spec/SKILL.md` unless this plan picked a bump (wire/ckpt, shipping `default.toml` / `coop.toml`, new `ControlVerb`).
+
+## Step 1 — Read the plan
+
+Read `docs/M{N}-plan.md` end to end. Implement **In scope** only. **Out of scope** stays later. The plan wins on timing vs long-term specs. Follow its Risks (postcard enum append, double-apply on `--load`, protocol bump).
+
+Work order = the plan’s PR sections, in one working tree (not separate git PRs unless they ask).
+
+## Step 2 — Code
+
+- Match locked TOML/CLI/overlay syntax, who/when, and hash effects.
+- Create `configs/` files the plan **named**. Do not invent extra overlays. Do not change shipping `configs/default.toml` or `configs/incentives/coop.toml` unless that is the slice.
+- Postcard enums: **append only** (new variants at the end). Overlay TOML is not `ExperimentConfig` postcard.
+- Tests for every row in the plan’s Tests table. `cargo test -- --exact NAME` takes **one** name. Integration: `--test governance` (or `incentives`, `checkpoint`, …). Unit: `--lib path::tests::…`.
+- Default mock hashes match pre-M{N} unless this slice changes defaults.
+- CI `provider = mock`; `cargo test` never needs the network.
+
+## Step 3 — Walkthrough + run
+
+Write `docs/M{N}-test-plan.md` in the recent shape:
+
+- Title `M{N} test plan — see each new feature`; link the plan; `--exact` gotcha; **Success for the slice** paragraph (`format_version` / `PROTOCOL_VERSION` as locked).
+- §0 safety net (`cargo test -p sim-core`, plus `-p viewer` / `-p sim-cli` if this slice touched them).
+- One numbered section per in-scope item: exact `cargo test` lines, success table, `sim-cli` / viewer commands a researcher can **read**.
+- Live/overnight recipes as copy-paste commands. **Do not run** them unless the user asked.
+- Next-slice line: `M{N+1}-plan.md` if it exists, else later work at the bottom of `M{N}-plan.md`.
+
+Run the mock/CLI steps you can. If a test fails, **fix the code** (do not paper over it in the walkthrough). Viewer/imgui bits that cannot run headless: document as viewer-not-automated.
+
+## Step 4 — Retarget docs
+
+| Place | Change |
+|---|---|
+| `docs/M{N}-plan.md` | Status: `implemented`; add **Walkthrough** link to `M{N}-test-plan.md` |
+| `README.md` | Current slice **M{N}** + walkthrough (spec left this on M{N-1}) |
+| `docs/00-INDEX-AND-HANDOFF.md` | M{N} **Done (tag `M{N}`)** + walkthrough; file-list row for `M{N}-test-plan.md`; suggested next = M{N} implemented, later work at the bottom of `M{N}-plan.md` |
+| Spec `Current slice:` banners | already `M{N}-plan.md` from `/spec`; leave |
+| Later-tables | leave; `/spec` for M{N+1} marks M{N} Done |
+| `docs/incentive-schedule-format.md` | only if this slice changed the shipping format |
+
+Do not invent `docs/M{N+1}-plan.md`.
+
+## Step 5 — Stop
+
+Summarize what shipped and which walkthrough sections were **not** run (live Spark, imgui). Offer commit / push / tag. Do not `/spec` the next slice.
+
+## Commit / tag (if they ask)
+
+```
+Deliver M{N}: <short slice name>.
+```
+
+Annotated git tag `M{N}` on that deliver commit **only** if they asked to tag. Docs-only `/spec` commits are never tagged `M{N}`.
