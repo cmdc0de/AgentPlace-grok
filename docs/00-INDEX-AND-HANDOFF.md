@@ -37,7 +37,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M19** | Done (tag `M19`) | [`M19-plan.md`](M19-plan.md), walkthrough [`M19-test-plan.md`](M19-test-plan.md) | SetCouncilTally meta-rule, `/set respect`, backpack + crate scale-by-fill |
 | **M20** | Done (tag `M20`) | [`M20-plan.md`](M20-plan.md), walkthrough [`M20-test-plan.md`](M20-test-plan.md) | Revert relationship_delta on leave, stacked worn packs, attach safety net |
 | **M21** | Done (tag `M21`) | [`M21-plan.md`](M21-plan.md), walkthrough [`M21-test-plan.md`](M21-test-plan.md) | Pack fill scale, sim-cli --connect, jump-to-tick on the wire |
-| After M21 | Not started | listed at the bottom of `M21-plan.md` | protobuf/TLS, wire Give |
+| **M22** | Planned — next | [`M22-plan.md`](M22-plan.md) | Wire Give, remote /ckpt and /events |
+| After M22 | Not started | listed at the bottom of `M22-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -86,15 +87,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 25b | `M20-test-plan.md` | M20 walkthrough (relationship leave/end, stacked packs, attach net) |
 | 26 | `M21-plan.md` | Milestone 21 (done, tag `M21`): pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | 26b | `M21-test-plan.md` | M21 walkthrough (pack fill, `--connect`, remote `/scrub`) |
+| 27 | `M22-plan.md` | Milestone 22 (planned): wire Give, remote /ckpt and /events |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M21-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M22-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M21 is implemented; later work is listed at the bottom of `M21-plan.md`. Do not expand into items it defers (protobuf/TLS, wire Give).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M22 is planned, not implemented; do not expand into items it defers (protobuf/TLS).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -122,14 +124,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M21 are done (tag `M21`). Later work is listed at the bottom of [`M21-plan.md`](M21-plan.md).
+M1–M21 are done (tag `M21`). **Next:** [`M22-plan.md`](M22-plan.md) (planned, not implemented). Later work is listed at the bottom of that file.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M21-plan.md.
-M21 is implemented (pack fill scale; sim-cli --connect; jump-to-tick on
-the wire, PROTOCOL_VERSION=3). Later work is at the bottom of that file.
-Do not add protobuf, TLS, or wire Give. CI stays provider=mock with no
-network.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M22-plan.md.
+M22 is planned (wire Give; remote /ckpt and /events; PROTOCOL_VERSION=4).
+Do not implement until asked. Do not add protobuf or TLS. CI stays
+provider=mock with no network.
 ```
 
 ---

@@ -103,8 +103,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M18** | Done — [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
 | **M19** | Done — [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
 | **M20** | Done — [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
-| **M21** | [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
-| After M21 | Protobuf/TLS; wire Give; LLM reflection-on-evict |
+| **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
+| **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
+| After M22 | Protobuf/TLS; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

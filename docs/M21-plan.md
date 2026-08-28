@@ -82,8 +82,9 @@ Server apply (host owns the sim):
 
 | Later | What |
 |---|---|
-| After M21 | protobuf/TLS; wire Give; extra LLM reflection/embeddings |
-| Not M21 | Browser; combat; CI Win/mac; Unix sockets; `/ckpt` `/events` on the wire |
+| **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
+| After M22 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets |
+| Not M21 | Browser; combat; CI Win/mac; Unix sockets |
 
 ## Key decisions
 
