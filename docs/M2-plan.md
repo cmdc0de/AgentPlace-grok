@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M17 are done (tag `M17`). **Current next slice:** [`M18-plan.md`](M18-plan.md) (weighted council, SetCouncil meta-rule, jump-to-tick catch-up). Later work is listed at the bottom of that file.
+M3–M18 are done (tag `M18`). **Current next slice:** [`M19-plan.md`](M19-plan.md) (SetCouncilTally, `/set respect`, backpack + crate scale-by-fill). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

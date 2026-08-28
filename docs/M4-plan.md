@@ -93,7 +93,8 @@ Writes `{experiment_id}_tick_{tick}_report.md` and optional `{experiment_id}_tic
 | **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
 | **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
 | **M17** | Done — [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
-| **M18** | [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| **M18** | Done — [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| **M19** | [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
 | Later | Attack/Flee, dialects, lie detection |
 
 Do not pull incentives into M4. The A/B loop needs a working board and a readable food report first.

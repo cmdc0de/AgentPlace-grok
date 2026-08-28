@@ -93,8 +93,9 @@ cost = qty * unit_weight_milli * haul_milli / 1000
 | **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
 | **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
 | **M17** | Done — [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
-| **M18** | [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
-| After M18 | Protobuf / JSON envelope; TLS/`wss`; wire Give; reflection-on-evict; embeddings; mesh scale-by-fill |
+| **M18** | Done — [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| **M19** | [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
+| After M19 | Protobuf / JSON envelope; TLS/`wss`; wire Give; reflection-on-evict; embeddings |
 | Not M10 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

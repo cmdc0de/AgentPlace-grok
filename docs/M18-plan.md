@@ -93,7 +93,8 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 
 | Later | What |
 |---|---|
-| After M18 | protobuf/TLS; wire Give; `/set respect`; revert relationship_delta on leave; meta-rule `council_tally`; jump-to-tick on the wire |
+| **M19** | [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
+| After M19 | protobuf/TLS; wire Give; revert relationship_delta on leave; jump-to-tick on the wire |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

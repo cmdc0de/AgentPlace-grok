@@ -74,7 +74,8 @@ Server → Client:
 | **M15** | Done — [`M15-plan.md`](M15-plan.md) — opt-in respect-weighted votes |
 | **M16** | Done — [`M16-plan.md`](M16-plan.md) — council/unanimous, `/set`, range-limited board |
 | **M17** | Done — [`M17-plan.md`](M17-plan.md) — meta-rules, join/leave one-shots, event JSONL timeline |
-| **M18** | [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| **M18** | Done — [`M18-plan.md`](M18-plan.md) — weighted council, SetCouncil meta-rule, jump-to-tick catch-up |
+| **M19** | [`M19-plan.md`](M19-plan.md) — SetCouncilTally, `/set respect`, backpack + crate scale-by-fill |
 | Later | TLS / `wss`, Unix sockets, multiple exclusive writers, delta compression, browser client, wire Give |
 
 Do **not** implement payoff/influence stubs that would change hashes.
