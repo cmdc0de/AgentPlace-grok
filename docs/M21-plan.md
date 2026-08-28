@@ -1,7 +1,8 @@
 # M21 — Pack fill scale, sim-cli --connect, jump-to-tick on the wire
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M20 complete (`docs/M20-plan.md`, git tag `M20`, commit `bc78e2d`)  
+**Walkthrough:** [`M21-test-plan.md`](M21-test-plan.md)  
 **Specs:** `M19-plan.md` (crate scale-by-fill; satchel/backpack do not scale), `M7-plan.md` (`sim-cli --connect` log tail deferred), `M18-plan.md` (in-process `/scrub`; remote refuses)
 
 ## Context
@@ -136,9 +137,9 @@ cargo run -p sim-cli -- --connect tcp://127.0.0.1:9000
 # viewer --connect: /scrub 50  (server must have --allow-control)
 ```
 
-## Verification (when implemented)
+## Verification
 
-Walkthrough: `docs/M21-test-plan.md` (written at implement).
+Walkthrough: [`M21-test-plan.md`](M21-test-plan.md).
 
 ```bash
 cargo test -p sim-core

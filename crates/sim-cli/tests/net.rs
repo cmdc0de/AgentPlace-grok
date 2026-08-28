@@ -3,6 +3,7 @@
 use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage, hello};
 use shared::transport::Connection;
+use sim_core::Simulation;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -308,7 +309,7 @@ fn control_pause_with_flag() {
 
 #[test]
 fn protocol_version_constant() {
-    assert_eq!(PROTOCOL_VERSION, 2);
+    assert_eq!(PROTOCOL_VERSION, 3);
 }
 
 #[test]
@@ -390,4 +391,219 @@ fn ws_loopback_hello_snapshot() {
     }
     let _ = conn.close();
     let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_log_tail_hash_neutral() {
+    let no = Command::new(bin())
+        .args([
+            "--config",
+            config().to_str().unwrap(),
+            "--ticks",
+            "40",
+            "--llm",
+            "mock",
+            "--quiet",
+        ])
+        .output()
+        .expect("run without listen");
+    assert!(
+        no.status.success(),
+        "{}",
+        String::from_utf8_lossy(&no.stderr)
+    );
+    let hash_a = parse_hash(&String::from_utf8_lossy(&no.stdout));
+
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let client = Command::new(bin())
+        .args(["--connect", &url, "--quiet"])
+        .output()
+        .expect("connect");
+    assert!(
+        client.status.success(),
+        "connect failed: {}\n{}",
+        String::from_utf8_lossy(&client.stderr),
+        String::from_utf8_lossy(&client.stdout)
+    );
+    let cout = String::from_utf8_lossy(&client.stdout);
+    assert!(cout.contains("welcome"), "{cout}");
+    assert!(cout.contains("snapshot ok"), "{cout}");
+    assert!(cout.contains("tick="), "{cout}");
+    let hash_b = wait_hash(&mut child, out_h, err_h);
+    assert_eq!(hash_a, hash_b, "--connect must not change state_hash");
+}
+
+#[test]
+fn listen_and_connect_is_error() {
+    let out = Command::new(bin())
+        .args([
+            "--listen",
+            "tcp://127.0.0.1:0",
+            "--connect",
+            "tcp://127.0.0.1:9",
+        ])
+        .output()
+        .expect("run");
+    assert!(!out.status.success());
+    let err = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(err.contains("listen") && err.contains("connect"), "{err}");
+}
+
+#[test]
+fn hello_v2_against_v3_is_protocol_error() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let mut conn = Connection::connect(&url).expect("connect");
+    conn.send_msg(&ClientMessage::Hello {
+        protocol_version: 2,
+        token: None,
+    })
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::Protocol,
+            message,
+        } => assert!(message.contains("2"), "{message}"),
+        other => panic!("expected Protocol error, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn scrub_without_allow_control_is_disabled() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Scrub(4)))
+        .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::ControlDisabled,
+            ..
+        } => {}
+        other => panic!("expected ControlDisabled, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn scrub_forward_from_live() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Pause))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("expected Snapshot, got {snap:?}");
+    };
+    let mut local = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    let start = local.tick;
+    let want = start + 2;
+    while local.tick < want {
+        assert!(local.tick());
+    }
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Scrub(want)))
+        .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert!(markdown_or_path.contains("scrubbed"), "{markdown_or_path}");
+        }
+        other => panic!("expected ReportReady, got {other:?}"),
+    }
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap2: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap2 else {
+        panic!("expected Snapshot, got {snap2:?}");
+    };
+    let remote = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(remote.tick, want);
+    assert_eq!(remote.state_hash(), local.state_hash());
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Scrub(want)))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap3: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap3 else {
+        panic!("expected Snapshot");
+    };
+    let again = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(again.state_hash(), remote.state_hash());
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn scrub_reload_from_ckpt() {
+    let dir = std::env::temp_dir().join(format!("m21-scrub-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir_s = dir.to_str().unwrap().to_string();
+    let (mut child, url, out_h, err_h) = spawn_listen(&[
+        "--allow-control",
+        "--out-dir",
+        &dir_s,
+        "--checkpoint-every",
+        "2",
+    ]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Pause))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Step(4)))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let at4: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = at4 else {
+        panic!("expected Snapshot");
+    };
+    let live = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert!(live.tick >= 4, "tick {}", live.tick);
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Scrub(2)))
+        .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match &msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert!(markdown_or_path.contains("scrubbed"), "{markdown_or_path}");
+        }
+        other => panic!("expected ReportReady, got {other:?}"),
+    }
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let back: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = back else {
+        panic!("expected Snapshot, got {back:?}");
+    };
+    let rewound = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(rewound.tick, 2);
+    let ckpt = dir
+        .read_dir()
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.contains("_tick_2.ckpt"))
+        })
+        .expect("tick 2 ckpt");
+    let file = Simulation::load_checkpoint(&ckpt).unwrap();
+    assert_eq!(rewound.state_hash(), file.state_hash());
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+    let _ = std::fs::remove_dir_all(&dir);
 }

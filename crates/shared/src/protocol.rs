@@ -29,6 +29,7 @@ pub enum ControlVerb {
     Save,
     Report,
     Summarize,
+    Scrub(u64),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -172,6 +173,7 @@ mod tests {
         });
         round_trip_client(ClientMessage::RequestSnapshot);
         round_trip_client(ClientMessage::Control(ControlVerb::Step(3)));
+        round_trip_client(ClientMessage::Control(ControlVerb::Scrub(50)));
         round_trip_client(ClientMessage::InjectIncentive {
             schedule_toml: "[[incentives]]".into(),
         });

@@ -6,7 +6,7 @@ use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
 use sim_core::{
     SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
-    experiment_id, summary_markdown, write_report, write_run_checkpoint,
+    ckpt_at_or_before, experiment_id, summary_markdown, write_report, write_run_checkpoint,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -184,6 +184,71 @@ impl Hub {
                     message: e.to_string(),
                 },
             },
+            ControlVerb::Scrub(want) => self.apply_scrub(want),
+        }
+    }
+
+    fn apply_scrub(&mut self, want: u64) -> ServerMessage {
+        let before = self.sim.tick;
+        if before == want {
+            return ServerMessage::ReportReady {
+                markdown_or_path: format!("scrubbed tick {want}"),
+            };
+        }
+        if before < want {
+            while self.sim.tick < want {
+                if !self.tick_once() {
+                    break;
+                }
+            }
+        } else {
+            let dir = self.checkpoint_dir();
+            let path = match ckpt_at_or_before(&dir, want) {
+                Ok(Some(p)) => p,
+                Ok(None) => {
+                    return ServerMessage::Error {
+                        code: ErrorCode::Internal,
+                        message: format!(
+                            "no checkpoint at or before tick {want} in {}",
+                            dir.display()
+                        ),
+                    };
+                }
+                Err(e) => {
+                    return ServerMessage::Error {
+                        code: ErrorCode::Internal,
+                        message: e.to_string(),
+                    };
+                }
+            };
+            match Simulation::load_checkpoint(&path) {
+                Ok(sim) => {
+                    self.sim = sim;
+                    self.last_event = self.sim.events.events.len();
+                    while self.sim.tick < want {
+                        if !self.tick_once() {
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    return ServerMessage::Error {
+                        code: ErrorCode::Internal,
+                        message: e.to_string(),
+                    };
+                }
+            }
+        }
+        self.paused = true;
+        if let Ok(snap) = self.snapshot() {
+            for sub in self.subscribers.values() {
+                if sub.subscribed {
+                    let _ = sub.tx.send(snap.clone());
+                }
+            }
+        }
+        ServerMessage::ReportReady {
+            markdown_or_path: format!("scrubbed tick {}", self.sim.tick),
         }
     }
 

@@ -1,3 +1,4 @@
+mod client;
 mod network;
 mod overlay;
 mod server;
@@ -39,6 +40,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut inject_path: Option<PathBuf> = None;
     let mut compare: Vec<PathBuf> = Vec::new();
     let mut csv = false;
+    let mut connect: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -86,6 +88,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .clone(),
                 );
             }
+            "--connect" => {
+                i += 1;
+                connect = Some(
+                    args.get(i)
+                        .ok_or("--connect requires tcp:// or ws:// URL")?
+                        .clone(),
+                );
+            }
             "--allow-control" => allow_control = true,
             "--token" => {
                 i += 1;
@@ -122,6 +132,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     if compare.len() == 2 {
         return run_compare(&compare[0], &compare[1], csv);
+    }
+    if let Some(url) = &connect {
+        if !listen.is_empty() {
+            return Err("--listen and --connect are mutually exclusive".into());
+        }
+        return client::log_tail(url, token, quiet);
     }
 
     let mut sim = if let Some(path) = &load_path {
@@ -317,6 +333,7 @@ Usage:
           [--out-dir DIR] [--checkpoint-every K]
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
+          [--connect tcp://HOST:PORT]
           [--allow-control] [--token SECRET]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
@@ -332,7 +349,8 @@ Options:
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
-      --allow-control       Accept pause/play/step/save/report/summarize from clients
+      --connect URL         Read-only log tail (Welcome/Tick hashes). Not with --listen
+      --allow-control       Accept pause/play/step/save/report/summarize/scrub from clients
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
       --incentives PATH     Apply incentive TOML from tick 0
       --inject PATH         Replace schedule (typical with --load)

@@ -241,15 +241,34 @@ commands:
   /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
   /set ID respect TOWARD N   respect edge 0–100 (in-process)
   /events TICK     filter log to JSONL tick at or before TICK (display-only)
-  /scrub TICK      load ckpt at or before TICK, then tick forward to TICK (--load DIR, in-process)
+  /scrub TICK      load ckpt at or before TICK, then tick forward (in-process --load DIR; remote --allow-control)
   /ckpt next|prev  adjacent checkpoint in the run directory
   [ ] keys         same as /ckpt prev|next when a ckpt dir is loaded"
 }
 
 /// Crate mesh scale: lerp 0.40..1.00 by max(slots/16, weight/80).
 pub fn crate_fill_scale(slots_used: u32, weight_milli: u32) -> f32 {
-    let slot_f = slots_used as f32 / sim_core::haul::SLOT_CAP as f32;
-    let w_f = weight_milli as f32 / sim_core::haul::WEIGHT_CAP_MILLI as f32;
+    pack_fill_scale(
+        slots_used,
+        weight_milli,
+        sim_core::haul::SLOT_CAP,
+        sim_core::haul::WEIGHT_CAP_MILLI,
+    )
+}
+
+/// Pack (or crate) mesh scale: lerp 0.40..1.00 by max(slots/cap, weight/cap).
+/// Cap 0 → 0.40 (no divide by zero).
+pub fn pack_fill_scale(
+    slots_used: u32,
+    weight_milli: u32,
+    slot_cap: u32,
+    weight_cap_milli: u32,
+) -> f32 {
+    if slot_cap == 0 || weight_cap_milli == 0 {
+        return 0.40;
+    }
+    let slot_f = slots_used as f32 / slot_cap as f32;
+    let w_f = weight_milli as f32 / weight_cap_milli as f32;
     let fill = slot_f.max(w_f).clamp(0.0, 1.0);
     0.40 + 0.60 * fill
 }
@@ -373,6 +392,7 @@ pub fn remote_control(cmd: &UiCommand) -> Option<ControlVerb> {
         UiCommand::Save { .. } => Some(ControlVerb::Save),
         UiCommand::Report { .. } => Some(ControlVerb::Report),
         UiCommand::Summarize => Some(ControlVerb::Summarize),
+        UiCommand::Scrub { tick } => Some(ControlVerb::Scrub(*tick)),
         _ => None,
     }
 }
@@ -512,7 +532,7 @@ pub fn run_command(
         }
         UiCommand::Scrub { tick } => {
             if state.remote {
-                return vec!["scrub is in-process only (not on the attach wire)".into()];
+                return vec![format!("scrub {tick} sent")];
             }
             match scrub.apply(state, tick) {
                 Ok(t) => vec![format!("loaded tick {t}")],
@@ -710,7 +730,7 @@ mod tests {
             &mut WindowFlags::default(),
             &mut scrub,
         );
-        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        assert!(msgs[0].contains("sent"), "{msgs:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -873,6 +893,28 @@ mod tests {
         assert!(one < full, "{one} vs {full}");
         assert!((full - 1.0).abs() < f32::EPSILON);
         assert!((crate_fill_scale(0, 0) - 0.40).abs() < 1e-5);
+    }
+
+    #[test]
+    fn pack_fill_scale_empty_less_than_full() {
+        let empty = pack_fill_scale(0, 0, 8, 2_500);
+        let full = pack_fill_scale(8, 2_500, 8, 2_500);
+        assert!(empty < full, "{empty} vs {full}");
+        assert!((empty - 0.40).abs() < 1e-5);
+        assert!((full - 1.0).abs() < 1e-5);
+        let one = crate_fill_scale(1, 50);
+        let crate_full = crate_fill_scale(16, 8_000);
+        assert!(one < crate_full, "{one} vs {crate_full}");
+        assert!((crate_full - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn pack_fill_scale_two_worn_same_mid_fill() {
+        let a = pack_fill_scale(10, 3_250, 20, 6_500);
+        let b = pack_fill_scale(10, 3_250, 20, 6_500);
+        assert_eq!(a, b);
+        assert!(a > 0.40 && a < 1.0, "{a}");
+        assert!((pack_fill_scale(0, 0, 0, 2_500) - 0.40).abs() < 1e-5);
     }
 
     #[test]

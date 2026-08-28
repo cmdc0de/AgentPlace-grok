@@ -4,7 +4,7 @@ mod render;
 mod ui;
 
 use bevy::prelude::*;
-use commands::{CkptScrubber, crate_fill_scale};
+use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
 use sim_bevy::{SimPlugin, SimState, step_once};
@@ -325,6 +325,7 @@ fn setup_scene(
                 agent.x,
                 agent.y,
                 false,
+                satchel_scale(agent, &params),
             );
         }
         if agent.worn_backpacks(&params) > 0 {
@@ -337,6 +338,7 @@ fn setup_scene(
                 agent.x,
                 agent.y,
                 true,
+                satchel_scale(agent, &params),
             );
         }
     }
@@ -445,6 +447,11 @@ fn sync_stockpile_markers(
     }
 }
 
+fn satchel_scale(agent: &sim_core::Agent, params: &sim_core::StorageParams) -> f32 {
+    let (slots, w) = agent.worn_pack_caps(params);
+    pack_fill_scale(agent.pack_count(), agent.pack_weight_milli(), slots, w)
+}
+
 fn spawn_satchel(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -454,6 +461,7 @@ fn spawn_satchel(
     x: u32,
     y: u32,
     backpack: bool,
+    scale: f32,
 ) {
     let spec = if backpack {
         markers::marker_backpack()
@@ -480,7 +488,7 @@ fn spawn_satchel(
     commands.spawn((
         Mesh3d(meshes.add(size)),
         MeshMaterial3d(mat),
-        Transform::from_translation(pos),
+        Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
         SatchelVisual { id, backpack },
         Visibility::default(),
     ));
@@ -526,6 +534,7 @@ fn sync_satchel_markers(
             agent.x,
             agent.y,
             backpack,
+            satchel_scale(agent, &params),
         );
     }
 }
@@ -706,6 +715,7 @@ fn sync_agent_transforms(
                 } else {
                     SATCHEL_OFFSET
                 };
+            transform.scale = Vec3::splat(satchel_scale(agent, &state.sim.storage));
         }
     }
 }
