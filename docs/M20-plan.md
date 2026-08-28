@@ -88,7 +88,8 @@ Not a protocol feature. On **implement**:
 |---|---|
 | **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
-| After M22 | protobuf/TLS; extra LLM reflection/embeddings |
+| **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
+| After M23 | protobuf/TLS; extra LLM reflection/embeddings |
 | Not M20 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings |
 
 ## Key decisions

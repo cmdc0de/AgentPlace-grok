@@ -75,8 +75,9 @@ Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Vi
 
 | Later | What |
 |---|---|
-| After M22 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets |
-| Not M22 | Browser; combat; CI Win/mac; **wire `/set`**; `sim-cli --connect` sending Control |
+| **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
+| After M23 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets; lockstep ack; wire `/set` |
+| Not M22 | Browser; combat; CI Win/mac; **wire `/set`** |
 
 ## Key decisions
 

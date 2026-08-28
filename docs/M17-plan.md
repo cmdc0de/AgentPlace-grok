@@ -81,7 +81,8 @@ Do **not** add extra LLM call types. Mid-run HTTP failure stays `Wait`.
 | **M20** | Done — [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
 | **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
-| After M22 | protobuf/TLS; extra LLM reflection/embeddings |
+| **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
+| After M23 | protobuf/TLS; extra LLM reflection/embeddings |
 | Not M17 | Browser; combat; CI Win/mac; extra LLM reflection; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
