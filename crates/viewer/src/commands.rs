@@ -238,8 +238,8 @@ commands:
   /tick
   /inject PATH     load incentive TOML (needs --allow-control when remote)
   /give ID ITEM QTY   pockets; hash-sensitive (in-process or remote --allow-control)
-  /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process)
-  /set ID respect TOWARD N   respect edge 0–100 (in-process)
+  /set ID FIELD N     hunger|thirst|energy|influence 0–100 (in-process or remote --allow-control)
+  /set ID respect TOWARD N   respect edge 0–100 (in-process or remote --allow-control)
   /events TICK     JSONL tick at or before TICK (display-only; remote --allow-control)
   /scrub TICK      load ckpt at or before TICK, then tick forward (in-process --load DIR; remote --allow-control)
   /ckpt next|prev  adjacent checkpoint file (in-process --load DIR; remote --allow-control)
@@ -401,6 +401,17 @@ pub fn remote_control(cmd: &UiCommand) -> Option<ControlVerb> {
         UiCommand::CkptNext => Some(ControlVerb::CkptNext),
         UiCommand::CkptPrev => Some(ControlVerb::CkptPrev),
         UiCommand::Events { tick } => Some(ControlVerb::Events(*tick)),
+        UiCommand::Set {
+            id,
+            field,
+            toward,
+            value,
+        } => Some(ControlVerb::Set {
+            id: *id,
+            field: field.clone(),
+            toward: *toward,
+            value: *value,
+        }),
         _ => None,
     }
 }
@@ -581,7 +592,7 @@ pub fn run_command(
             value,
         } => {
             if state.remote {
-                return vec!["set is in-process only (not on the attach wire)".into()];
+                return vec![format!("set agent {id} {field}={value} sent")];
             }
             if field == "respect" {
                 let Some(toward) = toward else {
@@ -796,6 +807,20 @@ mod tests {
     }
 
     #[test]
+    fn remote_set_sends_control_verb() {
+        let cmd = parse_command("/set 0 hunger 50").unwrap();
+        match remote_control(&cmd) {
+            Some(ControlVerb::Set {
+                id: 0,
+                field,
+                toward: None,
+                value: 50,
+            }) => assert_eq!(field, "hunger"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
     fn parse_set() {
         assert_eq!(
             parse_command("/set 0 hunger 50").unwrap(),
@@ -836,7 +861,7 @@ mod tests {
             &mut WindowFlags::default(),
             &mut CkptScrubber::default(),
         );
-        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        assert!(msgs[0].contains("sent"), "{msgs:?}");
     }
 
     #[test]
@@ -891,7 +916,7 @@ mod tests {
             &mut WindowFlags::default(),
             &mut CkptScrubber::default(),
         );
-        assert!(msgs[0].contains("in-process only"), "{msgs:?}");
+        assert!(msgs[0].contains("sent"), "{msgs:?}");
     }
 
     #[test]

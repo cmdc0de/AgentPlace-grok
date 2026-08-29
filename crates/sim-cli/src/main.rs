@@ -44,6 +44,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut start_paused = false;
     let mut llm_barrier = false;
     let mut llm_barrier_retries: Option<u32> = None;
+    let mut lockstep = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -101,6 +102,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--allow-control" => allow_control = true,
             "--start-paused" => start_paused = true,
+            "--lockstep" => lockstep = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -167,6 +169,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let net = network::NetworkParams::from_path(&config_path);
     allow_control = allow_control || net.allow_control;
+    lockstep = lockstep || net.lockstep;
     if token.is_none() && !net.token.is_empty() {
         token = Some(net.token.clone());
     }
@@ -249,6 +252,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             out_dir,
             checkpoint_every,
             write_timing,
+            lockstep,
         });
     }
 
@@ -367,7 +371,7 @@ Usage:
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
-          [--allow-control] [--start-paused] [--token SECRET]
+          [--allow-control] [--start-paused] [--lockstep] [--token SECRET]
           [--llm-barrier] [--llm-barrier-retries N]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
@@ -386,6 +390,7 @@ Options:
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control
       --allow-control       Listen: accept Control. Connect: send Control from stdin
       --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)
+      --lockstep            After each tick, wait for AckTick from every subscriber (overlay [network] lockstep)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

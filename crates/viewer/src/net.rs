@@ -111,6 +111,7 @@ pub fn connect(
         want_events: true,
         want_decisions: true,
     })?;
+    to_server.send(ClientMessage::AckTick(sim.tick))?;
 
     {
         let live = Arc::clone(&live);
@@ -182,6 +183,7 @@ pub fn apply_remote(
                     sim.last_tick_decisions = std::mem::take(&mut state.sim.last_tick_decisions);
                     sim.last_tick_timing = timing;
                     state.sim = sim;
+                    let _ = net.tx.send(ClientMessage::AckTick(state.sim.tick));
                 }
                 break;
             }
@@ -239,6 +241,11 @@ pub fn first_snapshot_index(kinds: &[&str]) -> Option<usize> {
     kinds.iter().position(|k| *k == "snapshot")
 }
 
+/// After a Snapshot is applied, ack that world tick (lockstep).
+pub fn ack_tick_after_snapshot(world_tick: u64) -> ClientMessage {
+    ClientMessage::AckTick(world_tick)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,6 +293,14 @@ mod tests {
         assert_eq!(pause_hint_from_report("loaded tick 2"), Some(true));
         assert_eq!(pause_hint_from_report("scrubbed tick 4"), Some(true));
         assert_eq!(pause_hint_from_report("gave 1 berry_bush to agent 0"), None);
+    }
+
+    #[test]
+    fn snapshot_apply_acks_world_tick() {
+        match ack_tick_after_snapshot(7) {
+            ClientMessage::AckTick(t) => assert_eq!(t, 7),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

@@ -23,6 +23,7 @@ struct Subscriber {
     want_events: bool,
     want_decisions: bool,
     subscribed: bool,
+    acked_tick: Option<u64>,
 }
 
 pub struct Hub {
@@ -191,6 +192,12 @@ impl Hub {
             ControlVerb::CkptNext => self.apply_ckpt_step(true),
             ControlVerb::CkptPrev => self.apply_ckpt_step(false),
             ControlVerb::Events(tick) => self.apply_events(tick),
+            ControlVerb::Set {
+                id,
+                field,
+                toward,
+                value,
+            } => self.apply_set(id, &field, toward, value),
         }
     }
 
@@ -201,6 +208,39 @@ impl Hub {
                     let _ = sub.tx.send(snap.clone());
                 }
             }
+        }
+    }
+
+    fn apply_set(
+        &mut self,
+        id: u64,
+        field: &str,
+        toward: Option<u64>,
+        value: u32,
+    ) -> ServerMessage {
+        let aid = AgentId(id);
+        let result = if field == "respect" {
+            let Some(t) = toward else {
+                return ServerMessage::Error {
+                    code: ErrorCode::Internal,
+                    message: "set respect requires toward agent id".into(),
+                };
+            };
+            self.sim.set_respect(aid, AgentId(t), value)
+        } else {
+            self.sim.set_display_field(aid, field, value)
+        };
+        match result {
+            Ok(milli) => {
+                self.broadcast_snapshot();
+                ServerMessage::ReportReady {
+                    markdown_or_path: format!("set agent {id} {field}={value} ({milli} milli)"),
+                }
+            }
+            Err(e) => ServerMessage::Error {
+                code: ErrorCode::Internal,
+                message: e.to_string(),
+            },
         }
     }
 
@@ -383,6 +423,7 @@ pub struct ServeOpts {
     pub out_dir: Option<PathBuf>,
     pub checkpoint_every: Option<u64>,
     pub write_timing: bool,
+    pub lockstep: bool,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -463,6 +504,9 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         };
         if did {
             remaining -= 1;
+            if opts.lockstep {
+                wait_lockstep_acks(&hub);
+            }
         } else {
             thread::sleep(Duration::from_millis(20));
         }
@@ -587,6 +631,7 @@ fn handle_client(
                 want_events: false,
                 want_decisions: false,
                 subscribed: false,
+                acked_tick: None,
             },
         );
     }
@@ -662,6 +707,12 @@ fn handle_client(
                 };
                 conn.send_msg(&reply)?;
             }
+            Ok(ClientMessage::AckTick(tick)) => {
+                let mut hub = hub.lock().unwrap();
+                if let Some(sub) = hub.subscribers.get_mut(&id) {
+                    sub.acked_tick = Some(tick);
+                }
+            }
             Ok(ClientMessage::Hello { .. }) => {
                 conn.send_msg(&ServerMessage::Error {
                     code: ErrorCode::Protocol,
@@ -675,6 +726,20 @@ fn handle_client(
                 return Err(e);
             }
         }
+    }
+}
+
+fn wait_lockstep_acks(hub: &Arc<Mutex<Hub>>) {
+    let tick = hub.lock().unwrap().sim.tick;
+    loop {
+        {
+            let h = hub.lock().unwrap();
+            let subs: Vec<_> = h.subscribers.values().filter(|s| s.subscribed).collect();
+            if subs.is_empty() || subs.iter().all(|s| s.acked_tick == Some(tick)) {
+                return;
+            }
+        }
+        thread::sleep(Duration::from_millis(5));
     }
 }
 

@@ -64,9 +64,48 @@ pub fn parse_control_line(line: &str) -> Result<ControlVerb, String> {
             let tick: u64 = t.parse().map_err(|_| format!("bad tick: {t}"))?;
             Ok(ControlVerb::Events(tick))
         }
-        "set" => Err("set is in-process only".into()),
-        "inject" => Err("inject is listen-side".into()),
+        "set" => {
+            let id_s = arg.ok_or("set requires agent id")?;
+            let id: u64 = id_s.parse().map_err(|_| format!("bad agent id: {id_s}"))?;
+            let field = parts
+                .next()
+                .ok_or("set requires field (hunger|thirst|energy|influence|respect)")?
+                .to_ascii_lowercase();
+            if field == "respect" {
+                let t = parts.next().ok_or("set respect requires toward agent id")?;
+                let v = parts.next().ok_or("set respect requires a value 0–100")?;
+                let toward: u64 = t.parse().map_err(|_| format!("bad toward id: {t}"))?;
+                let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
+                Ok(ControlVerb::Set {
+                    id,
+                    field,
+                    toward: Some(toward),
+                    value,
+                })
+            } else {
+                let v = parts.next().ok_or("set requires a value 0–100")?;
+                let value: u32 = v.parse().map_err(|_| format!("bad value: {v}"))?;
+                Ok(ControlVerb::Set {
+                    id,
+                    field,
+                    toward: None,
+                    value,
+                })
+            }
+        }
         other => Err(format!("unknown: /{other}")),
+    }
+}
+
+/// `/inject PATH` is a ClientMessage, not a ControlVerb.
+pub fn parse_inject_path(line: &str) -> Option<String> {
+    let line = line.trim();
+    let line = line.strip_prefix('/').unwrap_or(line).trim();
+    let mut parts = line.split_whitespace();
+    if parts.next()?.eq_ignore_ascii_case("inject") {
+        parts.next().map(|s| s.to_string())
+    } else {
+        None
     }
 }
 
@@ -123,6 +162,22 @@ pub fn log_tail(
     let stdin = io::stdin();
     for line in stdin.lock().lines() {
         let line = line?;
+        if let Some(path) = parse_inject_path(&line) {
+            match std::fs::read_to_string(&path) {
+                Ok(toml) => {
+                    if to_io
+                        .send(ClientMessage::InjectIncentive {
+                            schedule_toml: toml,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => eprintln!("inject read error: {e}"),
+            }
+            continue;
+        }
         match parse_control_line(&line) {
             Ok(verb) => {
                 if to_io.send(ClientMessage::Control(verb)).is_err() {
@@ -155,6 +210,9 @@ fn recv_loop(
                 tick, state_hash, ..
             }) => {
                 println!("tick={tick} hash={}", hash_hex(&state_hash));
+                if conn.send_msg(&ClientMessage::AckTick(tick)).is_err() {
+                    return Ok(());
+                }
             }
             Ok(ServerMessage::ReportReady { markdown_or_path }) => {
                 println!("{markdown_or_path}");
@@ -199,11 +257,38 @@ mod tests {
             parse_control_line("/scrub 10").unwrap(),
             ControlVerb::Scrub(10)
         );
+        assert_eq!(
+            parse_control_line("/set 0 hunger 50").unwrap(),
+            ControlVerb::Set {
+                id: 0,
+                field: "hunger".into(),
+                toward: None,
+                value: 50
+            }
+        );
+        assert_eq!(
+            parse_control_line("/set 0 respect 1 40").unwrap(),
+            ControlVerb::Set {
+                id: 0,
+                field: "respect".into(),
+                toward: Some(1),
+                value: 40
+            }
+        );
     }
 
     #[test]
-    fn parse_set_is_refused() {
-        let e = parse_control_line("/set 0 hunger 10").unwrap_err();
-        assert!(e.contains("in-process"), "{e}");
+    fn parse_inject_path_extracts_file() {
+        assert_eq!(
+            parse_inject_path("/inject configs/incentives/coop.toml").as_deref(),
+            Some("configs/incentives/coop.toml")
+        );
+        assert_eq!(parse_inject_path("/play"), None);
+    }
+
+    #[test]
+    fn parse_set_respect_requires_toward() {
+        let e = parse_control_line("/set 0 respect").unwrap_err();
+        assert!(e.contains("toward"), "{e}");
     }
 }

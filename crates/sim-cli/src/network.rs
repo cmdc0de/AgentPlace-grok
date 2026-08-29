@@ -18,6 +18,8 @@ pub struct NetworkParams {
     pub token: String,
     #[serde(default)]
     pub allow_control: bool,
+    #[serde(default)]
+    pub lockstep: bool,
 }
 
 impl NetworkParams {

@@ -1,7 +1,8 @@
 # M24 — Wire /set, connect /inject, lockstep ack
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M23 complete (`docs/M23-plan.md`, git tag `M23`, commit `a90535c`)  
+**Walkthrough:** [`M24-test-plan.md`](M24-test-plan.md)  
 **Specs:** `M16-plan.md` / `M19-plan.md` (in-process `/set` + `/set respect`; remote refuses), `M8-plan.md` (`InjectIncentive` on the wire), `M23-plan.md` (every-tick Snapshots; no lockstep ack; `--connect` inject refused)
 
 ## Context
@@ -168,7 +169,7 @@ cargo run -p sim-cli -- --connect tcp://127.0.0.1:9000 --allow-control
 
 ## Verification
 
-Walkthrough: `docs/M24-test-plan.md` (written at implement).
+Walkthrough: [`M24-test-plan.md`](M24-test-plan.md).
 
 ```bash
 cargo test -p sim-core

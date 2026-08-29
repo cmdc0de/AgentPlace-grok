@@ -19,6 +19,7 @@ pub enum ClientMessage {
     InjectIncentive {
         schedule_toml: String,
     },
+    AckTick(u64),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,10 +31,20 @@ pub enum ControlVerb {
     Report,
     Summarize,
     Scrub(u64),
-    Give { id: u64, item: String, qty: u32 },
+    Give {
+        id: u64,
+        item: String,
+        qty: u32,
+    },
     CkptNext,
     CkptPrev,
     Events(u64),
+    Set {
+        id: u64,
+        field: String,
+        toward: Option<u64>,
+        value: u32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,9 +196,16 @@ mod tests {
         }));
         round_trip_client(ClientMessage::Control(ControlVerb::CkptNext));
         round_trip_client(ClientMessage::Control(ControlVerb::Events(2)));
+        round_trip_client(ClientMessage::Control(ControlVerb::Set {
+            id: 0,
+            field: "hunger".into(),
+            toward: None,
+            value: 50,
+        }));
         round_trip_client(ClientMessage::InjectIncentive {
             schedule_toml: "[[incentives]]".into(),
         });
+        round_trip_client(ClientMessage::AckTick(3));
 
         round_trip_server(ServerMessage::Welcome {
             tick: 12,

@@ -2,7 +2,7 @@
 //!
 //! One postcard codec, two sockets (TCP and WebSocket). Blocking I/O, no tokio.
 
-pub const PROTOCOL_VERSION: u16 = 4;
+pub const PROTOCOL_VERSION: u16 = 5;
 
 /// Maximum framed payload (snapshot of a 64×64 world is well under this).
 pub const MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;

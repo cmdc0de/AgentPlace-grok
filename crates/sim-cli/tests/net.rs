@@ -309,7 +309,7 @@ fn control_pause_with_flag() {
 
 #[test]
 fn protocol_version_constant() {
-    assert_eq!(PROTOCOL_VERSION, 4);
+    assert_eq!(PROTOCOL_VERSION, 5);
 }
 
 #[test]
@@ -1001,6 +1001,27 @@ fn subscribe_reports_playing_when_running() {
     let _ = wait_hash(&mut child, out_h, err_h);
 }
 
+#[test]
+fn hello_v4_against_v5_is_protocol_error() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let mut conn = Connection::connect(&url).expect("connect");
+    conn.send_msg(&ClientMessage::Hello {
+        protocol_version: 4,
+        token: None,
+    })
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::Protocol,
+            message,
+        } => assert!(message.contains("4"), "{message}"),
+        other => panic!("expected Protocol error, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
 fn spawn_connect(url: &str, extra: &[&str]) -> Child {
     Command::new(bin())
         .args(["--connect", url])
@@ -1093,5 +1114,286 @@ fn connect_allow_control_without_server_flag_is_disabled() {
         "{cout}"
     );
     let _ = client.wait();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+fn drain_until_tick(conn: &mut Connection) -> u64 {
+    conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    loop {
+        match conn.recv_msg::<ServerMessage>().unwrap() {
+            ServerMessage::Tick { tick, .. } => return tick,
+            ServerMessage::ReportReady { .. } | ServerMessage::Snapshot { .. } => {}
+            other => panic!("expected Tick, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn set_without_allow_control_is_disabled() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 0,
+        field: "hunger".into(),
+        toward: None,
+        value: 50,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::ControlDisabled,
+            ..
+        } => {}
+        other => panic!("expected ControlDisabled, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn set_hunger_changes_hash() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Pause))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("{snap:?}");
+    };
+    let before = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    let hash_a = before.state_hash();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 0,
+        field: "hunger".into(),
+        toward: None,
+        value: 50,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert!(
+                markdown_or_path.contains("set agent 0"),
+                "{markdown_or_path}"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap2: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap2 else {
+        panic!("{snap2:?}");
+    };
+    let after = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(
+        after
+            .agents
+            .get(&sim_core::AgentId(0))
+            .unwrap()
+            .needs
+            .hunger,
+        5000
+    );
+    assert_ne!(hash_a, after.state_hash());
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn set_respect_changes_hash() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Pause))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 0,
+        field: "respect".into(),
+        toward: Some(1),
+        value: 40,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert!(markdown_or_path.contains("respect"), "{markdown_or_path}");
+        }
+        other => panic!("{other:?}"),
+    }
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("{snap:?}");
+    };
+    let sim = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    let r = sim
+        .agents
+        .get(&sim_core::AgentId(0))
+        .unwrap()
+        .relationships
+        .get(&sim_core::AgentId(1))
+        .map(|e| e.respect)
+        .unwrap_or(0);
+    assert_eq!(r, 4000);
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn set_unknown_or_missing_toward_is_error() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 0,
+        field: "nope".into(),
+        toward: None,
+        value: 1,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::Internal,
+            ..
+        } => {}
+        other => panic!("{other:?}"),
+    }
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 0,
+        field: "respect".into(),
+        toward: None,
+        value: 40,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::Internal,
+            message,
+        } => assert!(message.contains("toward"), "{message}"),
+        other => panic!("{other:?}"),
+    }
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Set {
+        id: 99,
+        field: "hunger".into(),
+        toward: None,
+        value: 1,
+    }))
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::Internal,
+            ..
+        } => {}
+        other => panic!("{other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn lockstep_zero_subscribers_finishes() {
+    let (mut child, _url, out_h, err_h) = spawn_listen(&["--lockstep", "--ticks", "2"]);
+    let hash = wait_hash(&mut child, out_h, err_h);
+    assert!(!hash.is_empty());
+}
+
+#[test]
+fn lockstep_waits_for_ack_then_advances() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[
+        "--allow-control",
+        "--start-paused",
+        "--lockstep",
+        "--ticks",
+        "4",
+    ]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: false,
+        want_decisions: false,
+    })
+    .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>().unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let t1 = drain_until_tick(&mut conn);
+    assert_eq!(t1, 1);
+    thread::sleep(Duration::from_millis(250));
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("{snap:?}");
+    };
+    let held = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(held.tick, 1, "must wait for AckTick");
+    conn.send_msg(&ClientMessage::AckTick(1)).unwrap();
+    let t2 = drain_until_tick(&mut conn);
+    assert_eq!(t2, 2);
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_auto_acks_lockstep() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--lockstep", "--ticks", "6"]);
+    let client = Command::new(bin())
+        .args(["--connect", &url, "--quiet"])
+        .output()
+        .expect("connect");
+    assert!(
+        client.status.success(),
+        "{}",
+        String::from_utf8_lossy(&client.stderr)
+    );
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_inject_applies_schedule() {
+    let coop = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/incentives/coop.toml");
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let mut client = spawn_connect(&url, &["--allow-control"]);
+    let mut stdin = client.stdin.take().expect("stdin");
+    let line = format!("/inject {}\n", coop.display());
+    stdin.write_all(line.as_bytes()).unwrap();
+    let cout = wait_stdout_contains(&mut client, "injected", 20);
+    assert!(cout.contains("injected"), "{cout}");
+    stdin.write_all(b"/play\n").unwrap();
+    drop(stdin);
+    let _ = client.wait();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_inject_missing_file_is_stderr() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let mut client = spawn_connect(&url, &["--allow-control"]);
+    {
+        let mut stdin = client.stdin.take().expect("stdin");
+        stdin
+            .write_all(b"/inject /no/such/incentive.toml\n/play\n")
+            .unwrap();
+        drop(stdin);
+    }
+    let err = {
+        let mut s = String::new();
+        if let Some(mut e) = client.stderr.take() {
+            let _ = std::io::Read::read_to_string(&mut e, &mut s);
+        }
+        s
+    };
+    let status = client.wait().expect("wait connect");
+    assert!(
+        err.contains("inject read error") || err.contains("No such file"),
+        "status={status:?} err={err}"
+    );
     let _ = wait_hash(&mut child, out_h, err_h);
 }
