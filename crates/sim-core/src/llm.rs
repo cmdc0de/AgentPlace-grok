@@ -85,6 +85,48 @@ impl Default for Chooser {
     }
 }
 
+/// Overlay `[llm] barrier` / `barrier_retries`. Not on `ExperimentConfig` (not hashed).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LlmBarrierParams {
+    pub barrier: bool,
+    /// Extra attempts after the first. Default 3 when barrier is on.
+    pub retries: u32,
+}
+
+impl Default for LlmBarrierParams {
+    fn default() -> Self {
+        Self {
+            barrier: false,
+            retries: 3,
+        }
+    }
+}
+
+impl LlmBarrierParams {
+    /// Read `[llm] barrier` and `barrier_retries` from an experiment TOML.
+    pub fn from_config_toml(s: &str) -> Self {
+        #[derive(Default, Deserialize)]
+        struct Slice {
+            #[serde(default)]
+            llm: Table,
+        }
+        #[derive(Default, Deserialize)]
+        struct Table {
+            barrier: Option<bool>,
+            barrier_retries: Option<u32>,
+        }
+        let slice: Slice = toml::from_str(s).unwrap_or_default();
+        let mut p = Self::default();
+        if let Some(b) = slice.llm.barrier {
+            p.barrier = b;
+        }
+        if let Some(n) = slice.llm.barrier_retries {
+            p.retries = n;
+        }
+        p
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReplayRecord {
     pub tick: u64,

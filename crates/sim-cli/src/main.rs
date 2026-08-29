@@ -42,6 +42,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut csv = false;
     let mut connect: Option<String> = None;
     let mut start_paused = false;
+    let mut llm_barrier = false;
+    let mut llm_barrier_retries: Option<u32> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -99,6 +101,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--allow-control" => allow_control = true,
             "--start-paused" => start_paused = true,
+            "--llm-barrier" => llm_barrier = true,
+            "--llm-barrier-retries" => {
+                i += 1;
+                llm_barrier = true;
+                llm_barrier_retries = Some(
+                    args.get(i)
+                        .ok_or("--llm-barrier-retries requires a number")?
+                        .parse()?,
+                );
+            }
             "--token" => {
                 i += 1;
                 token = Some(args.get(i).ok_or("--token requires a value")?.clone());
@@ -139,7 +151,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if !listen.is_empty() {
             return Err("--listen and --connect are mutually exclusive".into());
         }
-        return client::log_tail(url, token, quiet);
+        return client::log_tail(url, token, quiet, allow_control);
     }
 
     let mut sim = if let Some(path) = &load_path {
@@ -172,6 +184,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let text = std::fs::read_to_string(&config_path).unwrap_or_default();
         sim.storage = sim_core::StorageParams::from_config_toml(&text)?;
         sim.voting = sim_core::VotingParams::from_config_toml(&text)?;
+        let mut barrier = sim_core::LlmBarrierParams::from_config_toml(&text);
+        if llm_barrier {
+            barrier.barrier = true;
+        }
+        if let Some(n) = llm_barrier_retries {
+            barrier.barrier = true;
+            barrier.retries = n;
+        }
+        sim.llm_barrier = barrier.barrier;
+        sim.llm_barrier_retries = barrier.retries;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -346,6 +368,7 @@ Usage:
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
           [--allow-control] [--start-paused] [--token SECRET]
+          [--llm-barrier] [--llm-barrier-retries N]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -360,9 +383,11 @@ Options:
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
-      --connect URL         Read-only log tail (Welcome/Tick hashes). Not with --listen
-      --allow-control       Accept pause/play/step/save/report/summarize/scrub/give/ckpt/events from clients
+      --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control
+      --allow-control       Listen: accept Control. Connect: send Control from stdin
       --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)
+      --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
+      --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
       --incentives PATH     Apply incentive TOML from tick 0
       --inject PATH         Replace schedule (typical with --load)

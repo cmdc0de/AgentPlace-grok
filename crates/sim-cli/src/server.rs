@@ -599,12 +599,22 @@ fn handle_client(
                 want_events,
                 want_decisions,
             }) => {
-                let mut hub = hub.lock().unwrap();
-                if let Some(sub) = hub.subscribers.get_mut(&id) {
-                    sub.want_events = want_events;
-                    sub.want_decisions = want_decisions;
-                    sub.subscribed = true;
-                }
+                let paused = {
+                    let mut hub = hub.lock().unwrap();
+                    if let Some(sub) = hub.subscribers.get_mut(&id) {
+                        sub.want_events = want_events;
+                        sub.want_decisions = want_decisions;
+                        sub.subscribed = true;
+                    }
+                    hub.paused
+                };
+                conn.send_msg(&ServerMessage::ReportReady {
+                    markdown_or_path: if paused {
+                        "paused".into()
+                    } else {
+                        "playing".into()
+                    },
+                })?;
             }
             Ok(ClientMessage::RequestSnapshot) => {
                 let snap = {

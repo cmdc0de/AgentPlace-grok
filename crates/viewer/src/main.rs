@@ -71,6 +71,9 @@ fn main() {
             sim.voting = sim_core::VotingParams::from_config_toml(&text).unwrap_or_else(|e| {
                 panic!("failed to parse [voting]: {e}");
             });
+            let barrier = sim_core::LlmBarrierParams::from_config_toml(&text);
+            sim.llm_barrier = barrier.barrier;
+            sim.llm_barrier_retries = barrier.retries;
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

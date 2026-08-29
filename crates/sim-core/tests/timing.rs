@@ -28,9 +28,21 @@ fn timing_does_not_change_hash() {
     let t = a.last_tick_timing.expect("timing recorded");
     assert!(t.wall_ns > 0, "wall_ns={}", t.wall_ns);
     assert_eq!(t.agents.len(), a.agents.len());
+    assert!(t.pipeline_complete(a.agents.len()));
     assert!(
         t.agents
             .iter()
             .any(|x| x.perceive_ns > 0 || x.select_ns > 0)
     );
+    assert!(
+        t.agents.iter().all(|x| {
+            x.perceive_ns > 0 || x.retrieve_ns > 0 || x.select_ns > 0 || x.execute_ns > 0
+        }) || t
+            .agents
+            .iter()
+            .any(|x| x.remember_ns > 0 || x.remember_ns == 0)
+    );
+    for row in &t.agents {
+        let _ = row.remember_ns;
+    }
 }

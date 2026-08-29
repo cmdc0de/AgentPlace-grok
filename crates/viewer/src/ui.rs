@@ -186,14 +186,18 @@ fn draw_status(
         .position([12.0, 12.0], Condition::FirstUseEver)
         .build(|| {
             let hash = state.sim.state_hash().to_string();
-            let (tick, short) = crate::net::status_tick_hash(net, state.sim.tick, &hash);
+            let (tick, short, live_ahead) =
+                crate::net::status_tick_hash(net, state.sim.tick, &hash);
             let follow = match state.follow {
                 Some(id) => format!("agent {}", id.0),
                 None => "free camera".into(),
             };
+            let tick_line = match live_ahead {
+                Some(live) => format!("tick {tick} (live {live})"),
+                None => format!("tick {tick}"),
+            };
             ui.text(format!(
-                "tick {}  {}  follow {follow}  hash {short}",
-                tick,
+                "{tick_line}  {}  follow {follow}  hash {short}",
                 if state.paused { "paused" } else { "running" }
             ));
             ui.text(format!(
@@ -216,6 +220,11 @@ fn draw_status(
                 };
                 ui.text(format!(
                     "tick {last_ms:.2} ms  mean {mean_ms:.2}  max {max_ms:.2}"
+                ));
+                ui.text(format!(
+                    "pipeline {}/{}",
+                    t.agents.len(),
+                    state.sim.agents.len()
                 ));
             }
             if ui.button("Pause") {
@@ -364,11 +373,12 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
             if let Some(t) = &state.sim.last_tick_timing {
                 if let Some(at) = t.agents.iter().find(|x| x.agent == id.0) {
                     ui.text(format!(
-                        "step µs  perc {}  retr {}  sel {}  exec {}",
+                        "step µs  perc {}  retr {}  sel {}  exec {}  rem {}",
                         at.perceive_ns / 1000,
                         at.retrieve_ns / 1000,
                         at.select_ns / 1000,
-                        at.execute_ns / 1000
+                        at.execute_ns / 1000,
+                        at.remember_ns / 1000
                     ));
                 }
             }

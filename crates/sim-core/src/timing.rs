@@ -30,6 +30,13 @@ pub struct TickTiming {
     pub agents: Vec<AgentTiming>,
 }
 
+impl TickTiming {
+    /// Hash-neutral completeness: one timing row per living agent.
+    pub fn pipeline_complete(&self, living: usize) -> bool {
+        self.agents.len() == living
+    }
+}
+
 pub fn ns_since(start: Instant) -> u64 {
     start.elapsed().as_nanos() as u64
 }

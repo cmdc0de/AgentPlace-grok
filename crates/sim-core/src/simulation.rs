@@ -9,8 +9,8 @@ use crate::execute::{apply_heard_memories, execute_primary};
 use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    Chooser, LLM_WAIT_SENTINEL, ReplayRecord, ReplayTable, chosen_to_json, is_llm_wait_response,
-    parse_choice_json, prompt_hash,
+    ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, ReplayRecord, ReplayTable,
+    chosen_to_json, is_llm_wait_response, parse_choice_json, prompt_hash,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
@@ -74,6 +74,10 @@ pub struct Simulation {
     pub meta_council_tally: Option<CouncilTally>,
     /// Incentive id → agents who already received one-shots.
     pub incentive_oneshot: BTreeMap<String, BTreeSet<AgentId>>,
+    /// Overlay `[llm] barrier`. Not hashed, not checkpointed.
+    pub llm_barrier: bool,
+    /// Extra choose attempts after the first when `llm_barrier`. Default 3.
+    pub llm_barrier_retries: u32,
 }
 
 impl Simulation {
@@ -131,6 +135,8 @@ impl Simulation {
             meta_council: None,
             meta_council_tally: None,
             incentive_oneshot: BTreeMap::new(),
+            llm_barrier: false,
+            llm_barrier_retries: 3,
         })
     }
 
@@ -572,7 +578,7 @@ impl Simulation {
                 }
                 Chooser::Custom(chooser) => {
                     chooser_name = "llm";
-                    match chooser.choose(call_seed, &obs) {
+                    match self.choose_custom(chooser.as_ref(), call_seed, &obs) {
                         Ok((c, raw)) => {
                             policy_branch = "llm";
                             record_raw = Some(raw);
@@ -680,13 +686,41 @@ impl Simulation {
 
         let e0 = Instant::now();
         execute_primary(self, id, &chosen.primary);
+        timing.execute_ns = timing::ns_since(e0);
+        let m0 = Instant::now();
         if allow_speak {
             if let Some(speak) = chosen.speak {
                 self.execute_speak(id, speak);
             }
         }
-        timing.execute_ns = timing::ns_since(e0);
+        timing.remember_ns = timing::ns_since(m0);
         timing
+    }
+
+    fn choose_custom(
+        &self,
+        chooser: &dyn ActionChooser,
+        call_seed: u64,
+        obs: &observation::Observation,
+    ) -> Result<(ChosenAction, String), ChooseError> {
+        let attempts = if self.llm_barrier {
+            1u32.saturating_add(self.llm_barrier_retries)
+        } else {
+            1
+        };
+        let mut last = ChooseError::Unreachable;
+        for _ in 0..attempts {
+            match chooser.choose(call_seed, obs) {
+                Ok(v) => return Ok(v),
+                Err(e) => {
+                    last = e;
+                    if !self.llm_barrier {
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        Err(last)
     }
 
     fn execute_speak(&mut self, id: AgentId, mut speak: Speak) {

@@ -1,7 +1,8 @@
 # M23 — See every tick, LLM pipeline barrier, sim-cli Control
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M22 complete (`docs/M22-plan.md`, git tag `M22`, commit `58879b0`)  
+**Walkthrough:** [`M23-test-plan.md`](M23-test-plan.md)  
 **Specs:** `missing-features.md` (MF-2, MF-3), `M8-plan.md` (perceive/retrieve/select/execute/remember timing), `medium-priority-specs.md` §4 (timeout = Wait), `M21-plan.md` (`sim-cli --connect` read-only)
 
 ## Context
@@ -164,7 +165,7 @@ cargo run -p sim-cli -- --connect tcp://127.0.0.1:9000 --allow-control
 
 ## Verification
 
-Walkthrough: `docs/M23-test-plan.md` (written at implement).
+Walkthrough: [`M23-test-plan.md`](M23-test-plan.md).
 
 ```bash
 cargo test -p sim-core

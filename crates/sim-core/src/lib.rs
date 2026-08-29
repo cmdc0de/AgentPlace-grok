@@ -46,8 +46,8 @@ pub use event_log::{
 pub use haul::StorageParams;
 pub use incentive::{Incentive, IncentiveSchedule, IncentiveVisibility};
 pub use llm::{
-    ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, ReplayTable, extract_json_payload,
-    is_llm_wait_response, parse_choice_json, parse_item,
+    ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, LlmBarrierParams, ReplayTable,
+    extract_json_payload, is_llm_wait_response, parse_choice_json, parse_item,
 };
 pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};

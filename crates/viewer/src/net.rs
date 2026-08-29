@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 struct LiveClock {
     tick: AtomicU64,
@@ -21,7 +21,6 @@ struct LiveClock {
 pub struct NetLink {
     pub tx: Sender<ClientMessage>,
     rx: Mutex<Receiver<ServerMessage>>,
-    last_snapshot_req: Mutex<Instant>,
     live: Arc<LiveClock>,
 }
 
@@ -42,11 +41,20 @@ impl NetLink {
     }
 }
 
-/// HUD tick/hash: live Tick clock when attached, else local sim.
-pub fn status_tick_hash(net: Option<&NetLink>, sim_tick: u64, sim_hash_hex: &str) -> (u64, String) {
+/// HUD: world tick from `state.sim`; live clock when attached. Hash is live when attached.
+/// `live_ahead` is Some when the server tick is ahead of the displayed world.
+pub fn status_tick_hash(
+    net: Option<&NetLink>,
+    sim_tick: u64,
+    sim_hash_hex: &str,
+) -> (u64, String, Option<u64>) {
     match net {
-        Some(n) => status_from_live(n.live_tick(), n.live_hash()),
-        None => (sim_tick, hash_short(sim_hash_hex)),
+        Some(n) => {
+            let live = n.live_tick();
+            let ahead = if live != sim_tick { Some(live) } else { None };
+            (sim_tick, hex_short(&n.live_hash()), ahead)
+        }
+        None => (sim_tick, hash_short(sim_hash_hex), None),
     }
 }
 
@@ -98,7 +106,7 @@ pub fn connect(
         hash: Mutex::new(sim.state_hash().0),
     });
     let (to_server, from_bevy) = mpsc::channel::<ClientMessage>();
-    let (to_bevy, from_server) = mpsc::sync_channel::<ServerMessage>(64);
+    let (to_bevy, from_server) = mpsc::sync_channel::<ServerMessage>(256);
     to_server.send(ClientMessage::Subscribe {
         want_events: true,
         want_decisions: true,
@@ -118,7 +126,6 @@ pub fn connect(
         NetLink {
             tx: to_server,
             rx: Mutex::new(from_server),
-            last_snapshot_req: Mutex::new(Instant::now()),
             live,
         },
     ))
@@ -167,7 +174,6 @@ pub fn apply_remote(
     let Ok(rx) = net.rx.lock() else {
         return;
     };
-    let mut saw_tick = false;
     while let Ok(msg) = rx.try_recv() {
         match msg {
             ServerMessage::Snapshot { checkpoint_bytes } => {
@@ -175,9 +181,9 @@ pub fn apply_remote(
                 if let Ok(mut sim) = Simulation::decode_checkpoint(&checkpoint_bytes) {
                     sim.last_tick_decisions = std::mem::take(&mut state.sim.last_tick_decisions);
                     sim.last_tick_timing = timing;
-                    net.set_live(sim.tick, sim.state_hash().0);
                     state.sim = sim;
                 }
+                break;
             }
             ServerMessage::Tick {
                 tick,
@@ -186,7 +192,6 @@ pub fn apply_remote(
                 metrics,
                 ..
             } => {
-                saw_tick = true;
                 net.set_live(tick, state_hash);
                 if let Ok(recs) = serde_json::from_slice(&decisions) {
                     state.sim.last_tick_decisions = recs;
@@ -196,8 +201,12 @@ pub fn apply_remote(
                         state.sim.last_tick_timing = Some(t);
                     }
                 }
+                let _ = net.tx.send(ClientMessage::RequestSnapshot);
             }
             ServerMessage::ReportReady { markdown_or_path } => {
+                if let Some(paused) = pause_hint_from_report(&markdown_or_path) {
+                    state.paused = paused;
+                }
                 ui.scrollback.push(markdown_or_path);
             }
             ServerMessage::Error { message, .. } => {
@@ -206,13 +215,28 @@ pub fn apply_remote(
             ServerMessage::Welcome { .. } => {}
         }
     }
-    if saw_tick {
-        let mut last = net.last_snapshot_req.lock().unwrap();
-        if last.elapsed() >= Duration::from_millis(200) {
-            *last = Instant::now();
-            let _ = net.tx.send(ClientMessage::RequestSnapshot);
-        }
+}
+
+/// Pause/play from server ReportReady. None = not a pause hint (give, events, …).
+pub fn pause_hint_from_report(text: &str) -> Option<bool> {
+    let t = text.trim();
+    if t == "paused" || t.starts_with("loaded tick") || t.starts_with("scrubbed tick") {
+        Some(true)
+    } else if t == "playing" {
+        Some(false)
+    } else {
+        None
     }
+}
+
+/// How many Snapshot requests a frame of Tick messages should send (no 200 ms throttle).
+pub fn snapshot_requests_for_ticks(tick_count: usize) -> usize {
+    tick_count
+}
+
+/// Walk messages in order; stop after the first Snapshot (one decode per frame).
+pub fn first_snapshot_index(kinds: &[&str]) -> Option<usize> {
+    kinds.iter().position(|k| *k == "snapshot")
 }
 
 #[cfg(test)]
@@ -221,9 +245,10 @@ mod tests {
 
     #[test]
     fn status_tick_hash_local_when_not_attached() {
-        let (t, h) = status_tick_hash(None, 7, "0123456789abcdef");
+        let (t, h, ahead) = status_tick_hash(None, 7, "0123456789abcdef");
         assert_eq!(t, 7);
         assert_eq!(h, "0123456789ab");
+        assert_eq!(ahead, None);
     }
 
     #[test]
@@ -234,5 +259,82 @@ mod tests {
         let (t, h) = status_from_live(80, hash);
         assert_eq!(t, 80);
         assert_eq!(h, "abcd00000000");
+    }
+
+    #[test]
+    fn status_shows_world_and_live_when_they_differ() {
+        let live = LiveClock {
+            tick: AtomicU64::new(80),
+            hash: Mutex::new([0u8; 32]),
+        };
+        let (tx, _rx_c) = mpsc::channel();
+        let (_tx_s, rx) = mpsc::channel();
+        let net = NetLink {
+            tx,
+            rx: Mutex::new(rx),
+            live: Arc::new(live),
+        };
+        let (world, _h, ahead) = status_tick_hash(Some(&net), 12, "deadbeefdead");
+        assert_eq!(world, 12);
+        assert_eq!(ahead, Some(80));
+    }
+
+    #[test]
+    fn pause_hint_from_report_paused_and_playing() {
+        assert_eq!(pause_hint_from_report("paused"), Some(true));
+        assert_eq!(pause_hint_from_report("playing"), Some(false));
+        assert_eq!(pause_hint_from_report("loaded tick 2"), Some(true));
+        assert_eq!(pause_hint_from_report("scrubbed tick 4"), Some(true));
+        assert_eq!(pause_hint_from_report("gave 1 berry_bush to agent 0"), None);
+    }
+
+    #[test]
+    fn every_tick_requests_a_snapshot() {
+        assert_eq!(snapshot_requests_for_ticks(2), 2);
+        assert_eq!(snapshot_requests_for_ticks(0), 0);
+    }
+
+    #[test]
+    fn first_snapshot_stops_later_world_applies() {
+        let kinds = ["tick", "snapshot", "snapshot"];
+        assert_eq!(first_snapshot_index(&kinds), Some(1));
+        let rest = &kinds[2..];
+        assert_eq!(rest, ["snapshot"]);
+    }
+
+    #[test]
+    fn full_tick_channel_still_updates_live_clock() {
+        let live = Arc::new(LiveClock {
+            tick: AtomicU64::new(0),
+            hash: Mutex::new([0u8; 32]),
+        });
+        let (to_bevy, from_bevy) = mpsc::sync_channel::<ServerMessage>(1);
+        to_bevy
+            .send(ServerMessage::Tick {
+                tick: 1,
+                state_hash: [1u8; 32],
+                events: vec![],
+                decisions: vec![],
+                metrics: vec![],
+            })
+            .unwrap();
+        let msg = ServerMessage::Tick {
+            tick: 2,
+            state_hash: [2u8; 32],
+            events: vec![],
+            decisions: vec![],
+            metrics: vec![],
+        };
+        if let ServerMessage::Tick {
+            tick, state_hash, ..
+        } = &msg
+        {
+            live.tick.store(*tick, Ordering::Relaxed);
+            *live.hash.lock().unwrap() = *state_hash;
+        }
+        let dropped = to_bevy.try_send(msg).is_err();
+        assert!(dropped, "channel full should drop Tick");
+        assert_eq!(live.tick.load(Ordering::Relaxed), 2);
+        let _ = from_bevy;
     }
 }

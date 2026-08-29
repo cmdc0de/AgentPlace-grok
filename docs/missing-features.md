@@ -5,8 +5,8 @@ Researcher-facing gaps found in use. **Not** the After-M later-table (protobuf/T
 | ID | Area | Status | Gap |
 |---|---|---|---|
 | MF-1 | Viewer attach HUD | **Done (M22)** | Status line `tick N` is `state.sim.tick` from the **last Snapshot**, not the live server tick. `ServerMessage::Tick` already carries `tick` + `state_hash` every sim step, but `apply_remote` discarded it (`let _ = tick`) and only pulled a Snapshot at most every **200 ms**. Tick frames could also be dropped (`try_send`). **Shipped:** HUD uses a live Tick clock (not dropped) for tick + hash; 3D/world still snapshot-throttled (see MF-2). [`M22-plan.md`](M22-plan.md). |
-| MF-2 | Viewer world refresh | **Planned (M23)** | Researcher still does **not see every tick** in the 3D view, inspector, or other `state.sim` surfaces. HUD (MF-1) is live; world is not. [`M23-plan.md`](M23-plan.md). |
-| MF-3 | Tick barrier / LLM | **Planned (M23)** | Researcher cannot **verify** that every living agent finished every pipeline stage (perceive → retrieve → select → execute → remember) **before** tick *T+1* starts, including while an LLM call is outstanding. Timeout today is `Wait` + continue. Barrier is opt-in bounded retries (default 3), then Wait. [`M23-plan.md`](M23-plan.md). |
+| MF-2 | Viewer world refresh | **Done (M23)** | Researcher still does **not see every tick** in the 3D view, inspector, or other `state.sim` surfaces. HUD (MF-1) is live; world is not. **Shipped:** Snapshot every Tick, one decode per frame in order, live vs world on Status. [`M23-plan.md`](M23-plan.md). |
+| MF-3 | Tick barrier / LLM | **Done (M23)** | Researcher cannot **verify** that every living agent finished every pipeline stage (perceive → retrieve → select → execute → remember) **before** tick *T+1* starts, including while an LLM call is outstanding. Timeout today is `Wait` + continue. **Shipped:** pipeline N/N from timing; opt-in `[llm] barrier` / `--llm-barrier` with default 3 extra retries then Wait. [`M23-plan.md`](M23-plan.md). |
 
 ## MF-1 notes
 

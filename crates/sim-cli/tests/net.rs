@@ -4,7 +4,7 @@ use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage, hello};
 use shared::transport::Connection;
 use sim_core::{Simulation, parse_item};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -956,5 +956,142 @@ fn start_paused_holds_tick_until_play() {
         .unwrap();
     let _ = conn.recv_msg::<ServerMessage>();
     let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn subscribe_reports_paused_when_start_paused() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: false,
+        want_decisions: false,
+    })
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert_eq!(markdown_or_path, "paused");
+        }
+        other => panic!("expected paused, got {other:?}"),
+    }
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn subscribe_reports_playing_when_running() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control"]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: false,
+        want_decisions: false,
+    })
+    .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert_eq!(markdown_or_path, "playing", "{markdown_or_path}");
+        }
+        other => panic!("expected playing, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+fn spawn_connect(url: &str, extra: &[&str]) -> Child {
+    Command::new(bin())
+        .args(["--connect", url])
+        .args(extra)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn connect")
+}
+
+fn wait_stdout_contains(client: &mut Child, needle: &str, secs: u64) -> String {
+    let out = client.stdout.take().expect("stdout");
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    let want = needle.to_string();
+    thread::spawn(move || {
+        let mut all = String::new();
+        let reader = BufReader::new(out);
+        for line in reader.lines() {
+            let line = line.unwrap_or_default();
+            all.push_str(&line);
+            all.push('\n');
+            if all.contains(&want) {
+                let _ = tx.send(all.clone());
+            }
+        }
+        let _ = tx.send(all);
+    });
+    rx.recv_timeout(Duration::from_secs(secs))
+        .unwrap_or_else(|_| panic!("timeout waiting for {needle}"))
+}
+
+#[test]
+fn connect_allow_control_play_unpauses() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let mut client = spawn_connect(&url, &["--allow-control"]);
+    {
+        let mut stdin = client.stdin.take().expect("stdin");
+        stdin.write_all(b"/play\n").unwrap();
+        drop(stdin);
+    }
+    let cout = wait_stdout_contains(&mut client, "tick=", 20);
+    assert!(cout.contains("tick="), "{cout}");
+    let _ = client.wait();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_allow_control_give_changes_hash() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let mut client = spawn_connect(&url, &["--allow-control"]);
+    let mut stdin = client.stdin.take().expect("stdin");
+    stdin.write_all(b"/give 0 berry_bush 1\n").unwrap();
+    let cout = wait_stdout_contains(&mut client, "gave", 20);
+    assert!(cout.contains("gave"), "{cout}");
+
+    let (mut probe, _, _) = dummy_read_hello(&url, None).unwrap();
+    probe.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = probe.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("{snap:?}");
+    };
+    let sim = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    let item = parse_item("berry_bush", &sim.config.world.species).expect("berry");
+    let n = sim
+        .agents
+        .get(&sim_core::AgentId(0))
+        .map(|a| a.inventory.get(&item).copied().unwrap_or(0))
+        .unwrap_or(0);
+    assert!(n >= 1, "inventory {n}");
+    stdin.write_all(b"/play\n").unwrap();
+    drop(stdin);
+    let _ = probe.close();
+    let _ = client.wait();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn connect_allow_control_without_server_flag_is_disabled() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let mut client = spawn_connect(&url, &["--allow-control"]);
+    {
+        let mut stdin = client.stdin.take().expect("stdin");
+        stdin.write_all(b"/pause\n").unwrap();
+        drop(stdin);
+    }
+    let cout = wait_stdout_contains(&mut client, "error:", 20);
+    assert!(
+        cout.to_ascii_lowercase().contains("control") || cout.contains("error:"),
+        "{cout}"
+    );
+    let _ = client.wait();
     let _ = wait_hash(&mut child, out_h, err_h);
 }
