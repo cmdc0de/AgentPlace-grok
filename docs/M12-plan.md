@@ -88,7 +88,8 @@ Inspector lists **all** active incentives and marks hidden ones. Agent-POV / pro
 | **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
 | **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
-| After M23 | Protobuf/TLS; reflection; embeddings |
+| **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
+| After M24 | Protobuf/TLS; reflection; embeddings |
 | Not M12 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

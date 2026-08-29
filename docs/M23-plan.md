@@ -30,7 +30,7 @@ A researcher can:
 - Apply Snapshots **in receive order**, **at most one decode per Bevy frame**. Never skip to the latest. Researcher sees *T* then *T+1* even if the HUD live clock is ahead.
 - IO thread: **do not drop** Snapshot (`send`, not `try_send`). Tick may still be HUD-only if the Bevy queue is full (live clock already survives that). Enlarge the sync channel if 64 is tight.
 - Status: `tick {world}` from `state.sim.tick`; when attached and live ≠ world, also show live (MF-1 clock) so catch-up is visible. Hash on the HUD stays the live hash (MF-1).
-- No server lockstep ack. The sim does **not** wait for the viewer to paint. (Ack would bump PROTOCOL — After M23.)
+- No server lockstep ack. The sim does **not** wait for the viewer to paint. (Ack is [`M24-plan.md`](M24-plan.md).)
 - Server already answers `RequestSnapshot`. No new wire messages. Encode-every-tick is accepted cost for researcher attach.
 
 **In-process:**
@@ -92,8 +92,9 @@ sim-cli --connect tcp://… --allow-control --token SECRET
 
 | Later | What |
 |---|---|
-| After M23 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets; lockstep ack (server waits for viewer paint — would bump PROTOCOL); wire `/set` |
-| Not M23 | Browser; combat; CI Win/mac; Reflect/Plan LLM stages; hashed pipeline events; `sim-cli --connect` `/inject` |
+| **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
+| After M24 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets |
+| Not M23 | Browser; combat; CI Win/mac; Reflect/Plan LLM stages; hashed pipeline events |
 
 ## Key decisions
 

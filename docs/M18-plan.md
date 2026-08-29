@@ -98,7 +98,8 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
 | **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
-| After M23 | protobuf/TLS; extra LLM reflection/embeddings |
+| **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
+| After M24 | protobuf/TLS; extra LLM reflection/embeddings |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

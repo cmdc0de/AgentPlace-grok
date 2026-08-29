@@ -105,8 +105,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M20** | Done — [`M20-plan.md`](M20-plan.md) — revert relationship_delta on leave, stacked worn packs, attach safety net |
 | **M21** | Done — [`M21-plan.md`](M21-plan.md) — pack fill scale, sim-cli --connect, jump-to-tick on the wire |
 | **M22** | Done — [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
-| **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
-| After M23 | Protobuf/TLS; LLM reflection-on-evict |
+| **M23** | Done — [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
+| **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
+| After M24 | Protobuf/TLS; LLM reflection-on-evict |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions
