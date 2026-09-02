@@ -97,8 +97,9 @@ Hello **v4 vs v5** is Protocol. Old v4 clients cannot talk to a lockstep v5 serv
 
 | Later | What |
 |---|---|
-| After M24 | protobuf/TLS; extra LLM reflection/embeddings; Unix sockets |
-| Not M24 | Browser; combat; CI Win/mac; Reflect/Plan stages; hashed pipeline events; Ack timeout; lockstep without PROTOCOL bump |
+| **M25** | [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
+| After M25 | protobuf/TLS; embeddings; Unix sockets; Reflect/Plan every-N-ticks |
+| Not M24 | Browser; combat; CI Win/mac; hashed pipeline events |
 
 ## Key decisions
 

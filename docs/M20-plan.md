@@ -90,7 +90,8 @@ Not a protocol feature. On **implement**:
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
 | **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
 | **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
-| After M24 | protobuf/TLS; extra LLM reflection/embeddings |
+| **M25** | [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
+| After M25 | protobuf/TLS; extra LLM reflection/embeddings |
 | Not M20 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings |
 
 ## Key decisions
