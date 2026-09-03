@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M30 are done. **Current next slice:** [`M31-plan.md`](M31-plan.md) (kinship, reproduction, D&D-like sheet). Later work is listed at the bottom of that file.
+M3–M31 are done. **Current next slice:** [`M32-plan.md`](M32-plan.md) (kin_of incentives, household, aging). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

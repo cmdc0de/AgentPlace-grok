@@ -89,8 +89,9 @@ Do **not** add extra LLM call types. Mid-run HTTP failure stays `Wait`.
 | **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
 | **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
-| **M31** | [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
-| After M31 | protobuf/TLS |
+| **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
+| **M32** | [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
+| After M32 | protobuf/TLS |
 | Not M17 | Browser; combat; CI Win/mac; extra LLM reflection; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

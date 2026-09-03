@@ -72,7 +72,8 @@ CLI: `--reproduction` implies `--sheet`.
 
 | Later | What |
 |---|---|
-| After M31 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; `kin_of` incentives; household; aging |
+| **M32** | [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
+| After M32 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client** |
 | Not M31 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions
