@@ -104,6 +104,9 @@ pub enum SimEventKind {
     Incapacitated {
         by: AgentId,
     },
+    CombatDeath {
+        by: AgentId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,6 +263,10 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update([27u8]);
             hasher.update(by.0.to_le_bytes());
         }
+        SimEventKind::CombatDeath { by } => {
+            hasher.update([28u8]);
+            hasher.update(by.0.to_le_bytes());
+        }
     }
 }
 
@@ -308,6 +315,7 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Attack { .. } => "Attack",
         SimEventKind::Flee => "Flee",
         SimEventKind::Incapacitated { .. } => "Incapacitated",
+        SimEventKind::CombatDeath { .. } => "CombatDeath",
     }
 }
 
@@ -341,6 +349,7 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::Attack { .. } => "attack",
         SimEventKind::Flee => "flee",
         SimEventKind::Incapacitated { .. } => "incapacitated",
+        SimEventKind::CombatDeath { .. } => "combat_death",
     }
 }
 
@@ -395,5 +404,6 @@ pub fn is_primary_kind(kind: &SimEventKind) -> bool {
             | SimEventKind::Died { .. }
             | SimEventKind::RuleBlocked { .. }
             | SimEventKind::Incapacitated { .. }
+            | SimEventKind::CombatDeath { .. }
     )
 }

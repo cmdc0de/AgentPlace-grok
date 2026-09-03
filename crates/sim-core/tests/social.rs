@@ -211,6 +211,7 @@ fn relationships_survive_eviction() {
                     id: 0,
                     participants: vec![other],
                     valence: 0,
+                    ..Default::default()
                 },
             );
         }

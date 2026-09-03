@@ -260,12 +260,17 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         return;
     }
     let mut down = false;
+    let mut lethal = false;
     if let Some(d) = sim.agents.get_mut(&target) {
         d.needs.energy = d.needs.energy.saturating_sub(damage);
         d.health = d.health.saturating_sub(damage);
-        if d.health == 0 && !d.incapacitated {
-            d.incapacitated = true;
-            down = true;
+        if d.health == 0 {
+            if sim.conflict_death_enabled {
+                lethal = true;
+            } else if !d.incapacitated {
+                d.incapacitated = true;
+                down = true;
+            }
         }
     }
     push(
@@ -279,6 +284,14 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
             target,
             SimEventKind::Incapacitated { by: id },
         );
+    }
+    if lethal {
+        push(
+            sim,
+            target,
+            SimEventKind::CombatDeath { by: id },
+        );
+        sim.agents.remove(&target);
     }
 }
 
@@ -832,6 +845,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
                 id: 0,
                 participants: Vec::new(),
                 valence: -80,
+                ..Default::default()
             },
         );
         let _ = agent.remember(
@@ -849,6 +863,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
                 id: 0,
                 participants: Vec::new(),
                 valence: -90,
+                ..Default::default()
             },
         );
     }
@@ -1113,6 +1128,7 @@ fn propose(
             id: 0,
             participants: Vec::new(),
             valence: 0,
+            ..Default::default()
         },
     );
     push(sim, id, SimEventKind::Propose { proposal_id: pid });
@@ -1164,6 +1180,7 @@ fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
             id: 0,
             participants: author.into_iter().collect(),
             valence: if support { 50 } else { -50 },
+            ..Default::default()
         },
     );
     if let Some(a) = sim.agents.get(&id) {
@@ -1206,6 +1223,7 @@ fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
                         id: 0,
                         participants: vec![id],
                         valence: if support { 40 } else { -40 },
+                        ..Default::default()
                     },
                 );
                 if let Some(a) = sim.agents.get_mut(&author) {
@@ -1245,6 +1263,7 @@ fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) 
             id: 0,
             participants: Vec::new(),
             valence: 0,
+            ..Default::default()
         },
     );
 }
@@ -1257,6 +1276,9 @@ pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, mut entry: Memor
     let milli = crate::incentive::memory_boost_milli(sim, id, entry.kind);
     entry.importance =
         crate::incentive::scale_u32(u32::from(entry.importance), milli).min(255) as u8;
+    if sim.config.agents.memory.enable_embeddings {
+        entry.ensure_embedding();
+    }
     let dropped = if let Some(a) = sim.agents.get_mut(&id) {
         a.remember(cap, policy, bonus, persist, entry)
     } else {
@@ -1307,6 +1329,7 @@ pub fn apply_heard_memories(
                 id: 0,
                 participants: parts.clone(),
                 valence: 0,
+                ..Default::default()
             },
         );
         for (i, spec) in species.vegetation.iter().enumerate() {
@@ -1331,6 +1354,7 @@ pub fn apply_heard_memories(
                         id: 0,
                         participants: parts.clone(),
                         valence: -40,
+                        ..Default::default()
                     },
                 );
             }

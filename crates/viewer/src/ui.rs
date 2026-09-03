@@ -828,6 +828,7 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Attack { .. } => "attack",
         SimEventKind::Flee => "flee",
         SimEventKind::Incapacitated { .. } => "incapacitated",
+        SimEventKind::CombatDeath { .. } => "combat_death",
     }
 }
 

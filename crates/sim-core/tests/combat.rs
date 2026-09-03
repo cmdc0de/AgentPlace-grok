@@ -52,8 +52,19 @@ fn place_adjacent(sim: &mut Simulation) -> (AgentId, AgentId) {
 fn overlay_parses_conflict() {
     let p = ConflictParams::from_config_toml("[conflict]\nenabled = true\n");
     assert!(p.enabled);
+    assert!(!p.death_enabled);
     let d = ConflictParams::from_config_toml("[llm]\nprovider = \"mock\"\n");
     assert!(!d.enabled);
+    assert!(!d.death_enabled);
+}
+
+#[test]
+fn overlay_parses_conflict_death() {
+    let p = ConflictParams::from_config_toml(
+        "[conflict]\nenabled = true\ndeath_enabled = true\n",
+    );
+    assert!(p.enabled);
+    assert!(p.death_enabled);
 }
 
 #[test]
@@ -200,6 +211,43 @@ fn combat_role_helper_distinct() {
     assert_ne!(
         format!("{:?}", CombatRole::Attacker),
         format!("{:?}", CombatRole::Defender)
+    );
+}
+
+#[test]
+fn mock_conflict_death_overlay_no_attack_same_hash() {
+    let cfg = tiny(0x29_10);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.conflict_enabled = true;
+    on.conflict_death_enabled = true;
+    off.run_ticks(6);
+    on.run_ticks(6);
+    assert_eq!(off.state_hash(), on.state_hash());
+}
+
+#[test]
+fn health_zero_combat_death_removes() {
+    let mut sim = Simulation::new(tiny(0x29_11)).unwrap();
+    sim.conflict_enabled = true;
+    sim.conflict_death_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim.agents.get_mut(&b).unwrap().health = ATTACK_DAMAGE;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    assert!(sim.agents.get(&b).is_none(), "combat death must remove");
+    assert!(sim.agents.get(&a).is_some());
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::CombatDeath { by } if by == a
+    )));
+    assert!(
+        !sim.events
+            .events
+            .iter()
+            .any(|e| matches!(e.kind, SimEventKind::Incapacitated { .. })),
+        "{:?}",
+        sim.events.events
     );
 }
 

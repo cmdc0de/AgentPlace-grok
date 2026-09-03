@@ -1,8 +1,8 @@
 # M29 — Local embeddings, combat death, CI Win/mac
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M28 complete (`docs/M28-plan.md`, git tag `M28`, commit `da75c86`)  
-**Walkthrough:** written on implement (`docs/M29-test-plan.md`)  
+**Walkthrough:** [`M29-test-plan.md`](M29-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` (optional embeddings, not in `state_hash`), `M5-plan.md` (`enable_embeddings = false` default; no network embed), `medium-priority-specs.md` §2 (`death_enabled` after incapacitation)
 
 ## Context

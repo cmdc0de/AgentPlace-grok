@@ -79,7 +79,9 @@ fn main() {
             sim.llm_plan_every_n = barrier.plan_every_n_ticks;
             sim.llm_plan_length = barrier.plan_length;
             sim.llm_execute_plan = barrier.execute_plan;
-            sim.conflict_enabled = sim_core::ConflictParams::from_config_toml(&text).enabled;
+            let conflict = sim_core::ConflictParams::from_config_toml(&text);
+            sim.conflict_enabled = conflict.enabled;
+            sim.conflict_death_enabled = conflict.death_enabled;
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

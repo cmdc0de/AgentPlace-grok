@@ -355,6 +355,7 @@ impl Simulation {
             llm_plan_length: 4,
             llm_execute_plan: false,
             conflict_enabled: false,
+            conflict_death_enabled: false,
         };
         if let Some(raw) = body.active_incentives.entries.get(1) {
             if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {
@@ -649,6 +650,9 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         SimEventKind::Flee => "{\"type\":\"flee\"}".to_string(),
         SimEventKind::Incapacitated { by } => {
             format!("{{\"type\":\"incapacitated\",\"by\":{}}}", by.0)
+        }
+        SimEventKind::CombatDeath { by } => {
+            format!("{{\"type\":\"combat_death\",\"by\":{}}}", by.0)
         }
     };
     format!(

@@ -93,6 +93,8 @@ pub struct Simulation {
     pub llm_execute_plan: bool,
     /// Overlay `[conflict] enabled`. Not hashed.
     pub conflict_enabled: bool,
+    /// Overlay `[conflict] death_enabled`. Not hashed.
+    pub conflict_death_enabled: bool,
 }
 
 impl Simulation {
@@ -158,6 +160,7 @@ impl Simulation {
             llm_plan_length: 4,
             llm_execute_plan: false,
             conflict_enabled: false,
+            conflict_death_enabled: false,
         })
     }
 
@@ -420,6 +423,7 @@ impl Simulation {
                     id: 0,
                     participants: Vec::new(),
                     valence: 0,
+                    ..Default::default()
                 },
             );
         }
@@ -500,6 +504,7 @@ impl Simulation {
                 id: 0,
                 participants: Vec::new(),
                 valence: 0,
+                ..Default::default()
             },
         );
     }
@@ -834,6 +839,9 @@ impl Simulation {
 
     fn step_agent(&mut self, id: AgentId) -> AgentTiming {
         let mut timing = AgentTiming::new(id);
+        if self.agents.get(&id).is_none() {
+            return timing;
+        }
         if self
             .agents
             .get(&id)
@@ -859,10 +867,24 @@ impl Simulation {
         let retrieved_ids: Vec<u64> = {
             let bonus = self.config.social_bonus_milli();
             let k = self.config.agents.memory.retrieval_k as usize;
+            let query = if self.config.agents.memory.enable_embeddings {
+                let mut s = format!("h{} t{} e{}", obs.hunger, obs.thirst, obs.energy);
+                for h in &obs.heard {
+                    s.push(' ');
+                    s.push_str(&h.text);
+                }
+                for t in &obs.toxins {
+                    s.push(' ');
+                    s.push_str(t);
+                }
+                Some(s)
+            } else {
+                None
+            };
             self.agents
                 .get(&id)
                 .map(|a| {
-                    crate::memory::retrieve(&a.memory, k, bonus)
+                    crate::memory::retrieve(&a.memory, k, bonus, query.as_deref())
                         .into_iter()
                         .map(|e| e.id)
                         .collect()
@@ -1092,6 +1114,7 @@ impl Simulation {
                 id: 0,
                 participants: Vec::new(),
                 valence: 0,
+                ..Default::default()
             },
         );
         let (broadcast, targets) = match speak.to {

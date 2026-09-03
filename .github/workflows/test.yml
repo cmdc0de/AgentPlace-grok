@@ -1,0 +1,32 @@
+# Mock CI matrix. No network, no live LLM.
+# Viewer tests are command/net helpers only — do not launch the Bevy/imgui
+# GUI here (runners may have no display).
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.1
+      - name: Mock tests (no network)
+        shell: bash
+        run: |
+          cargo test -p sim-core
+          cargo test -p shared
+          cargo test -p sim-cli --test net
+          cargo test -p viewer

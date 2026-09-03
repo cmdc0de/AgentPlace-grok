@@ -39,6 +39,7 @@ fn noise(tick: u64, text: &str) -> MemoryEntry {
         id: 0,
         participants: Vec::new(),
         valence: 0,
+        ..Default::default()
     }
 }
 
