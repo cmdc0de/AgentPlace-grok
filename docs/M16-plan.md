@@ -111,8 +111,9 @@ Researcher imgui **Board** window stays full. Agent-POV 3D fog unchanged (still 
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
 | **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
-| **M32** | [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
-| After M32 | protobuf/TLS |
+| **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
+| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| After M33 | protobuf/TLS |
 | Not M16 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump; `/set respect`; weighted council |
 
 ## Key decisions

@@ -109,8 +109,9 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
 | **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
-| **M32** | [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
-| After M32 | Protobuf / JSON envelope; TLS/`wss` |
+| **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
+| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| After M33 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions

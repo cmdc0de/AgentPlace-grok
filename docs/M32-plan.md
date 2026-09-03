@@ -71,7 +71,8 @@ CLI: `--aging` (does **not** imply `--sheet` / `--reproduction`).
 
 | Later | What |
 |---|---|
-| After M32 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; household shared crates; culture inheritance |
+| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| After M33 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
 | Not M32 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions
