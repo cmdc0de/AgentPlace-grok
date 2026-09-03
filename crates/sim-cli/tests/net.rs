@@ -1433,4 +1433,41 @@ fn browser_page_ships_protocol_5() {
     assert!(text.contains("PROTOCOL_VERSION = 5"), "{text}");
     assert!(text.contains("postcard"), "{text}");
     assert!(text.contains("ws://"), "{text}");
+    assert!(text.contains("id=\"agents\""), "agents section");
+    assert!(text.contains("id=\"board\""), "board section");
+    assert!(text.contains("id=\"metrics\""), "metrics section");
+    assert!(text.contains("encodeSubscribe"), "{text}");
+    assert!(text.contains("encodeRequestSnapshot"), "{text}");
+    assert!(text.contains("inspector"), "{text}");
+}
+
+#[test]
+fn tick_metrics_include_inspector() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: true,
+        want_decisions: true,
+    })
+    .unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    loop {
+        match conn.recv_msg::<ServerMessage>().unwrap() {
+            ServerMessage::Tick { metrics, .. } => {
+                let v: serde_json::Value = serde_json::from_slice(&metrics).expect("metrics json");
+                assert!(v.get("inspector").is_some(), "{v}");
+                let agents = v["inspector"]["agents"].as_array().expect("agents");
+                assert!(!agents.is_empty(), "{v}");
+                assert!(v["inspector"]["board"].is_object(), "{v}");
+                assert!(v["inspector"]["metrics"].is_object(), "{v}");
+                let t: sim_core::TickTiming = serde_json::from_slice(&metrics).unwrap();
+                assert!(t.tick > 0);
+                break;
+            }
+            ServerMessage::ReportReady { .. } | ServerMessage::Snapshot { .. } => {}
+            other => panic!("expected Tick, got {other:?}"),
+        }
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
 }

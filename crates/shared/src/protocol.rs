@@ -185,8 +185,51 @@ mod tests {
         assert!(frame.len() >= 7, "{:?}", frame);
         let len = u32::from_le_bytes(frame[0..4].try_into().unwrap());
         assert_eq!(len as usize, frame.len() - 4);
-        assert_eq!(&frame[4..], &[0, 5, 0], "Hello variant 0, protocol 5, token None");
+        assert_eq!(
+            &frame[4..],
+            &[0, 5, 0],
+            "Hello variant 0, protocol 5, token None"
+        );
         assert_eq!(PROTOCOL_VERSION, 5);
+    }
+
+    #[test]
+    fn subscribe_true_true_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::Subscribe {
+            want_events: true,
+            want_decisions: true,
+        })
+        .unwrap();
+        assert_eq!(&frame[4..], &[1, 1, 1]);
+    }
+
+    #[test]
+    fn request_snapshot_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::RequestSnapshot).unwrap();
+        assert_eq!(&frame[4..], &[2]);
+    }
+
+    #[test]
+    fn tick_postcard_layout_metrics_at_end() {
+        let metrics = br#"{"inspector":{"agents":[]}}"#;
+        let msg = ServerMessage::Tick {
+            tick: 4,
+            state_hash: [9; 32],
+            events: b"[]".to_vec(),
+            decisions: b"[]".to_vec(),
+            metrics: metrics.to_vec(),
+        };
+        let frame = encode_frame(&msg).unwrap();
+        let p = &frame[4..];
+        assert_eq!(p[0], 2, "Tick variant");
+        assert_eq!(p[1], 4, "tick varint");
+        assert_eq!(&p[2..34], &[9; 32]);
+        assert_eq!(p[34], 2);
+        assert_eq!(&p[35..37], b"[]");
+        assert_eq!(p[37], 2);
+        assert_eq!(&p[38..40], b"[]");
+        assert_eq!(p[40], metrics.len() as u8);
+        assert_eq!(&p[41..41 + metrics.len()], metrics);
     }
 
     #[test]

@@ -4,25 +4,43 @@
   <meta charset="utf-8" />
   <title>AgentPlace attach (postcard v5)</title>
   <style>
-    body { font-family: sans-serif; margin: 1.5rem; max-width: 48rem; }
-    #log { white-space: pre-wrap; background: #111; color: #eee; padding: 1rem; min-height: 8rem; }
-    label { display: block; margin: 0.5rem 0; }
+    body { font-family: sans-serif; margin: 1.5rem; max-width: 96rem; }
+    #log { white-space: pre-wrap; background: #111; color: #eee; padding: 1rem; min-height: 6rem; max-height: 12rem; overflow: auto; }
+    label { display: inline-block; margin: 0.5rem 1rem 0.5rem 0; }
+    table { border-collapse: collapse; margin: 0.5rem 0 1.25rem; width: 100%; font-size: 0.9rem; }
+    th, td { border: 1px solid #ccc; padding: 0.25rem 0.4rem; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; }
+    h2 { margin-top: 1.25rem; }
+    .muted { color: #666; }
   </style>
 </head>
 <body>
   <h1>AgentPlace browser attach</h1>
-  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Same Hello/Welcome/Tick as <code>sim-cli --connect</code>.</p>
+  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Tables come from <code>Tick.metrics.inspector</code> JSON (no wasm). Play/Pause still optional with <code>--allow-control</code>.</p>
   <label>WebSocket URL <input id="url" size="40" value="ws://127.0.0.1:9001" /></label>
   <label>Token (optional) <input id="token" size="20" /></label>
   <button id="connect">Connect</button>
   <button id="play" disabled>Play</button>
   <button id="pause" disabled>Pause</button>
   <div id="log"></div>
+  <h2>Agents</h2>
+  <p id="agents-empty" class="muted">Waiting for Tick (hit Play if the server started paused).</p>
+  <div id="agents"></div>
+  <h2>Board</h2>
+  <div id="board"></div>
+  <h2>Metrics</h2>
+  <div id="metrics"></div>
   <script>
     const PROTOCOL_VERSION = 5;
     function log(s) {
       const el = document.getElementById("log");
       el.textContent += s + "\n";
+      el.scrollTop = el.scrollHeight;
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
     }
     function varint(n) {
       const out = [];
@@ -34,6 +52,16 @@
       out.push(x);
       return out;
     }
+    function frame(body) {
+      const len = body.length;
+      const out = new Uint8Array(4 + len);
+      out[0] = len & 255;
+      out[1] = (len >>> 8) & 255;
+      out[2] = (len >>> 16) & 255;
+      out[3] = (len >>> 24) & 255;
+      out.set(body, 4);
+      return out;
+    }
     function encodeHello(token) {
       const body = [0];
       body.push(...varint(PROTOCOL_VERSION));
@@ -43,22 +71,16 @@
       } else {
         body.push(0);
       }
-      const len = body.length;
-      const frame = new Uint8Array(4 + len);
-      frame[0] = len & 255;
-      frame[1] = (len >>> 8) & 255;
-      frame[2] = (len >>> 16) & 255;
-      frame[3] = (len >>> 24) & 255;
-      frame.set(body, 4);
-      return frame;
+      return frame(body);
+    }
+    function encodeSubscribe() {
+      return frame([1, 1, 1]);
+    }
+    function encodeRequestSnapshot() {
+      return frame([2]);
     }
     function encodeControl(play) {
-      const body = [3, play ? 1 : 0];
-      const len = body.length;
-      const frame = new Uint8Array(4 + len);
-      frame[0] = len & 255;
-      frame.set(body, 4);
-      return frame;
+      return frame([3, play ? 1 : 0]);
     }
     function readVarint(u8, i) {
       let n = 0, shift = 0;
@@ -70,10 +92,21 @@
       }
       return [n >>> 0, i];
     }
-    function decodeServer(frame) {
-      if (frame.length < 4) return { type: "truncated" };
-      const len = frame[0] | (frame[1] << 8) | (frame[2] << 16) | (frame[3] << 24);
-      const p = frame.subarray(4, 4 + len);
+    function readVec(u8, i) {
+      const [len, i2] = readVarint(u8, i);
+      return [u8.subarray(i2, i2 + len), i2 + len];
+    }
+    function utf8(bytes) {
+      return new TextDecoder().decode(bytes);
+    }
+    function parseJsonBytes(bytes) {
+      if (!bytes || !bytes.length) return null;
+      try { return JSON.parse(utf8(bytes)); } catch { return null; }
+    }
+    function decodeServer(raw) {
+      if (raw.length < 4) return { type: "truncated" };
+      const len = raw[0] | (raw[1] << 8) | (raw[2] << 16) | (raw[3] << 24);
+      const p = raw.subarray(4, 4 + len);
       let i = 0;
       const [tag, i1] = readVarint(p, i);
       i = i1;
@@ -85,16 +118,94 @@
           .join("");
         return { type: "Welcome", tick, hash: hash.slice(0, 16) + "…" };
       }
+      if (tag === 1) return { type: "Snapshot" };
       if (tag === 2) {
         const [tick, i2] = readVarint(p, i);
         i = i2;
         const hash = Array.from(p.subarray(i, i + 32))
           .map((b) => b.toString(16).padStart(2, "0"))
           .join("");
-        return { type: "Tick", tick, hash: hash.slice(0, 16) + "…" };
+        i += 32;
+        let inspector = null;
+        try {
+          const ev = readVec(p, i); i = ev[1];
+          const dec = readVec(p, i); i = dec[1];
+          const met = readVec(p, i);
+          const metrics = parseJsonBytes(met[0]);
+          if (metrics && metrics.inspector) inspector = metrics.inspector;
+        } catch (e) { /* keep M35 tick/hash if postcard layout mismatches */ }
+        return { type: "Tick", tick, hash: hash.slice(0, 16) + "…", inspector };
       }
+      if (tag === 3) return { type: "ReportReady" };
       if (tag === 4) return { type: "Error" };
       return { type: "msg", tag };
+    }
+    function mapText(obj) {
+      if (!obj || typeof obj !== "object") return "";
+      return Object.entries(obj).map(([k, v]) => k + "=" + v).join(" ");
+    }
+    function renderInspector(ins) {
+      const empty = document.getElementById("agents-empty");
+      if (!ins) return;
+      empty.style.display = "none";
+      const agents = ins.agents || [];
+      let html = "<table><thead><tr><th>id</th><th>cell</th><th>hunger</th><th>thirst</th><th>energy</th><th>health</th><th>sheet</th><th>inventory</th><th>pack</th><th>goals</th><th>last</th><th>relationships</th><th>kinship</th></tr></thead><tbody>";
+      for (const a of agents) {
+        const rel = (a.relationships || []).map((r) =>
+          "#" + r.id + " t" + r.trust + " a" + r.affinity + " r" + r.respect + " f" + r.fear
+        ).join("; ");
+        html += "<tr>" +
+          "<td>" + esc(a.id) + "</td>" +
+          "<td>" + esc(a.x) + "," + esc(a.y) + "</td>" +
+          "<td>" + esc(a.hunger) + "</td>" +
+          "<td>" + esc(a.thirst) + "</td>" +
+          "<td>" + esc(a.energy) + "</td>" +
+          "<td>" + esc(a.health) + "</td>" +
+          "<td>" + esc(mapText(a.sheet)) + "</td>" +
+          "<td>" + esc(mapText(a.inventory)) + "</td>" +
+          "<td>" + esc(mapText(a.pack)) + "</td>" +
+          "<td>" + esc((a.goals || []).join("; ")) + "</td>" +
+          "<td>" + esc(a.last_action || "") + "</td>" +
+          "<td>" + esc(rel) + "</td>" +
+          "<td>" + esc((a.kinship || []).join("; ")) + "</td>" +
+          "</tr>";
+      }
+      html += "</tbody></table>";
+      document.getElementById("agents").innerHTML = html;
+
+      const board = ins.board || {};
+      const open = board.open || [];
+      const adopted = board.adopted || [];
+      let bhtml = "<h3>Open</h3><table><thead><tr><th>id</th><th>author</th><th>text</th><th>support</th><th>oppose</th></tr></thead><tbody>";
+      for (const p of open) {
+        bhtml += "<tr><td>" + esc(p.id) + "</td><td>" + esc(p.author) + "</td><td>" + esc(p.text) +
+          "</td><td>" + esc(p.supporters) + "</td><td>" + esc(p.opposers) + "</td></tr>";
+      }
+      if (!open.length) bhtml += "<tr><td colspan=\"5\" class=\"muted\">none</td></tr>";
+      bhtml += "</tbody></table><h3>Adopted</h3><table><thead><tr><th>proposal</th><th>text</th></tr></thead><tbody>";
+      for (const r of adopted) {
+        bhtml += "<tr><td>" + esc(r.proposal_id) + "</td><td>" + esc(r.text) + "</td></tr>";
+      }
+      if (!adopted.length) bhtml += "<tr><td colspan=\"2\" class=\"muted\">none</td></tr>";
+      bhtml += "</tbody></table>";
+      document.getElementById("board").innerHTML = bhtml;
+
+      const m = ins.metrics || {};
+      const t = m.timing || {};
+      let mhtml = "<table><tbody>" +
+        "<tr><th>hungry</th><td>" + esc(m.hungry) + "</td></tr>" +
+        "<tr><th>thirsty</th><td>" + esc(m.thirsty) + "</td></tr>" +
+        "<tr><th>tired</th><td>" + esc(m.tired) + "</td></tr>" +
+        "<tr><th>mean trust</th><td>" + esc(m.mean_trust) + "</td></tr>" +
+        "<tr><th>illness</th><td>" + esc(m.illness) + "</td></tr>" +
+        "<tr><th>timing tick</th><td>" + esc(t.tick != null ? t.tick : "") + "</td></tr>" +
+        "<tr><th>wall_ns</th><td>" + esc(t.wall_ns != null ? t.wall_ns : "") + "</td></tr>" +
+        "<tr><th>world_ns</th><td>" + esc(t.world_ns != null ? t.world_ns : "") + "</td></tr>" +
+        "<tr><th>board_ns</th><td>" + esc(t.board_ns != null ? t.board_ns : "") + "</td></tr>" +
+        "<tr><th>incentive_ns</th><td>" + esc(t.incentive_ns != null ? t.incentive_ns : "") + "</td></tr>" +
+        "<tr><th>agents_ns</th><td>" + esc(t.agents_ns != null ? t.agents_ns : "") + "</td></tr>" +
+        "</tbody></table>";
+      document.getElementById("metrics").innerHTML = mhtml;
     }
     let ws = null;
     document.getElementById("connect").onclick = () => {
@@ -105,12 +216,20 @@
       ws.onopen = () => {
         log("open " + url);
         ws.send(encodeHello(token || null));
+        ws.send(encodeSubscribe());
+        ws.send(encodeRequestSnapshot());
         document.getElementById("play").disabled = false;
         document.getElementById("pause").disabled = false;
       };
       ws.onmessage = (ev) => {
         const u8 = new Uint8Array(ev.data);
-        log(JSON.stringify(decodeServer(u8)));
+        const msg = decodeServer(u8);
+        if (msg.type === "Tick" || msg.type === "Welcome") {
+          log(JSON.stringify({ type: msg.type, tick: msg.tick, hash: msg.hash }));
+        } else {
+          log(JSON.stringify({ type: msg.type, tag: msg.tag }));
+        }
+        if (msg.inspector) renderInspector(msg.inspector);
       };
       ws.onerror = () => log("error");
       ws.onclose = () => log("close");

@@ -18,7 +18,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-4 | Sheet effects on the agent | Open | Remaining score → sim uses (accuracy, invent, haul cap, illness, …). M34 shipped a first set. |
 | PG-5 | Inventions | Open | Invented artifacts: private payoff for the inventor vs public payoff for the society. |
 | PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models for agents, food/veg, and every item. |
-| PG-7 | Browser researcher UI | Open | Attach page lists every agent, board posts, and metrics — no 3D required. |
+| PG-7 | Browser researcher UI | Done (M36) | Attach page lists every agent, board posts, and metrics — no 3D required. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -188,9 +188,9 @@ Out of this theme until picked: skeletal animation cycles, photogrammetry, per-a
 
 ## PG-7 — Browser researcher UI (no 3D)
 
-**Shipped today (M35):** `web/index.html` attaches on `ws://` with postcard **v5** and shows **tick + `state_hash`** (plus Play/Pause). That is a log tail, not an inspector.
+**Shipped today (M36):** `InspectorView::from_sim` (not hashed) plus `web/index.html` tables for every living agent, board posts, and metrics. Tick JSON extra key `inspector` (no PROTOCOL bump). wasm checkpoint decode still optional.
 
-**Wanted:** the browser client stays **2D / tables / text**. It does **not** need to render the Bevy world. After Hello + Snapshot (or equivalent decode of checkpoint bytes already on the wire), a researcher can inspect:
+**Wanted (later):** protobuf/TLS/`wss`; `/set` `/give` in the page; time-series charts; wasm Snapshot decode. The browser client stays **2D / tables / text**. A researcher can inspect:
 
 | Surface | What to show |
 |---|---|

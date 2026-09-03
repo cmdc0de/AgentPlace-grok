@@ -113,12 +113,7 @@ impl Hub {
             } else {
                 Vec::new()
             };
-            let metrics = self
-                .sim
-                .last_tick_timing
-                .as_ref()
-                .and_then(|t| serde_json::to_vec(t).ok())
-                .unwrap_or_default();
+            let metrics = sim_core::inspector::metrics_json_with_inspector(&self.sim);
             let _ = sub.tx.send(ServerMessage::Tick {
                 tick,
                 state_hash,

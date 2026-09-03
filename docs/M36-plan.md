@@ -1,8 +1,8 @@
 # M36 — Browser researcher UI (no 3D)
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M35 complete (`docs/M35-plan.md`, git tag `M35`)  
-**Walkthrough:** written on implement (`docs/M36-test-plan.md`)  
+**Walkthrough:** [`docs/M36-test-plan.md`](M36-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-7), `docs/M35-plan.md` (postcard WS attach)
 
 ## Context
@@ -86,7 +86,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M36-test-plan.md`).
+Walkthrough: [`docs/M36-test-plan.md`](M36-test-plan.md).
 
 ```bash
 cargo test -p sim-core
