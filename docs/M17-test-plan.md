@@ -1,6 +1,6 @@
 # M17 test plan — see each new feature
 
-Walkthrough for [`M17-plan.md`](M17-plan.md). Automated tests prove the code; the Spark section is the live LLM proof. CI / `cargo test` never need the network. Next slice: [`M34-plan.md`](M34-plan.md).
+Walkthrough for [`M17-plan.md`](M17-plan.md). Automated tests prove the code; the Spark section is the live LLM proof. CI / `cargo test` never need the network. Next slice: [`M35-plan.md`](M35-plan.md).
 
 `cargo test -- --exact NAME` takes **one** test name.
 

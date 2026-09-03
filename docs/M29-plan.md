@@ -70,8 +70,9 @@ Add `.github/workflows/test.yml`:
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
-| After M34 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
+| **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| **M35** | [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
+| After M35 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
 | Not M29 | PROTOCOL bump; flipping shipping `enable_embeddings` |
 
 ## Key decisions
@@ -79,7 +80,7 @@ Add `.github/workflows/test.yml`:
 1. **`PROTOCOL_VERSION` stays 5.**
 2. Embeddings are local projection only; vectors never enter `state_hash`. Shipping default stays false.
 3. Combat death is overlay; new event tag 28 append-only. Do not add fields to `Died`.
-4. CI matrix is mock tests. Browser stays After M34.
+4. CI matrix is mock tests. Browser attach is M35; TLS/`wss` stays later.
 5. Do not change shipping `configs/default.toml` / `coop.toml`. `format_version = 2`.
 
 ## Tests (M29 acceptance bar)

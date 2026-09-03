@@ -108,8 +108,9 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
-| After M34 | protobuf/TLS |
+| **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| **M35** | [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
+| After M35 | protobuf/TLS |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

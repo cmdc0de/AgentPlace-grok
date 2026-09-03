@@ -12,9 +12,12 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 
 | ID | Theme | Status | One-liner |
 |---|---|---|---|
-| PG-1 | Kinship / family relations | Open | Parent, child, sibling, pair-bond as first-class links, distinct from dyadic trust/respect. |
-| PG-2 | Children / reproduction | Open | Agents can have children; new agents spawn mid-run with derived identity. |
-| PG-3 | Physical sheet (D&D-like) | Open | Strength/Dex/Con/Int/Wis/Cha (plus a few derived stats). Founders rolled; children **calculated** from parents. |
+| PG-1 | Kinship / family relations | Done (M31/M32) | Parent, child, sibling, pair-bond, household, `kin_of` / `household` scopes. |
+| PG-2 | Children / reproduction | Done (M31) | PairBond/Reproduce; child sheet calculated. Aging/close-kin in M32/M34. |
+| PG-3 | Physical sheet (D&D-like) | Done (M31) | STR/DEX/CON/INT/WIS/CHA rolled for founders; children mixed. |
+| PG-4 | Sheet effects on the agent | Open | Remaining score → sim uses (accuracy, invent, haul cap, illness, …). M34 shipped a first set. |
+| PG-5 | Inventions | Open | Invented artifacts: private payoff for the inventor vs public payoff for the society. |
+| PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models for agents, food/veg, and every item. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -100,9 +103,89 @@ Hash: only when the sheet is enabled **or** a score ≠ the “uninitialized / u
 
 Viewer: inspector “Sheet” pane (STR 14 (+2) …). 3D capsule scale from size/CON optional, hash-neutral.
 
+**Shipped later:** M31 rolled the six scores + CON `health_max`. M34 applied STR attack damage, DEX move cost, WIS perception range, CHA influence vote weight. Remaining uses live in **PG-4**.
+
 ---
 
-## How these three interact
+## PG-4 — Sheet effects on the agent
+
+**Shipped today (M34):** unused scores (0) keep today’s constants. Overlay `[agents.sheet]` / `--sheet` rolls founders. Derived mods `(score-10)/2`. CON → `health_max = 10000 + CON_mod*500`. STR → Attack damage `2000 + STR_mod*250`. DEX → move energy `base − DEX_mod*40`. WIS → +mod vision/hear/ident cells. CHA → influence vote weight `influence + CHA_mod*100` (not stored). INT unused for sim math.
+
+**Wanted:** the rest of “the sheet changes what the body can do,” still derived (no extra blob fields), still 0-mod when unused.
+
+| Score | Remaining / deeper uses (lock in `/spec`) |
+|---|---|
+| Constitution | Already health max. Later: energy max, illness duration/chance. |
+| Dexterity / agility | Already move cost. Later: **defense vs accuracy** — attacker “to-hit” vs defender DEX so a high-DEX agent is **hit less often** when the attack needs a roll. Flee bonus. |
+| Intelligence | **Invent** chance / quality (PG-5). Soft: memory cap, retrieval_k, plan length. |
+| Strength | Already melee damage. Later: haul / inventory cap, gather/hunt payoff. |
+| Wisdom | Already perception range. Later: toxin detect, board range. |
+| Charisma | Already influence votes. Later: speech range/weight, proposal support, pair-bond odds. |
+
+Accuracy sketch (not locked): Attack stays adjacent; overlay-on sheet rolls a seeded check `attacker STR or DEX` vs `defender DEX`. Miss → no damage (or reduced). Overlay off / unused scores ⇒ always hit as today. Mock + unused ⇒ **same hashes**.
+
+INT → invent is **not** a free extra LLM call unless a later plan says so. Prefer a deterministic millipoint chance from INT_mod + a child RNG stream, then PG-5’s Invent action.
+
+Overlay off / score 0 ⇒ current constants. Do not store derived HP/accuracy; recompute from scores so `--load` cannot double-apply.
+
+---
+
+## PG-5 — Inventions
+
+**Shipped today:** Craft recipes (Basket, Spear, FishingRod, Backpack) are **fixed**. No mid-run discovery. No inventor credit. No society-wide unlock.
+
+**Wanted:** an opt-in overlay so an agent can **invent** something new. An invention is a named, hashed record: who, when, what it does. It has **two payoffs** that a `/spec` must keep distinct:
+
+| Audience | What it provides |
+|---|---|
+| **Inventor** | Private, first-mover: prestige / influence, exclusive Craft/use for *N* ticks, a protected memory, optional monopoly on the recipe. INT_mod (PG-4) raises invent chance or quality. |
+| **Society** | Public, after a delay or a Share/Propose: others may Craft or use it; optional adopted rule, incentive, or world recipe unlock. Not automatic omniscience — living agents in range / on the board learn it. |
+
+```toml
+[inventions]
+enabled = true          # default false
+# later: share_delay_ticks, inventor_exclusive_ticks, max_live, …
+```
+
+CLI: `--inventions` (does **not** imply `--sheet`; INT bonus is 0 if unused).
+
+Mechanics (sketch for a later `/spec`):
+
+- New `PrimaryAction::Invent` (append). Legal only when overlay **on**. Mock never picks it unless a plan says so.
+- Seeded outcome from `tick_{t}_agent_{id}_invent_0` plus INT_mod. Fail → Wait (or a hashed `InventFailed` if the plan wants it).
+- Success appends `SimEventKind::Invented { … }` and a small table packed in the board blob (id, inventor, tick, kind/effect). Hash only when non-empty.
+- Inventor payoff applies immediately to **that agent**. Society payoff starts later (delay, Share, or adopted rule) so A/B can measure “genius vs commons.”
+- Overlay **off** ⇒ action illegal, empty table, **same hashes**.
+
+Out of this theme until picked: full tech trees, stealing recipes, patents as governance meta-rules, LLM-written invention text (extra call).
+
+---
+
+## PG-6 — Viewer 3D models
+
+**Shipped today:** the 3D view is **primitives + colour**. Agents are capsules; vegetation/animals/fish use distinct `Mesh` kinds (M5 legend); crates/packs/combat FX are cubes, flashes, and scaled fill. That is enough to tell berry from hare, not a world that looks like the items.
+
+**Wanted:** authored **3D models** (glTF / Bevy scenes, or equivalent) so a researcher can read the scene without the legend:
+
+| Kind | Model |
+|---|---|
+| Agent | Humanoid (or species body); optional sheet/CON scale stays hash-neutral. |
+| Food / vegetation | One mesh per veg species (berry bush ≠ herb), plus hare, perch, crops. |
+| Each `ItemId` | Wood, fiber, stone, basket, spear, fishing rod, backpack — in world, crate, and worn pack. |
+| Later | Household home marker, invention artifacts (PG-5), incapacitated/dead poses. |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** Models never enter `state_hash` or checkpoints. Same sim, new art.
+- One asset per kind; palette/LOD optional. Fog still hides what Observation cannot see.
+- Fallback to today’s primitive if a file is missing (CI / headless must not require GPU art).
+- Do not block `cargo test -p viewer` on loading `.glb` from the network.
+
+Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture.
+
+---
+
+## How these interact
 
 ```
 Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shipped)
@@ -113,6 +196,8 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 ```
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
+
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only art for agents, food, and items (and later PG-5 artifacts); it does not change the sim.
 
 ---
 
@@ -128,4 +213,4 @@ Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinshi
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: aging, dialects, seasons, embeddings, Unix sockets, protobuf/TLS, combat `death_enabled`, etc. Prefer the After-M later-table when the item is already listed there.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, and viewer models are **PG-4 / PG-5 / PG-6**, not parking-lot one-liners.
