@@ -109,8 +109,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M24** | Done — [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
 | **M25** | Done — [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
 | **M26** | Done — [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
-| **M27** | [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
-| After M27 | Protobuf/TLS; embeddings |
+| **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
+| **M28** | [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
+| After M28 | Protobuf/TLS; embeddings |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

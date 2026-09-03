@@ -69,7 +69,8 @@ Do **not** implement embeddings, Unix sockets, protobuf/TLS, HP/incapacitation, 
 
 | Later | What |
 |---|---|
-| After M27 | protobuf/TLS; embeddings; Unix sockets; reflection importance-adjust; incentive-forced reflect; hashed pipeline events; `health` / incapacitation; combat viewer FX |
+| **M28** | [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
+| After M28 | protobuf/TLS; embeddings; Unix sockets; reflection importance-adjust; hashed pipeline events; conflict `death_enabled`; combat particles/meshes |
 | Not M27 | Browser; CI Win/mac; PROTOCOL bump |
 
 ## Key decisions
