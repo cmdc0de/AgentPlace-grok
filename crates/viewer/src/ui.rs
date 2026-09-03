@@ -396,6 +396,23 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 a.illness_ticks,
                 a.influence_factor as f32 / 100.0
             ));
+            if !a.sheet.is_unused() {
+                ui.separator();
+                ui.text("sheet");
+                for (name, score) in a.sheet.rows() {
+                    ui.text(format!(
+                        "  {name} {score} ({:+})",
+                        sim_core::AbilitySheet::modifier(score)
+                    ));
+                }
+            }
+            if !a.kinship.is_empty() {
+                ui.separator();
+                ui.text("family");
+                for line in a.kinship.lines() {
+                    ui.text(format!("  {line}"));
+                }
+            }
             ui.separator();
             ui.text(format!(
                 "abilities g{} h{} f{} farm{} c{}",
@@ -830,6 +847,8 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Flee => "flee",
         SimEventKind::Incapacitated { .. } => "incapacitated",
         SimEventKind::CombatDeath { .. } => "combat_death",
+        SimEventKind::PairBonded { .. } => "pair_bonded",
+        SimEventKind::Born { .. } => "born",
     }
 }
 

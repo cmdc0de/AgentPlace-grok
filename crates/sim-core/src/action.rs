@@ -59,6 +59,12 @@ pub enum PrimaryAction {
         target: AgentId,
     },
     Flee,
+    PairBond {
+        target: AgentId,
+    },
+    Reproduce {
+        with: AgentId,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

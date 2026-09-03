@@ -52,6 +52,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut llm_execute_plan = false;
     let mut conflict = false;
     let mut conflict_death = false;
+    let mut sheet = false;
+    let mut reproduction = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -140,6 +142,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--conflict-death" => {
                 conflict = true;
                 conflict_death = true;
+            }
+            "--sheet" => sheet = true,
+            "--reproduction" => {
+                reproduction = true;
+                sheet = true;
             }
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
@@ -244,6 +251,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let cp = sim_core::ConflictParams::from_config_toml(&text);
         sim.conflict_enabled = conflict || cp.enabled;
         sim.conflict_death_enabled = conflict_death || cp.death_enabled;
+        if sheet || sim_core::SheetParams::from_config_toml(&text).enabled {
+            sim.enable_sheet();
+        }
+        if reproduction || sim_core::PopulationParams::from_config_toml(&text).reproduction {
+            sim.enable_reproduction();
+        }
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -424,6 +437,7 @@ Usage:
           [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
           [--llm-reflect-every N] [--llm-plan-every N]
           [--llm-execute-plan] [--conflict] [--conflict-death]
+          [--sheet] [--reproduction]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -449,6 +463,8 @@ Options:
       --llm-execute-plan    Execute plan[0] when it is legal action JSON (overlay [llm] execute_plan)
       --conflict            Enable Attack/Flee (overlay [conflict] enabled)
       --conflict-death      0 health removes the agent (implies --conflict; overlay death_enabled)
+      --sheet               Roll founder STR/DEX/CON/INT/WIS/CHA (overlay [agents.sheet] enabled)
+      --reproduction        PairBond/Reproduce (implies --sheet; overlay [population] reproduction)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

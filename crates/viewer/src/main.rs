@@ -91,6 +91,12 @@ fn main() {
             let conflict = sim_core::ConflictParams::from_config_toml(&text);
             sim.conflict_enabled = conflict.enabled;
             sim.conflict_death_enabled = conflict.death_enabled;
+            if sim_core::SheetParams::from_config_toml(&text).enabled {
+                sim.enable_sheet();
+            }
+            if sim_core::PopulationParams::from_config_toml(&text).reproduction {
+                sim.enable_reproduction();
+            }
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

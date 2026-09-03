@@ -53,6 +53,8 @@ pub fn legal_names(legal: &[PrimaryAction]) -> Vec<String> {
             PrimaryAction::Unpack { .. } => "Unpack".into(),
             PrimaryAction::Attack { .. } => "Attack".into(),
             PrimaryAction::Flee => "Flee".into(),
+            PrimaryAction::PairBond { .. } => "PairBond".into(),
+            PrimaryAction::Reproduce { .. } => "Reproduce".into(),
         })
         .collect()
 }
@@ -114,6 +116,8 @@ pub fn mock_branch_for(primary: &PrimaryAction) -> &'static str {
         PrimaryAction::Unpack { .. } => "unpack",
         PrimaryAction::Attack { .. } => "attack",
         PrimaryAction::Flee => "flee",
+        PrimaryAction::PairBond { .. } => "pair_bond",
+        PrimaryAction::Reproduce { .. } => "reproduce",
     }
 }
 

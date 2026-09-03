@@ -137,6 +137,11 @@ pub struct Agent {
     pub health: u32,
     #[serde(default, skip)]
     pub incapacitated: bool,
+    /// D&D-like scores. 0 = unused; packed in the board blob.
+    #[serde(default, skip)]
+    pub sheet: crate::sheet::AbilitySheet,
+    #[serde(default, skip)]
+    pub kinship: crate::kinship::Kinship,
 }
 
 impl Default for Needs {
@@ -180,6 +185,8 @@ impl Agent {
             plan: Vec::new(),
             health: HEALTH_MAX,
             incapacitated: false,
+            sheet: crate::sheet::AbilitySheet::default(),
+            kinship: crate::kinship::Kinship::default(),
         }
     }
 
@@ -492,6 +499,8 @@ impl Agent {
         if self.incapacitated {
             hasher.update([1u8]);
         }
+        self.sheet.hash_into(hasher);
+        self.kinship.hash_into(hasher);
     }
 }
 

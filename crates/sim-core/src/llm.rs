@@ -517,6 +517,24 @@ pub fn parse_choice_json(
             PrimaryAction::Attack { target: AgentId(to) }
         }
         "flee" => PrimaryAction::Flee,
+        "pair_bond" | "pairbond" => {
+            let to = parsed
+                .target
+                .as_ref()
+                .and_then(|v| v.as_u64())
+                .or(parsed.proposal_id)
+                .unwrap_or(0);
+            PrimaryAction::PairBond { target: AgentId(to) }
+        }
+        "reproduce" => {
+            let to = parsed
+                .target
+                .as_ref()
+                .and_then(|v| v.as_u64())
+                .or(parsed.proposal_id)
+                .unwrap_or(0);
+            PrimaryAction::Reproduce { with: AgentId(to) }
+        }
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {

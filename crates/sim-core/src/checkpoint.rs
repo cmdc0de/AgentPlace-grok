@@ -48,6 +48,12 @@ struct BoardBlob {
     health: BTreeMap<u64, u32>,
     #[serde(default)]
     incapacitated: BTreeMap<u64, bool>,
+    #[serde(default)]
+    sheets: BTreeMap<u64, crate::sheet::AbilitySheet>,
+    #[serde(default)]
+    kinship: BTreeMap<u64, crate::kinship::Kinship>,
+    #[serde(default)]
+    next_agent_id: u64,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -113,6 +119,17 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .iter()
             .map(|(id, a)| (id.0, a.incapacitated))
             .collect(),
+        sheets: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.sheet))
+            .collect(),
+        kinship: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.kinship.clone()))
+            .collect(),
+        next_agent_id: sim.next_agent_id,
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -125,12 +142,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
 fn board_from_wire(
     wire: &PublicBoard,
     agents: &mut BTreeMap<crate::agent::AgentId, Agent>,
-) -> RichBoard {
+) -> (RichBoard, u64) {
     let Some(hex_str) = wire.entries.first() else {
-        return RichBoard::default();
+        return (RichBoard::default(), 0);
     };
     let Ok(bytes) = hex::decode(hex_str) else {
-        return RichBoard::default();
+        return (RichBoard::default(), 0);
     };
     let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
         Ok(b) => b,
@@ -148,7 +165,7 @@ fn board_from_wire(
                     goals: old.goals,
                     ..BoardBlob::default()
                 },
-                Err(_) => return RichBoard::default(),
+                Err(_) => return (RichBoard::default(), 0),
             }
         }
     };
@@ -199,7 +216,17 @@ fn board_from_wire(
             agent.incapacitated = down;
         }
     }
-    blob.board
+    for (id, sheet) in blob.sheets {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.sheet = sheet;
+        }
+    }
+    for (id, kin) in blob.kinship {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.kinship = kin;
+        }
+    }
+    (blob.board, blob.next_agent_id)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -298,7 +325,7 @@ impl Simulation {
         }
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
-        let board = board_from_wire(&body.public_board, &mut agents);
+        let (board, blob_next_id) = board_from_wire(&body.public_board, &mut agents);
         let inf = config.influence_milli();
         for a in agents.values_mut() {
             if a.influence_factor == 0 {
@@ -356,7 +383,19 @@ impl Simulation {
             llm_execute_plan: false,
             conflict_enabled: false,
             conflict_death_enabled: false,
+            sheet_enabled: false,
+            reproduction_enabled: false,
+            next_agent_id: blob_next_id,
         };
+        if sim.next_agent_id == 0 {
+            sim.next_agent_id = sim
+                .agents
+                .keys()
+                .map(|id| id.0)
+                .max()
+                .unwrap_or(0)
+                .saturating_add(1);
+        }
         if let Some(raw) = body.active_incentives.entries.get(1) {
             if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {
                 sim.incentive_oneshot = map
@@ -653,6 +692,15 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         }
         SimEventKind::CombatDeath { by } => {
             format!("{{\"type\":\"combat_death\",\"by\":{}}}", by.0)
+        }
+        SimEventKind::PairBonded { with } => {
+            format!("{{\"type\":\"pair_bonded\",\"with\":{}}}", with.0)
+        }
+        SimEventKind::Born { parent_a, parent_b } => {
+            format!(
+                "{{\"type\":\"born\",\"parent_a\":{},\"parent_b\":{}}}",
+                parent_a.0, parent_b.0
+            )
         }
     };
     format!(

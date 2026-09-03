@@ -97,6 +97,9 @@ pub struct Observation {
     /// Short-term plan from the Plan stage. Empty when unused.
     #[serde(default)]
     pub plan: Vec<String>,
+    /// Kinship names (`parent #3`). Empty when unused.
+    #[serde(default)]
+    pub kin: Vec<String>,
 }
 
 impl Default for Observation {
@@ -125,6 +128,7 @@ impl Default for Observation {
             toxins: Vec::new(),
             incentives: Vec::new(),
             plan: Vec::new(),
+            kin: Vec::new(),
         }
     }
 }
@@ -324,6 +328,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         toxins,
         incentives,
         plan: agent.plan.clone(),
+        kin: agent.kinship.lines(),
     }
 }
 
@@ -760,6 +765,29 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             legal.push(PrimaryAction::Flee);
         }
     }
+    if sim.reproduction_enabled && !agent.incapacitated {
+        let floor = sim.config.energy_max_milli() / 2;
+        for other in sim.agents.values() {
+            if other.id == agent.id || other.incapacitated {
+                continue;
+            }
+            if chebyshev(agent.x, agent.y, other.x, other.y) != 1 {
+                continue;
+            }
+            let unbound = agent.kinship.pair_bond.is_none() && other.kinship.pair_bond.is_none();
+            if unbound {
+                legal.push(PrimaryAction::PairBond { target: other.id });
+            }
+            let mutual = agent.kinship.pair_bond == Some(other.id)
+                && other.kinship.pair_bond == Some(agent.id);
+            if mutual
+                && agent.needs.energy >= floor
+                && other.needs.energy >= floor
+            {
+                legal.push(PrimaryAction::Reproduce { with: other.id });
+            }
+        }
+    }
     legal
 }
 
@@ -923,6 +951,8 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         }
         PrimaryAction::Attack { target } => format!("Attack #{}", target.0),
         PrimaryAction::Flee => "Flee".into(),
+        PrimaryAction::PairBond { target } => format!("PairBond #{}", target.0),
+        PrimaryAction::Reproduce { with } => format!("Reproduce #{}", with.0),
     }
 }
 

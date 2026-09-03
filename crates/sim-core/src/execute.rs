@@ -40,6 +40,8 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Unpack { item, qty } => unpack_item(sim, id, *item, *qty),
         PrimaryAction::Attack { target } => attack(sim, id, *target),
         PrimaryAction::Flee => flee(sim, id),
+        PrimaryAction::PairBond { target } => pair_bond(sim, id, *target),
+        PrimaryAction::Reproduce { with } => reproduce(sim, id, *with),
     }
 }
 
@@ -293,6 +295,210 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         );
         sim.agents.remove(&target);
     }
+}
+
+fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
+    if id == target || !sim.reproduction_enabled {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(a) = sim.agents.get(&id) else {
+        return;
+    };
+    let Some(b) = sim.agents.get(&target) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    if a.incapacitated || b.incapacitated {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if crate::observation::chebyshev(a.x, a.y, b.x, b.y) != 1 {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if a.kinship.pair_bond.is_some() || b.kinship.pair_bond.is_some() {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if let Some(ag) = sim.agents.get_mut(&id) {
+        ag.kinship.pair_bond = Some(target);
+    }
+    if let Some(ag) = sim.agents.get_mut(&target) {
+        ag.kinship.pair_bond = Some(id);
+    }
+    push(sim, id, SimEventKind::PairBonded { with: target });
+}
+
+fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
+    if id == with || !sim.reproduction_enabled {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let floor = sim.config.energy_max_milli() / 2;
+    let Some(a) = sim.agents.get(&id) else {
+        return;
+    };
+    let Some(b) = sim.agents.get(&with) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    if a.incapacitated || b.incapacitated {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if a.needs.energy < floor || b.needs.energy < floor {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if a.kinship.pair_bond != Some(with) || b.kinship.pair_bond != Some(id) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if crate::observation::chebyshev(a.x, a.y, b.x, b.y) != 1 {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let ax = a.x;
+    let ay = a.y;
+    let occupied: std::collections::BTreeSet<(u32, u32)> =
+        sim.agents.values().map(|ag| (ag.x, ag.y)).collect();
+    let mut cell = None;
+    for dx in -1i32..=1 {
+        for dy in -1i32..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let nx = ax as i32 + dx;
+            let ny = ay as i32 + dy;
+            if !sim.world.in_bounds(nx, ny) {
+                continue;
+            }
+            let ux = nx as u32;
+            let uy = ny as u32;
+            if sim.world.is_land(ux, uy) && !occupied.contains(&(ux, uy)) {
+                cell = Some((ux, uy));
+                break;
+            }
+        }
+        if cell.is_some() {
+            break;
+        }
+    }
+    let Some((cx, cy)) = cell else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let child_id = AgentId(sim.next_agent_id);
+    sim.next_agent_id = sim.next_agent_id.saturating_add(1);
+    let (parent_a, parent_b) = if id.0 <= with.0 {
+        (id, with)
+    } else {
+        (with, id)
+    };
+    let seed = crate::seeding::derive_seed(
+        sim.config.master_seed,
+        &format!("tick_{}_birth_{}", sim.tick, child_id.0),
+    );
+    let mut rng = crate::seeding::rng_from_seed(seed);
+    let sheet = crate::sheet::AbilitySheet::mix(
+        &sim.agents.get(&id).unwrap().sheet,
+        &sim.agents.get(&with).unwrap().sheet,
+        &mut rng,
+    );
+    let mut child = crate::agent::Agent::new(child_id, cx, cy);
+    child.inventory_cap = sim.config.agents.inventory_capacity;
+    child.needs = crate::agent::Needs::maxed(
+        sim.config.hunger_max_milli(),
+        sim.config.thirst_max_milli(),
+        sim.config.energy_max_milli(),
+    );
+    let pa = sim.agents.get(&id).unwrap();
+    let pb = sim.agents.get(&with).unwrap();
+    child.abilities = crate::agent::Abilities {
+        gather: crate::sheet::mix_stat(pa.abilities.gather, pb.abilities.gather, &mut rng),
+        hunt: crate::sheet::mix_stat(pa.abilities.hunt, pb.abilities.hunt, &mut rng),
+        fish: crate::sheet::mix_stat(pa.abilities.fish, pb.abilities.fish, &mut rng),
+        farm: crate::sheet::mix_stat(pa.abilities.farm, pb.abilities.farm, &mut rng),
+        craft: crate::sheet::mix_stat(pa.abilities.craft, pb.abilities.craft, &mut rng),
+    };
+    child.personality = crate::agent::Personality {
+        openness: crate::sheet::mix_stat(pa.personality.openness, pb.personality.openness, &mut rng),
+        conscientiousness: crate::sheet::mix_stat(
+            pa.personality.conscientiousness,
+            pb.personality.conscientiousness,
+            &mut rng,
+        ),
+        extraversion: crate::sheet::mix_stat(
+            pa.personality.extraversion,
+            pb.personality.extraversion,
+            &mut rng,
+        ),
+        agreeableness: crate::sheet::mix_stat(
+            pa.personality.agreeableness,
+            pb.personality.agreeableness,
+            &mut rng,
+        ),
+        neuroticism: crate::sheet::mix_stat(
+            pa.personality.neuroticism,
+            pb.personality.neuroticism,
+            &mut rng,
+        ),
+        perceptiveness: crate::sheet::mix_stat(
+            pa.personality.perceptiveness,
+            pb.personality.perceptiveness,
+            &mut rng,
+        ),
+        traits: Vec::new(),
+        allergy_tags: Vec::new(),
+    };
+    child.sheet = sheet;
+    child.health = sheet.health_max();
+    child.kinship.parents = vec![parent_a, parent_b];
+    child.influence_factor = sim.config.influence_milli();
+    if sim.config.agents.start_with_basic_needs {
+        child.goals = vec![
+            crate::board::Goal {
+                id: 0,
+                text: "stay fed".into(),
+                priority: 80,
+                source: "birth".into(),
+            },
+        ];
+    }
+    let sibs: Vec<AgentId> = {
+        let mut s = Vec::new();
+        for p in [id, with] {
+            if let Some(ag) = sim.agents.get(&p) {
+                for c in &ag.kinship.children {
+                    crate::kinship::push_unique(&mut s, *c);
+                }
+            }
+        }
+        s
+    };
+    child.kinship.siblings = sibs.clone();
+    for sib in &sibs {
+        if let Some(ag) = sim.agents.get_mut(sib) {
+            crate::kinship::push_unique(&mut ag.kinship.siblings, child_id);
+        }
+    }
+    if let Some(ag) = sim.agents.get_mut(&id) {
+        crate::kinship::push_unique(&mut ag.kinship.children, child_id);
+    }
+    if let Some(ag) = sim.agents.get_mut(&with) {
+        crate::kinship::push_unique(&mut ag.kinship.children, child_id);
+    }
+    sim.agents.insert(child_id, child);
+    let _ = sim.rngs.agent_stream(child_id);
+    push(
+        sim,
+        child_id,
+        SimEventKind::Born {
+            parent_a,
+            parent_b,
+        },
+    );
 }
 
 fn flee(sim: &mut Simulation, id: AgentId) {

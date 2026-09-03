@@ -107,6 +107,13 @@ pub enum SimEventKind {
     CombatDeath {
         by: AgentId,
     },
+    PairBonded {
+        with: AgentId,
+    },
+    Born {
+        parent_a: AgentId,
+        parent_b: AgentId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -267,6 +274,15 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update([28u8]);
             hasher.update(by.0.to_le_bytes());
         }
+        SimEventKind::PairBonded { with } => {
+            hasher.update([29u8]);
+            hasher.update(with.0.to_le_bytes());
+        }
+        SimEventKind::Born { parent_a, parent_b } => {
+            hasher.update([30u8]);
+            hasher.update(parent_a.0.to_le_bytes());
+            hasher.update(parent_b.0.to_le_bytes());
+        }
     }
 }
 
@@ -316,6 +332,8 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Flee => "Flee",
         SimEventKind::Incapacitated { .. } => "Incapacitated",
         SimEventKind::CombatDeath { .. } => "CombatDeath",
+        SimEventKind::PairBonded { .. } => "PairBonded",
+        SimEventKind::Born { .. } => "Born",
     }
 }
 
@@ -350,6 +368,8 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::Flee => "flee",
         SimEventKind::Incapacitated { .. } => "incapacitated",
         SimEventKind::CombatDeath { .. } => "combat_death",
+        SimEventKind::PairBonded { .. } => "pair_bonded",
+        SimEventKind::Born { .. } => "born",
     }
 }
 
@@ -405,5 +425,6 @@ pub fn is_primary_kind(kind: &SimEventKind) -> bool {
             | SimEventKind::RuleBlocked { .. }
             | SimEventKind::Incapacitated { .. }
             | SimEventKind::CombatDeath { .. }
+            | SimEventKind::Born { .. }
     )
 }

@@ -95,6 +95,12 @@ pub struct Simulation {
     pub conflict_enabled: bool,
     /// Overlay `[conflict] death_enabled`. Not hashed.
     pub conflict_death_enabled: bool,
+    /// Overlay `[agents.sheet] enabled`. Not hashed.
+    pub sheet_enabled: bool,
+    /// Overlay `[population] reproduction`. Not hashed.
+    pub reproduction_enabled: bool,
+    /// Next AgentId to assign on birth. Checkpointed in the board blob.
+    pub next_agent_id: u64,
 }
 
 impl Simulation {
@@ -119,6 +125,7 @@ impl Simulation {
         for agent in agents.values() {
             let _ = rngs.agent_stream(agent.id);
         }
+        let next_agent_id = agents.keys().map(|id| id.0).max().unwrap_or(0).saturating_add(1);
 
         let chooser = if config.llm.provider == "wait" {
             Chooser::Wait
@@ -161,7 +168,44 @@ impl Simulation {
             llm_execute_plan: false,
             conflict_enabled: false,
             conflict_death_enabled: false,
+            sheet_enabled: false,
+            reproduction_enabled: false,
+            next_agent_id,
         })
+    }
+
+    /// Overlay on: roll unused founder sheets from `agent_init` (not the live spawn stream).
+    pub fn enable_sheet(&mut self) {
+        self.sheet_enabled = true;
+        let spawn = self
+            .rngs
+            .derived_seeds
+            .get("agent_init")
+            .copied()
+            .unwrap_or(self.config.master_seed);
+        let ids: Vec<AgentId> = self.agents.keys().copied().collect();
+        for id in ids {
+            let unused = self
+                .agents
+                .get(&id)
+                .is_some_and(|a| a.sheet.is_unused());
+            if !unused {
+                continue;
+            }
+            let seed = derive_seed(spawn, &format!("sheet_{}", id.0));
+            let mut rng = crate::seeding::rng_from_seed(seed);
+            if let Some(a) = self.agents.get_mut(&id) {
+                a.sheet = crate::sheet::AbilitySheet::roll_3d6(&mut rng);
+                if a.health == crate::agent::HEALTH_MAX {
+                    a.health = a.sheet.health_max();
+                }
+            }
+        }
+    }
+
+    pub fn enable_reproduction(&mut self) {
+        self.reproduction_enabled = true;
+        self.enable_sheet();
     }
 
     pub fn refresh_meta(&mut self) {

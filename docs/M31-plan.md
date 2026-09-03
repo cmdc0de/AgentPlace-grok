@@ -1,8 +1,8 @@
 # M31 — Kinship, reproduction, D&D-like sheet
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M30 complete (`docs/M30-plan.md`, git tag `M30`, commit `2b90dfd`)  
-**Walkthrough:** written on implement (`docs/M31-test-plan.md`)  
+**Walkthrough:** [`M31-test-plan.md`](M31-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-1/2/3), `simulation-and-agents-spec.md` (personality, spawn), `M28-plan.md` (`health` skip + BoardBlob)
 
 ## Context
