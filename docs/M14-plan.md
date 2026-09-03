@@ -70,8 +70,9 @@ Helper (sim-core, no Bevy): list ticks in a dir; `ckpt_at_or_before(dir, tick) -
 | **M22** | [`M22-plan.md`](M22-plan.md) — wire Give, remote /ckpt and /events |
 | **M23** | [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
 | **M24** | [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
-| **M25** | [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
-| After M25 | protobuf/TLS |
+| **M25** | Done — [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
+| **M26** | [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
+| After M26 | protobuf/TLS |
 | Not M14 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

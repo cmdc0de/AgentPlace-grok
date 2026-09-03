@@ -41,7 +41,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M23** | Done (tag `M23`) | [`M23-plan.md`](M23-plan.md), walkthrough [`M23-test-plan.md`](M23-test-plan.md) | See every tick, LLM pipeline barrier, sim-cli Control |
 | **M24** | Done (tag `M24`) | [`M24-plan.md`](M24-plan.md), walkthrough [`M24-test-plan.md`](M24-test-plan.md) | Wire /set, connect /inject, lockstep ack |
 | **M25** | Done (tag `M25`) | [`M25-plan.md`](M25-plan.md), walkthrough [`M25-test-plan.md`](M25-test-plan.md) | Reflection-on-evict, lockstep Ack timeout |
-| After M25 | Not started | listed at the bottom of `M25-plan.md` | protobuf/TLS |
+| **M26** | Planned — next | [`M26-plan.md`](M26-plan.md) | Reflect/Plan every-N-ticks, record/replay of reflection text |
+| After M26 | Not started | listed at the bottom of `M26-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -99,15 +100,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 29b | `M24-test-plan.md` | M24 walkthrough (wire `/set`, `--connect` `/inject`, lockstep ack) |
 | 30 | `M25-plan.md` | Milestone 25 (done, tag `M25`): reflection-on-evict, lockstep Ack timeout |
 | 30b | `M25-test-plan.md` | M25 walkthrough (reflect-on-evict, lockstep Ack timeout) |
+| 31 | `M26-plan.md` | Milestone 26 (planned): Reflect/Plan every-N-ticks, record/replay of reflection text |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M25-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M26-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M25 is implemented; later work is listed at the bottom of `M25-plan.md`. Do not expand into items it defers (protobuf/TLS).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M26 is the current slice (`M26-plan.md`). Do not expand into items it defers (protobuf/TLS).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -135,13 +137,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M25 are done (tag `M25`). Later work is listed at the bottom of [`M25-plan.md`](M25-plan.md).
+M1–M25 are done. Current slice is [`M26-plan.md`](M26-plan.md) (planned, not yet implemented).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M25-plan.md.
-M25 is implemented (reflection-on-evict; lockstep Ack timeout;
-PROTOCOL_VERSION=5). Later work is at the bottom of that file. Do not
-add protobuf or TLS. CI stays provider=mock with no network.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M26-plan.md.
+M26 is the current slice (Reflect/Plan every-N-ticks; record/replay of
+reflection text; PROTOCOL_VERSION=5). Later work is at the bottom of
+that file. Do not add protobuf or TLS. CI stays provider=mock with no
+network.
 ```
 
 ---

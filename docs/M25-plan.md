@@ -74,7 +74,8 @@ lockstep_timeout_ms = 5000
 
 | Later | What |
 |---|---|
-| After M25 | protobuf/TLS; embeddings; Unix sockets; Reflect/Plan every-N-ticks; record/replay of reflection text |
+| **M26** | [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
+| After M26 | protobuf/TLS; embeddings; Unix sockets |
 | Not M25 | Browser; combat; CI Win/mac; hashed pipeline events; PROTOCOL bump |
 
 ## Key decisions
