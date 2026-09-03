@@ -16,6 +16,7 @@ pub enum MemoryKind {
     Proposal,
     Interaction,
     Norm,
+    Reflection,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -53,7 +54,10 @@ impl MemoryEntry {
     }
 
     pub fn protected_kind(&self) -> bool {
-        matches!(self.kind, MemoryKind::Sickness | MemoryKind::ToxinFact)
+        matches!(
+            self.kind,
+            MemoryKind::Sickness | MemoryKind::ToxinFact | MemoryKind::Reflection
+        )
     }
 }
 
@@ -87,9 +91,9 @@ pub fn remember_policy(
     persist: bool,
     relationships: &BTreeMap<AgentId, crate::social::RelationshipSummary>,
     entry: MemoryEntry,
-) {
+) -> Vec<String> {
     store.push(entry);
-    evict(store, cap, policy, social_bonus, persist, relationships);
+    evict(store, cap, policy, social_bonus, persist, relationships)
 }
 
 pub fn evict(
@@ -99,19 +103,21 @@ pub fn evict(
     social_bonus: u32,
     persist: bool,
     relationships: &BTreeMap<AgentId, crate::social::RelationshipSummary>,
-) {
+) -> Vec<String> {
     let cap = cap as usize;
+    let mut dropped = Vec::new();
     while store.len() > cap {
         let protected = protected_indices(store, persist, relationships);
         let idx = pick_victim(store, policy, social_bonus, &protected);
         if let Some(i) = idx {
-            store.remove(i);
+            dropped.push(store.remove(i).text);
         } else if !store.is_empty() {
-            store.remove(0);
+            dropped.push(store.remove(0).text);
         } else {
             break;
         }
     }
+    dropped
 }
 
 fn protected_indices(

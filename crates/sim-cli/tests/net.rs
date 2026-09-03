@@ -1342,6 +1342,34 @@ fn lockstep_waits_for_ack_then_advances() {
 }
 
 #[test]
+fn lockstep_timeout_advances_without_ack() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[
+        "--allow-control",
+        "--start-paused",
+        "--lockstep",
+        "--lockstep-timeout-ms",
+        "200",
+        "--ticks",
+        "4",
+    ]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: false,
+        want_decisions: false,
+    })
+    .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>().unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let t1 = drain_until_tick(&mut conn);
+    assert_eq!(t1, 1);
+    let t2 = drain_until_tick(&mut conn);
+    assert!(t2 >= 2, "timeout should advance, got tick {t2}");
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
 fn connect_auto_acks_lockstep() {
     let (mut child, url, out_h, err_h) = spawn_listen(&["--lockstep", "--ticks", "6"]);
     let client = Command::new(bin())

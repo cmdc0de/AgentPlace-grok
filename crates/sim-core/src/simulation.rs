@@ -25,6 +25,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// SHA-256 of canonical simulation state.
@@ -78,6 +79,8 @@ pub struct Simulation {
     pub llm_barrier: bool,
     /// Extra choose attempts after the first when `llm_barrier`. Default 3.
     pub llm_barrier_retries: u32,
+    /// Overlay `[llm] reflect_on_evict`. Not hashed, not checkpointed.
+    pub llm_reflect_on_evict: bool,
 }
 
 impl Simulation {
@@ -137,6 +140,7 @@ impl Simulation {
             incentive_oneshot: BTreeMap::new(),
             llm_barrier: false,
             llm_barrier_retries: 3,
+            llm_reflect_on_evict: false,
         })
     }
 
@@ -268,6 +272,57 @@ impl Simulation {
         self.incentives = sched;
         self.incentive_toml = toml.to_string();
         Ok(())
+    }
+
+    /// Test/helper: write a memory through the live remember path (may reflect-on-evict).
+    pub fn remember_entry(&mut self, id: AgentId, entry: MemoryEntry) {
+        crate::execute::remember_agent(self, id, entry);
+    }
+
+    pub(crate) fn reflect_on_evict(&mut self, id: AgentId, dropped: Vec<String>) {
+        if dropped.is_empty() || !self.llm_reflect_on_evict || self.replay.is_some() {
+            return;
+        }
+        let Chooser::Custom(ch) = &self.chooser else {
+            return;
+        };
+        let ch = Arc::clone(ch);
+        let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
+        let seed = derive_seed(
+            llm_base,
+            &format!("tick_{}_agent_{}_reflect_0", self.tick, id.0),
+        );
+        let Ok(summary) = ch.reflect(seed, &dropped) else {
+            return;
+        };
+        let summary = summary.trim().to_string();
+        if summary.is_empty() {
+            return;
+        }
+        let tick = self.tick;
+        let cap = self.config.memory_capacity();
+        let policy = self.config.agents.memory.eviction_policy;
+        let bonus = self.config.social_bonus_milli();
+        let persist = self.config.agents.memory.persistent_relationships;
+        if let Some(a) = self.agents.get_mut(&id) {
+            let _ = a.remember(
+                cap,
+                policy,
+                bonus,
+                persist,
+                MemoryEntry {
+                    tick,
+                    kind: MemoryKind::Reflection,
+                    text: summary,
+                    importance: 200,
+                    last_accessed: tick,
+                    species_tag: 0,
+                    id: 0,
+                    participants: Vec::new(),
+                    valence: 0,
+                },
+            );
+        }
     }
 
     pub fn agent_ids(&self) -> Vec<AgentId> {

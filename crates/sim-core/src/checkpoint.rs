@@ -313,6 +313,7 @@ impl Simulation {
             incentive_oneshot: BTreeMap::new(),
             llm_barrier: false,
             llm_barrier_retries: 3,
+            llm_reflect_on_evict: false,
         };
         if let Some(raw) = body.active_incentives.entries.get(1) {
             if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {

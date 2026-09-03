@@ -1,7 +1,8 @@
 # M25 — Reflection-on-evict, lockstep Ack timeout
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M24 complete (`docs/M24-plan.md`, git tag `M24`, commit `8980d01`)  
+**Walkthrough:** [`M25-test-plan.md`](M25-test-plan.md)  
 **Specs:** `memory-goals-incentives-spec.md` (summarise-then-drop), `M8-plan.md` / `M9-plan.md` (reflection-on-evict deferred), `M24-plan.md` (lockstep wait-forever)
 
 ## Context
@@ -128,7 +129,7 @@ cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 
 ## Verification
 
-Walkthrough: `docs/M25-test-plan.md` (written at implement).
+Walkthrough: [`M25-test-plan.md`](M25-test-plan.md).
 
 ```bash
 cargo test -p sim-core

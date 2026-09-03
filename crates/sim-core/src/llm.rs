@@ -60,6 +60,12 @@ pub trait ActionChooser: Send + Sync {
         call_seed: u64,
         obs: &Observation,
     ) -> Result<(ChosenAction, String), ChooseError>;
+
+    /// Summarise dropped memory texts. Default: skip (no extra call).
+    fn reflect(&self, seed: u64, dropped: &[String]) -> Result<String, ChooseError> {
+        let _ = (seed, dropped);
+        Err(ChooseError::Malformed)
+    }
 }
 
 #[derive(Clone)]
@@ -91,6 +97,8 @@ pub struct LlmBarrierParams {
     pub barrier: bool,
     /// Extra attempts after the first. Default 3 when barrier is on.
     pub retries: u32,
+    /// Overlay `[llm] reflect_on_evict`. Not hashed.
+    pub reflect_on_evict: bool,
 }
 
 impl Default for LlmBarrierParams {
@@ -98,6 +106,7 @@ impl Default for LlmBarrierParams {
         Self {
             barrier: false,
             retries: 3,
+            reflect_on_evict: false,
         }
     }
 }
@@ -114,6 +123,7 @@ impl LlmBarrierParams {
         struct Table {
             barrier: Option<bool>,
             barrier_retries: Option<u32>,
+            reflect_on_evict: Option<bool>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -122,6 +132,9 @@ impl LlmBarrierParams {
         }
         if let Some(n) = slice.llm.barrier_retries {
             p.retries = n;
+        }
+        if let Some(r) = slice.llm.reflect_on_evict {
+            p.reflect_on_evict = r;
         }
         p
     }

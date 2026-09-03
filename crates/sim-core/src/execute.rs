@@ -708,7 +708,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         agent.illness_ticks = agent.illness_ticks.max(ILLNESS_TICKS);
         agent.consumption.toxic_events += 1;
         agent.needs.energy = agent.needs.energy.saturating_sub(800);
-        agent.remember(
+        let _ = agent.remember(
             cap,
             policy,
             bonus,
@@ -725,7 +725,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
                 valence: -80,
             },
         );
-        agent.remember(
+        let _ = agent.remember(
             cap,
             policy,
             bonus,
@@ -1148,9 +1148,12 @@ pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, mut entry: Memor
     let milli = crate::incentive::memory_boost_milli(sim, id, entry.kind);
     entry.importance =
         crate::incentive::scale_u32(u32::from(entry.importance), milli).min(255) as u8;
-    if let Some(a) = sim.agents.get_mut(&id) {
-        a.remember(cap, policy, bonus, persist, entry);
-    }
+    let dropped = if let Some(a) = sim.agents.get_mut(&id) {
+        a.remember(cap, policy, bonus, persist, entry)
+    } else {
+        return;
+    };
+    sim.reflect_on_evict(id, dropped);
 }
 
 pub fn apply_heard_memories(

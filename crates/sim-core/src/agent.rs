@@ -172,7 +172,7 @@ impl Agent {
         social_bonus: u32,
         persist: bool,
         mut entry: crate::memory::MemoryEntry,
-    ) {
+    ) -> Vec<String> {
         if entry.id == 0 {
             entry.id = self.next_memory_id;
             self.next_memory_id = self.next_memory_id.saturating_add(1);
@@ -185,7 +185,7 @@ impl Agent {
             persist,
             &self.relationships,
             entry,
-        );
+        )
     }
 
     pub fn inventory_count(&self) -> u32 {

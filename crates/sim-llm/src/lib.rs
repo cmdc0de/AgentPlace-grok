@@ -158,6 +158,28 @@ impl ActionChooser for OpenAiCompatClient {
         }
         Err(last)
     }
+
+    fn reflect(&self, seed: u64, dropped: &[String]) -> Result<String, ChooseError> {
+        if dropped.is_empty() {
+            return Err(ChooseError::Malformed);
+        }
+        let mut lines = String::new();
+        for (i, t) in dropped.iter().take(12).enumerate() {
+            lines.push_str(&format!("{}. {}\n", i + 1, t));
+        }
+        let prompt = format!(
+            "These memories were forgotten. Summarise them as one short reflection.\n{lines}Reply JSON only: {{\"reflection\":\"...\"}}"
+        );
+        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let payload = extract_json_payload(&text);
+        let v: serde_json::Value =
+            serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
+        v.get("reflection")
+            .and_then(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .ok_or(ChooseError::Malformed)
+    }
 }
 
 const PROMPT_LINE_CAP: usize = 16;

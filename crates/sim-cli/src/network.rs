@@ -20,6 +20,8 @@ pub struct NetworkParams {
     pub allow_control: bool,
     #[serde(default)]
     pub lockstep: bool,
+    #[serde(default)]
+    pub lockstep_timeout_ms: u64,
 }
 
 impl NetworkParams {

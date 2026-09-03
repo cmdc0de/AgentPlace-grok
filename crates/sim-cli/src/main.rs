@@ -45,6 +45,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut llm_barrier = false;
     let mut llm_barrier_retries: Option<u32> = None;
     let mut lockstep = false;
+    let mut lockstep_timeout_ms: Option<u64> = None;
+    let mut llm_reflect_on_evict = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -103,6 +105,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--allow-control" => allow_control = true,
             "--start-paused" => start_paused = true,
             "--lockstep" => lockstep = true,
+            "--lockstep-timeout-ms" => {
+                i += 1;
+                lockstep_timeout_ms = Some(
+                    args.get(i)
+                        .ok_or("--lockstep-timeout-ms requires a number")?
+                        .parse()?,
+                );
+            }
+            "--llm-reflect-on-evict" => llm_reflect_on_evict = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -170,6 +181,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let net = network::NetworkParams::from_path(&config_path);
     allow_control = allow_control || net.allow_control;
     lockstep = lockstep || net.lockstep;
+    let lockstep_timeout_ms = lockstep_timeout_ms.unwrap_or(net.lockstep_timeout_ms);
     if token.is_none() && !net.token.is_empty() {
         token = Some(net.token.clone());
     }
@@ -197,6 +209,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         sim.llm_barrier = barrier.barrier;
         sim.llm_barrier_retries = barrier.retries;
+        sim.llm_reflect_on_evict = llm_reflect_on_evict || barrier.reflect_on_evict;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -253,6 +266,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             checkpoint_every,
             write_timing,
             lockstep,
+            lockstep_timeout_ms,
         });
     }
 
@@ -371,8 +385,9 @@ Usage:
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
-          [--allow-control] [--start-paused] [--lockstep] [--token SECRET]
-          [--llm-barrier] [--llm-barrier-retries N]
+          [--allow-control] [--start-paused] [--lockstep] [--lockstep-timeout-ms N]
+          [--token SECRET]
+          [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -391,6 +406,8 @@ Options:
       --allow-control       Listen: accept Control. Connect: send Control from stdin
       --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)
       --lockstep            After each tick, wait for AckTick from every subscriber (overlay [network] lockstep)
+      --lockstep-timeout-ms N  Give up waiting for AckTick after N ms (0 = forever; overlay lockstep_timeout_ms)
+      --llm-reflect-on-evict   Summarise dropped memories via LLM (overlay [llm] reflect_on_evict)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

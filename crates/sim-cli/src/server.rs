@@ -424,6 +424,7 @@ pub struct ServeOpts {
     pub checkpoint_every: Option<u64>,
     pub write_timing: bool,
     pub lockstep: bool,
+    pub lockstep_timeout_ms: u64,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -505,7 +506,7 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         if did {
             remaining -= 1;
             if opts.lockstep {
-                wait_lockstep_acks(&hub);
+                wait_lockstep_acks(&hub, opts.lockstep_timeout_ms);
             }
         } else {
             thread::sleep(Duration::from_millis(20));
@@ -729,13 +730,23 @@ fn handle_client(
     }
 }
 
-fn wait_lockstep_acks(hub: &Arc<Mutex<Hub>>) {
+fn wait_lockstep_acks(hub: &Arc<Mutex<Hub>>, timeout_ms: u64) {
     let tick = hub.lock().unwrap().sim.tick;
+    let deadline = if timeout_ms == 0 {
+        None
+    } else {
+        Some(std::time::Instant::now() + Duration::from_millis(timeout_ms))
+    };
     loop {
         {
             let h = hub.lock().unwrap();
             let subs: Vec<_> = h.subscribers.values().filter(|s| s.subscribed).collect();
             if subs.is_empty() || subs.iter().all(|s| s.acked_tick == Some(tick)) {
+                return;
+            }
+        }
+        if let Some(d) = deadline {
+            if std::time::Instant::now() >= d {
                 return;
             }
         }

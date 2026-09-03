@@ -74,6 +74,7 @@ fn main() {
             let barrier = sim_core::LlmBarrierParams::from_config_toml(&text);
             sim.llm_barrier = barrier.barrier;
             sim.llm_barrier_retries = barrier.retries;
+            sim.llm_reflect_on_evict = barrier.reflect_on_evict;
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {
