@@ -78,6 +78,8 @@ fn main() {
             sim.llm_reflect_every_n = barrier.reflect_every_n_ticks;
             sim.llm_plan_every_n = barrier.plan_every_n_ticks;
             sim.llm_plan_length = barrier.plan_length;
+            sim.llm_execute_plan = barrier.execute_plan;
+            sim.conflict_enabled = sim_core::ConflictParams::from_config_toml(&text).enabled;
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

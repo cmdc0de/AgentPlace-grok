@@ -6,6 +6,7 @@ pub mod board;
 pub mod checkpoint;
 pub mod compare;
 pub mod config;
+pub mod conflict;
 pub mod decision_log;
 pub mod error;
 pub mod event_log;
@@ -36,6 +37,7 @@ pub use checkpoint::{
     summary_markdown, write_run_checkpoint,
 };
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
+pub use conflict::ConflictParams;
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};
 pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;

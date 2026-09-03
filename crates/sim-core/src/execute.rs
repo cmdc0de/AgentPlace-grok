@@ -38,6 +38,8 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Retrieve { item, qty } => retrieve(sim, id, *item, *qty),
         PrimaryAction::Pack { item, qty } => pack_item(sim, id, *item, *qty),
         PrimaryAction::Unpack { item, qty } => unpack_item(sim, id, *item, *qty),
+        PrimaryAction::Attack { target } => attack(sim, id, *target),
+        PrimaryAction::Flee => flee(sim, id),
     }
 }
 
@@ -228,6 +230,96 @@ fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         return;
     }
     push(sim, id, SimEventKind::Unpack { item, qty });
+}
+
+fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
+    if id == target || !sim.agents.contains_key(&target) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(atk) = sim.agents.get(&id) else {
+        return;
+    };
+    let Some(def) = sim.agents.get(&target) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let dist = crate::observation::chebyshev(atk.x, atk.y, def.x, def.y);
+    if dist != 1 {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let cost = crate::conflict::ATTACK_ENERGY_COST;
+    let damage = crate::conflict::ATTACK_DAMAGE;
+    if !pay_energy(sim, id, cost) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if let Some(d) = sim.agents.get_mut(&target) {
+        d.needs.energy = d.needs.energy.saturating_sub(damage);
+    }
+    push(
+        sim,
+        id,
+        SimEventKind::Attack { target, damage },
+    );
+}
+
+fn flee(sim: &mut Simulation, id: AgentId) {
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    let ax = agent.x;
+    let ay = agent.y;
+    let mut nearest: Option<(u32, u32, u32)> = None;
+    for other in sim.agents.values() {
+        if other.id == id {
+            continue;
+        }
+        let dist = crate::observation::chebyshev(ax, ay, other.x, other.y);
+        match nearest {
+            None => nearest = Some((dist, other.x, other.y)),
+            Some((d, _, _)) if dist < d => nearest = Some((dist, other.x, other.y)),
+            _ => {}
+        }
+    }
+    let Some((_, ox, oy)) = nearest else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    let here = crate::observation::chebyshev(ax, ay, ox, oy);
+    let cost = agent.move_cost_milli(&sim.storage);
+    let mut best: Option<(i32, i32, u32)> = None;
+    for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
+        let nx = ax as i32 + dx;
+        let ny = ay as i32 + dy;
+        if !sim.world.in_bounds(nx, ny) || !sim.world.is_land(nx as u32, ny as u32) {
+            continue;
+        }
+        let nd = crate::observation::chebyshev(nx as u32, ny as u32, ox, oy);
+        if nd <= here {
+            continue;
+        }
+        if best.is_none_or(|(_, _, d)| nd > d) {
+            best = Some((dx, dy, nd));
+        }
+    }
+    let Some((dx, dy, _)) = best else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    if agent.needs.energy < cost {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    move_rel(sim, id, dx, dy);
+    if let Some(last) = sim.events.events.last_mut() {
+        if last.agent == id && last.tick == sim.tick {
+            if matches!(last.kind, SimEventKind::Move { .. }) {
+                last.kind = SimEventKind::Flee;
+            }
+        }
+    }
 }
 
 fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: AgentId) {

@@ -329,6 +329,8 @@ impl Simulation {
             llm_reflect_every_n: 0,
             llm_plan_every_n: 0,
             llm_plan_length: 4,
+            llm_execute_plan: false,
+            conflict_enabled: false,
         };
         if let Some(raw) = body.active_incentives.entries.get(1) {
             if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {
@@ -614,6 +616,13 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         SimEventKind::Give { qty, .. } => format!("{{\"type\":\"give\",\"qty\":{qty}}}"),
         SimEventKind::Pack { qty, .. } => format!("{{\"type\":\"pack\",\"qty\":{qty}}}"),
         SimEventKind::Unpack { qty, .. } => format!("{{\"type\":\"unpack\",\"qty\":{qty}}}"),
+        SimEventKind::Attack { target, damage } => {
+            format!(
+                "{{\"type\":\"attack\",\"target\":{},\"damage\":{damage}}}",
+                target.0
+            )
+        }
+        SimEventKind::Flee => "{\"type\":\"flee\"}".to_string(),
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

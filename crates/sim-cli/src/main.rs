@@ -49,6 +49,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut llm_reflect_on_evict = false;
     let mut llm_reflect_every: Option<u64> = None;
     let mut llm_plan_every: Option<u64> = None;
+    let mut llm_execute_plan = false;
+    let mut conflict = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -132,6 +134,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .parse()?,
                 );
             }
+            "--llm-execute-plan" => llm_execute_plan = true,
+            "--conflict" => conflict = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -231,6 +235,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.llm_reflect_every_n = llm_reflect_every.unwrap_or(barrier.reflect_every_n_ticks);
         sim.llm_plan_every_n = llm_plan_every.unwrap_or(barrier.plan_every_n_ticks);
         sim.llm_plan_length = barrier.plan_length;
+        sim.llm_execute_plan = llm_execute_plan || barrier.execute_plan;
+        sim.conflict_enabled = conflict || sim_core::ConflictParams::from_config_toml(&text).enabled;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -410,6 +416,7 @@ Usage:
           [--token SECRET]
           [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
           [--llm-reflect-every N] [--llm-plan-every N]
+          [--llm-execute-plan] [--conflict]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -432,6 +439,8 @@ Options:
       --llm-reflect-on-evict   Summarise dropped memories via LLM (overlay [llm] reflect_on_evict)
       --llm-reflect-every N Periodic insight every N ticks (0 = off; overlay reflect_every_n_ticks)
       --llm-plan-every N    Short-term plan every N ticks (0 = off; overlay plan_every_n_ticks)
+      --llm-execute-plan    Execute plan[0] when it is legal action JSON (overlay [llm] execute_plan)
+      --conflict            Enable Attack/Flee (overlay [conflict] enabled)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

@@ -72,9 +72,20 @@ pub fn parse_plan_json(raw: &str, max_len: usize) -> Option<Vec<String>> {
     let arr = v.get("plan")?.as_array()?;
     let steps: Vec<String> = arr
         .iter()
-        .filter_map(|x| x.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+        .filter_map(|x| {
+            if let Some(s) = x.as_str() {
+                let t = s.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            } else if x.is_object() {
+                serde_json::to_string(x).ok()
+            } else {
+                None
+            }
+        })
         .take(max_len)
         .collect();
     if steps.is_empty() {
@@ -183,6 +194,8 @@ pub struct LlmBarrierParams {
     pub plan_every_n_ticks: u64,
     /// Overlay `[llm] plan_length`. Default 4.
     pub plan_length: u32,
+    /// Overlay `[llm] execute_plan`. Not hashed.
+    pub execute_plan: bool,
 }
 
 impl Default for LlmBarrierParams {
@@ -194,6 +207,7 @@ impl Default for LlmBarrierParams {
             reflect_every_n_ticks: 0,
             plan_every_n_ticks: 0,
             plan_length: 4,
+            execute_plan: false,
         }
     }
 }
@@ -214,6 +228,7 @@ impl LlmBarrierParams {
             reflect_every_n_ticks: Option<u64>,
             plan_every_n_ticks: Option<u64>,
             plan_length: Option<u32>,
+            execute_plan: Option<bool>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -234,6 +249,9 @@ impl LlmBarrierParams {
         }
         if let Some(n) = slice.llm.plan_length {
             p.plan_length = n;
+        }
+        if let Some(e) = slice.llm.execute_plan {
+            p.execute_plan = e;
         }
         p
     }
@@ -489,6 +507,16 @@ pub fn parse_choice_json(
                 qty: parsed.qty.unwrap_or(1).max(1),
             }
         }
+        "attack" => {
+            let to = parsed
+                .target
+                .as_ref()
+                .and_then(|v| v.as_u64())
+                .or(parsed.proposal_id)
+                .unwrap_or(0);
+            PrimaryAction::Attack { target: AgentId(to) }
+        }
+        "flee" => PrimaryAction::Flee,
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {
@@ -517,6 +545,29 @@ pub fn parse_choice_json(
         })
     });
     Ok(ChosenAction { primary, speak })
+}
+
+/// Plan-step parse: unknown / illegal / missing action is `None` (do not Wait-substitute).
+pub fn try_parse_plan_step(
+    raw: &str,
+    legal: &[PrimaryAction],
+    species: &SpeciesTables,
+) -> Option<ChosenAction> {
+    let trimmed = extract_json_payload(raw);
+    let parsed: LlmJson = serde_json::from_str(&trimmed).ok()?;
+    let name = parsed.action.as_deref()?.trim().to_ascii_lowercase();
+    if name.is_empty() {
+        return None;
+    }
+    let choice = parse_choice_json(raw, legal, species).ok()?;
+    let explicit_wait = name == "wait";
+    if matches!(choice.primary, PrimaryAction::Wait) && !explicit_wait {
+        return None;
+    }
+    if !crate::observation::is_legal_choice(legal, &choice.primary) {
+        return None;
+    }
+    Some(choice)
 }
 
 fn parse_rule(r: &RuleJson, species: &SpeciesTables) -> Option<crate::board::StructuredRule> {

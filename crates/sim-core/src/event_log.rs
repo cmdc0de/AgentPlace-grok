@@ -96,6 +96,11 @@ pub enum SimEventKind {
         item: ItemId,
         qty: u32,
     },
+    Attack {
+        target: AgentId,
+        damage: u32,
+    },
+    Flee,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +247,12 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hash_item(hasher, *item);
             hasher.update(qty.to_le_bytes());
         }
+        SimEventKind::Attack { target, damage } => {
+            hasher.update([25u8]);
+            hasher.update(target.0.to_le_bytes());
+            hasher.update(damage.to_le_bytes());
+        }
+        SimEventKind::Flee => hasher.update([26u8]),
     }
 }
 
@@ -287,6 +298,8 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Give { .. } => "Give",
         SimEventKind::Pack { .. } => "Pack",
         SimEventKind::Unpack { .. } => "Unpack",
+        SimEventKind::Attack { .. } => "Attack",
+        SimEventKind::Flee => "Flee",
     }
 }
 
@@ -317,6 +330,8 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::Give { .. } => "give",
         SimEventKind::Pack { .. } => "pack",
         SimEventKind::Unpack { .. } => "unpack",
+        SimEventKind::Attack { .. } => "attack",
+        SimEventKind::Flee => "flee",
     }
 }
 

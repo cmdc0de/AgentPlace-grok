@@ -222,7 +222,7 @@ impl ActionChooser for OpenAiCompatClient {
             obs.plan.join(" | ")
         };
         let prompt = format!(
-            "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nCurrent plan: {current}\nPropose up to {n} short next steps (sub-goals, not executed automatically).\nReply JSON only: {{\"plan\":[\"...\"]}}",
+            "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nCurrent plan: {current}\nPropose up to {n} next actions as JSON objects (executed if legal).\nReply JSON only: {{\"plan\":[{{\"action\":\"Wait\"}}]}}",
             obs.agent_id.0,
             obs.x,
             obs.y,
@@ -336,7 +336,7 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
          Relationships: [{}]\n\
          Heard: [{}]\n\
          Legal primary actions (you MUST pick one of these):\n{}\n\
-         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose|Transfer|Store|Retrieve|Pack|Unpack\",\"target\":\"species, item, or agent id\",\"dx\":0,\"dy\":0,\"qty\":1,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
+         Reply JSON: {{\"action\":\"Wait|Rest|Drink|Hunt|Fish|Gather|Eat|Farm|Craft|MoveRelative|Propose|Support|Oppose|Transfer|Store|Retrieve|Pack|Unpack|Attack|Flee\",\"target\":\"species, item, or agent id\",\"dx\":0,\"dy\":0,\"qty\":1,\"recipe\":\"spear\",\"text\":\"proposal text\",\"proposal_id\":0,\"rule\":{{\"kind\":\"BanEatSpecies|BanGatherSpecies|MaxGatherPerTick\",\"species\":\"mushroom\",\"n\":1}},\"speak\":{{\"to\":\"broadcast\",\"shout\":false,\"text\":\"...\"}}}}\n\
          Prefer a structured rule when banning a species. Unknown rule kind waits. Omit speak if silent. Drink if thirsty and water is legal; Eat if hungry and food is legal. Store surplus food; Retrieve from a stockpile when hungry. Pack cargo into a Basket backpack to move cheaper.",
         obs.agent_id.0,
         obs.x,

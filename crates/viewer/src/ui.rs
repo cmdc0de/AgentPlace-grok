@@ -820,6 +820,8 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Give { .. } => "give",
         SimEventKind::Pack { .. } => "pack",
         SimEventKind::Unpack { .. } => "unpack",
+        SimEventKind::Attack { .. } => "attack",
+        SimEventKind::Flee => "flee",
     }
 }
 

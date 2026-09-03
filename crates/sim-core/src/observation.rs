@@ -734,6 +734,32 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             });
         }
     }
+    if sim.conflict_enabled {
+        let vis = if sim.config.observation.full_information {
+            sim.world.width.max(sim.world.height)
+        } else {
+            effective_range(
+                sim.config.observation.base_vision_range,
+                agent.personality.perceptiveness,
+            )
+        };
+        let mut any_visible = false;
+        for other in sim.agents.values() {
+            if other.id == agent.id {
+                continue;
+            }
+            let dist = chebyshev(agent.x, agent.y, other.x, other.y);
+            if dist == 1 && agent.needs.energy >= crate::conflict::ATTACK_ENERGY_COST {
+                legal.push(PrimaryAction::Attack { target: other.id });
+            }
+            if dist <= vis {
+                any_visible = true;
+            }
+        }
+        if any_visible {
+            legal.push(PrimaryAction::Flee);
+        }
+    }
     legal
 }
 
@@ -895,6 +921,8 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         PrimaryAction::Unpack { item, qty } => {
             format!("Unpack {}×{}", item_display_name(*item, species), qty)
         }
+        PrimaryAction::Attack { target } => format!("Attack #{}", target.0),
+        PrimaryAction::Flee => "Flee".into(),
     }
 }
 

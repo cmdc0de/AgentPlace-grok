@@ -55,6 +55,10 @@ pub enum PrimaryAction {
         item: ItemId,
         qty: u32,
     },
+    Attack {
+        target: AgentId,
+    },
+    Flee,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

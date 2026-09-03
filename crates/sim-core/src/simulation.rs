@@ -12,7 +12,7 @@ use crate::llm::{
     ActionChooser, ChooseError, Chooser, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL, REPLAY_CALL_CHOOSE,
     REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT, REPLAY_CALL_REFLECT_EVICT, ReplayRecord, ReplayTable,
     chosen_to_json, insight_record_json, is_llm_wait_response, is_skip_response, parse_choice_json,
-    parse_insight_json, parse_plan_json, plan_record_json, prompt_hash,
+    parse_insight_json, parse_plan_json, plan_record_json, prompt_hash, try_parse_plan_step,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
@@ -89,6 +89,10 @@ pub struct Simulation {
     pub llm_plan_every_n: u64,
     /// Overlay `[llm] plan_length`. Default 4. Not hashed.
     pub llm_plan_length: u32,
+    /// Overlay `[llm] execute_plan`. Not hashed.
+    pub llm_execute_plan: bool,
+    /// Overlay `[conflict] enabled`. Not hashed.
+    pub conflict_enabled: bool,
 }
 
 impl Simulation {
@@ -152,6 +156,8 @@ impl Simulation {
             llm_reflect_every_n: 0,
             llm_plan_every_n: 0,
             llm_plan_length: 4,
+            llm_execute_plan: false,
+            conflict_enabled: false,
         })
     }
 
@@ -570,6 +576,24 @@ impl Simulation {
             .unwrap_or_default();
     }
 
+    fn try_execute_plan(
+        &mut self,
+        id: AgentId,
+        obs: &observation::Observation,
+    ) -> Option<ChosenAction> {
+        if !self.llm_execute_plan {
+            return None;
+        }
+        let step = self.agents.get(&id)?.plan.first()?.clone();
+        let choice = try_parse_plan_step(&step, &obs.legal, &self.config.world.species)?;
+        if let Some(a) = self.agents.get_mut(&id) {
+            if !a.plan.is_empty() {
+                a.plan.remove(0);
+            }
+        }
+        Some(choice)
+    }
+
     pub fn agent_ids(&self) -> Vec<AgentId> {
         self.agents.keys().copied().collect()
     }
@@ -848,7 +872,12 @@ impl Simulation {
 
         let s0 = Instant::now();
         let mut record_raw: Option<String> = None;
-        let mut chosen = if let Some(raw) = self
+        let mut chosen = if let Some(c) = self.try_execute_plan(id, &obs) {
+            chooser_name = "plan";
+            policy_branch = "execute_plan";
+            record_raw = Some(chosen_to_json(&c));
+            c
+        } else if let Some(raw) = self
             .replay
             .as_ref()
             .and_then(|t| t.get(self.tick, id.0).map(|s| s.to_string()))

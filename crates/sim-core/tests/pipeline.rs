@@ -240,3 +240,127 @@ fn record_replay_insight_plan_same_hash() {
     assert_eq!(replay_stub.plan.load(Ordering::SeqCst), 0);
     let _ = std::fs::remove_file(&rec);
 }
+
+struct WaitPlanStub {
+    choose: AtomicU32,
+}
+
+impl WaitPlanStub {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            choose: AtomicU32::new(0),
+        })
+    }
+}
+
+impl ActionChooser for WaitPlanStub {
+    fn choose(
+        &self,
+        _call_seed: u64,
+        _obs: &Observation,
+    ) -> Result<(ChosenAction, String), ChooseError> {
+        self.choose.fetch_add(1, Ordering::SeqCst);
+        Ok((ChosenAction::wait(), r#"{"action":"Wait"}"#.into()))
+    }
+
+    fn plan(
+        &self,
+        _seed: u64,
+        _obs: &Observation,
+        max_len: usize,
+    ) -> Result<Vec<String>, ChooseError> {
+        Ok(vec![r#"{"action":"Wait"}"#.into()]
+            .into_iter()
+            .take(max_len.max(1))
+            .collect())
+    }
+}
+
+#[test]
+fn parse_plan_json_accepts_objects() {
+    let raw = r#"{"plan":[{"action":"Drink"},{"action":"Wait"}]}"#;
+    let steps = sim_core::llm::parse_plan_json(raw, 4).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert!(steps[0].contains("Drink"), "{steps:?}");
+}
+
+#[test]
+fn overlay_parses_execute_plan() {
+    let p = LlmBarrierParams::from_config_toml("[llm]\nexecute_plan = true\n");
+    assert!(p.execute_plan);
+    let d = LlmBarrierParams::from_config_toml("[llm]\nprovider = \"mock\"\n");
+    assert!(!d.execute_plan);
+}
+
+#[test]
+fn mock_execute_plan_overlay_same_hash() {
+    let cfg = tiny(0x27_01);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.llm_execute_plan = true;
+    off.run_ticks(6);
+    on.run_ticks(6);
+    assert_eq!(off.state_hash(), on.state_hash());
+}
+
+#[test]
+fn execute_plan_pops_legal_wait() {
+    let stub = WaitPlanStub::new();
+    let mut sim = Simulation::new(tiny(0x27_02)).unwrap();
+    sim.chooser = Chooser::Custom(stub.clone());
+    sim.llm_execute_plan = true;
+    for a in sim.agents.values_mut() {
+        a.plan = vec![
+            r#"{"action":"Wait"}"#.into(),
+            r#"{"action":"Wait"}"#.into(),
+        ];
+    }
+    let id = AgentId(0);
+    sim.tick();
+    assert_eq!(stub.choose.load(Ordering::SeqCst), 0);
+    assert_eq!(sim.agents.get(&id).unwrap().plan.len(), 1);
+}
+
+#[test]
+fn unparseable_plan_falls_through() {
+    let stub = WaitPlanStub::new();
+    let mut sim = Simulation::new(tiny(0x27_03)).unwrap();
+    sim.chooser = Chooser::Custom(stub.clone());
+    sim.llm_execute_plan = true;
+    for a in sim.agents.values_mut() {
+        a.plan = vec!["drink water".into()];
+    }
+    let id = AgentId(0);
+    sim.tick();
+    assert!(stub.choose.load(Ordering::SeqCst) >= 1);
+    assert_eq!(
+        sim.agents.get(&id).unwrap().plan,
+        vec!["drink water".to_string()]
+    );
+}
+
+#[test]
+fn record_replay_execute_plan_same_hash() {
+    let rec = tmp("m27-exec");
+    let _ = std::fs::remove_file(&rec);
+    let mut cfg = tiny(0x27_04);
+    cfg.llm.replay_file = rec.to_string_lossy().into();
+
+    let mut writer = Simulation::new(cfg.clone()).unwrap();
+    writer.chooser = Chooser::Custom(WaitPlanStub::new());
+    writer.llm_plan_every_n = 1;
+    writer.llm_execute_plan = true;
+    writer.run_ticks(4);
+    let hash = writer.state_hash();
+
+    let replay_stub = WaitPlanStub::new();
+    let mut replayed = Simulation::new(cfg).unwrap();
+    replayed.chooser = Chooser::Custom(replay_stub.clone());
+    replayed.llm_plan_every_n = 1;
+    replayed.llm_execute_plan = true;
+    replayed.run_ticks(4);
+    assert_eq!(replayed.state_hash(), hash);
+    assert_eq!(replay_stub.choose.load(Ordering::SeqCst), 0);
+    let _ = std::fs::remove_file(&rec);
+}
+

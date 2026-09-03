@@ -1,8 +1,8 @@
 # M27 — Auto-execute plan, combat
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M26 complete (`docs/M26-plan.md`, git tag `M26`, commit `4ce0b02`)  
-**Walkthrough:** written on implement (`docs/M27-test-plan.md`)  
+**Walkthrough:** [`M27-test-plan.md`](M27-test-plan.md)  
 **Specs:** `decision-observation-llm-economy-metrics-spec.md` §1 (Attack/Flee; core never executes raw NL), `medium-priority-specs.md` §2 (physical conflict v2-lite), `M26-plan.md` (plan stored, not executed)
 
 ## Context
@@ -126,7 +126,7 @@ cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M27-test-plan.md`).
+Walkthrough: [`M27-test-plan.md`](M27-test-plan.md).
 
 ```bash
 cargo test -p sim-core
