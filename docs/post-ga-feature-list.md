@@ -18,6 +18,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-4 | Sheet effects on the agent | Open | Remaining score → sim uses (accuracy, invent, haul cap, illness, …). M34 shipped a first set. |
 | PG-5 | Inventions | Open | Invented artifacts: private payoff for the inventor vs public payoff for the society. |
 | PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models for agents, food/veg, and every item. |
+| PG-7 | Browser researcher UI | Open | Attach page lists every agent, board posts, and metrics — no 3D required. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -185,6 +186,32 @@ Out of this theme until picked: skeletal animation cycles, photogrammetry, per-a
 
 ---
 
+## PG-7 — Browser researcher UI (no 3D)
+
+**Shipped today (M35):** `web/index.html` attaches on `ws://` with postcard **v5** and shows **tick + `state_hash`** (plus Play/Pause). That is a log tail, not an inspector.
+
+**Wanted:** the browser client stays **2D / tables / text**. It does **not** need to render the Bevy world. After Hello + Snapshot (or equivalent decode of checkpoint bytes already on the wire), a researcher can inspect:
+
+| Surface | What to show |
+|---|---|
+| Every agent | id, cell, hunger/thirst/energy, health, sheet, inventory/pack, goals, last action |
+| Relationships | trust / affinity / respect / fear toward others (friendships) |
+| Kinship | parent / child / sibling / pair-bond / household |
+| Board | open and adopted posts (proposals, stances, rules) |
+| Metrics | wall-clock tick timing (perceive/retrieve/select/execute) **and** sim needs (hungry, thirsty, tired, mean trust, illness) |
+| Later | inventions (PG-5), culture, age/child, combat downed |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral attach.** Same PROTOCOL **5** postcard; no JSON wire, no `wss` unless a later slice bumps.
+- Decode Snapshot checkpoint in-page (wasm/`shared` codec) or a thin read-only summary the server already sends. Do not add hashed events for “client connected.”
+- Optional `--allow-control` for Play/Pause/Step only; full `/set` `/give` can wait.
+- CI: loopback WS + page still builds without a GPU or a live display.
+
+Out of this theme until picked: PG-6 3D in the browser, charts time-series (M8 parking), mobile layout polish.
+
+---
+
 ## How these interact
 
 ```
@@ -197,7 +224,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only art for agents, food, and items (and later PG-5 artifacts); it does not change the sim.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art. PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D.
 
 ---
 
@@ -213,4 +240,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, and viewer models are **PG-4 / PG-5 / PG-6**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, and the browser inspector are **PG-4 / PG-5 / PG-6 / PG-7**, not parking-lot one-liners.

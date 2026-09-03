@@ -53,8 +53,9 @@ Inspector already shows `STR 14 (+2)`. No new Observation field required.
 
 | Later | What |
 |---|---|
-| **M35** | [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
-| After M35 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; extra invention kinds |
+| **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
+| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| After M36 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; extra invention kinds |
 | Not M34 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

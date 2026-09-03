@@ -112,8 +112,9 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
-| **M35** | [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
-| After M35 | Protobuf / JSON envelope; TLS/`wss` |
+| **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
+| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| After M36 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions
