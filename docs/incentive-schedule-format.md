@@ -59,6 +59,8 @@ delta = 0.15
 | `agent:N` | Agent id `N` (e.g. `agent:0`). |
 | `archetype:name` | Agents whose abilities/personality still match that named `[agents.archetypes]` entry. |
 | `supporters_of:proposal_N` | Agents currently in that proposal’s `supporters` set (also `supporters_of:N`). Missing id → empty scope. `supporters_of:nope` → load error. Per-tick effects follow the live set; one-shots (`goal_injection`, `relationship_delta`, `influence_factor_delta`) apply on start/join. Leave and incentive end revert influence and relationship_delta; goals stay. |
+| `kin_of:N` | Living parents, children, siblings, and pair-bond of agent `N` (also `kin_of:agent_N`). **Not** N unless they appear in that map. Missing agent → empty scope. `kin_of:nope` → load error. |
+| `household:H` | Living agents whose kinship household id is `H`. Missing id → empty scope. `household:nope` → load error. |
 
 ## Effect tables (`[[incentives.effects]]`)
 

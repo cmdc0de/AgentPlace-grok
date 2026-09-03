@@ -1,0 +1,18 @@
+# Family food bonus — living kin of agent 0 get 1.4× food.
+# Overlay only; not part of ExperimentConfig / state_hash.
+#
+#   sim-cli --sheet --reproduction --incentives configs/incentives/kin-bonus.toml
+#
+# Agent 0 is not in scope unless they appear as someone else's relative.
+# Full fields: docs/incentive-schedule-format.md
+
+[[incentives]]
+id = "kin_food"
+description = "1.4x food for living kin of agent 0"
+start_tick = 0
+applies_to = "kin_of:0"
+
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4

@@ -396,6 +396,10 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 a.illness_ticks,
                 a.influence_factor as f32 / 100.0
             ));
+            if a.age_ticks != 0 || state.sim.aging_enabled {
+                let child = if state.sim.is_child(a) { "  child" } else { "" };
+                ui.text(format!("age {}{child}", a.age_ticks));
+            }
             if !a.sheet.is_unused() {
                 ui.separator();
                 ui.text("sheet");

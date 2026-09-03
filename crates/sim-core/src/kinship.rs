@@ -13,6 +13,8 @@ pub struct Kinship {
     pub siblings: Vec<AgentId>,
     #[serde(default)]
     pub pair_bond: Option<AgentId>,
+    #[serde(default)]
+    pub household: Option<u64>,
 }
 
 impl Kinship {
@@ -21,6 +23,21 @@ impl Kinship {
             && self.children.is_empty()
             && self.siblings.is_empty()
             && self.pair_bond.is_none()
+            && self.household.is_none()
+    }
+
+    pub fn relatives(&self) -> Vec<AgentId> {
+        let mut ids = Vec::new();
+        for id in self
+            .parents
+            .iter()
+            .chain(self.children.iter())
+            .chain(self.siblings.iter())
+            .chain(self.pair_bond.iter())
+        {
+            push_unique(&mut ids, *id);
+        }
+        ids
     }
 
     pub fn hash_into(&self, hasher: &mut impl sha2::Digest) {
@@ -41,6 +58,7 @@ impl Kinship {
         }
         hasher.update([0xff]);
         hasher.update(self.pair_bond.map(|id| id.0).unwrap_or(u64::MAX).to_le_bytes());
+        hasher.update(self.household.unwrap_or(u64::MAX).to_le_bytes());
     }
 
     pub fn lines(&self) -> Vec<String> {
@@ -57,6 +75,9 @@ impl Kinship {
         if let Some(id) = self.pair_bond {
             out.push(format!("pair-bond #{}", id.0));
         }
+        if let Some(h) = self.household {
+            out.push(format!("household #{h}"));
+        }
         out
     }
 }
@@ -71,12 +92,18 @@ pub fn push_unique(ids: &mut Vec<AgentId>, id: AgentId) {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PopulationParams {
     pub reproduction: bool,
+    pub aging: bool,
+    pub childhood_ticks: u64,
+    pub founder_age_ticks: u64,
 }
 
 impl Default for PopulationParams {
     fn default() -> Self {
         Self {
             reproduction: false,
+            aging: false,
+            childhood_ticks: 80,
+            founder_age_ticks: 200,
         }
     }
 }
@@ -91,10 +118,16 @@ impl PopulationParams {
         #[derive(Default, Deserialize)]
         struct Table {
             reproduction: Option<bool>,
+            aging: Option<bool>,
+            childhood_ticks: Option<u64>,
+            founder_age_ticks: Option<u64>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         Self {
             reproduction: slice.population.reproduction.unwrap_or(false),
+            aging: slice.population.aging.unwrap_or(false),
+            childhood_ticks: slice.population.childhood_ticks.unwrap_or(80),
+            founder_age_ticks: slice.population.founder_age_ticks.unwrap_or(200),
         }
     }
 }

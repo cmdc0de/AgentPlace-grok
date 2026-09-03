@@ -1,8 +1,8 @@
 # M32 — kin_of incentives, household, aging
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M31 complete (`docs/M31-plan.md`, git tag `M31`, commit `5827f21`)  
-**Walkthrough:** written on implement (`docs/M32-test-plan.md`)  
+**Walkthrough:** [`M32-test-plan.md`](M32-test-plan.md)  
 **Specs:** `docs/incentive-schedule-format.md` (`applies_to`), `docs/post-ga-feature-list.md` (PG-1 household), `docs/M31-plan.md` (kinship / reproduction)
 
 ## Context

@@ -65,6 +65,13 @@ fn overlay_parses_sheet_and_population() {
     assert!(p.reproduction);
     let po = PopulationParams::from_config_toml("[conflict]\nenabled = true\n");
     assert!(!po.reproduction);
+    assert!(!po.aging);
+    let ag = PopulationParams::from_config_toml(
+        "[population]\naging = true\nchildhood_ticks = 10\nfounder_age_ticks = 50\n",
+    );
+    assert!(ag.aging);
+    assert_eq!(ag.childhood_ticks, 10);
+    assert_eq!(ag.founder_age_ticks, 50);
 }
 
 #[test]
@@ -175,4 +182,175 @@ fn pair_bond_and_reproduce_writes_kin_and_calculated_sheet() {
     let c0 = sim.agents.get(&kids[0]).unwrap();
     let c1 = sim.agents.get(&kids[1]).unwrap();
     assert!(c0.kinship.siblings.contains(&kids[1]) || c1.kinship.siblings.contains(&kids[0]));
+}
+
+fn tiny3(seed: u64) -> ExperimentConfig {
+    ExperimentConfig::from_toml_str(&format!(
+        r#"
+master_seed = {seed}
+[simulation]
+max_ticks = 1000
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 3
+"#
+    ))
+    .unwrap()
+}
+
+const KIN_FOOD: &str = r#"
+[[incentives]]
+id = "kin_food"
+applies_to = "kin_of:0"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#;
+
+#[test]
+fn kin_of_scope_after_pair_bond_and_birth() {
+    let mut sim = Simulation::new(tiny(0x32_01)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    assert_eq!(a, AgentId(0));
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    sim.inject_schedule_toml(KIN_FOOD).unwrap();
+    sim.run_ticks(1);
+    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, a, "food"), 1000);
+    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, b, "food"), 1400);
+    let child = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| *id != a && *id != b)
+        .unwrap();
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, child, "food"),
+        1400
+    );
+}
+
+#[test]
+fn kin_of_missing_agent_empty_scope() {
+    let mut sim = Simulation::new(tiny(0x32_02)).unwrap();
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "kin_food"
+applies_to = "kin_of:99"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#,
+    )
+    .unwrap();
+    sim.run_ticks(1);
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, AgentId(0), "food"),
+        1000
+    );
+}
+
+#[test]
+fn pair_bond_mints_household_child_inherits() {
+    let mut sim = Simulation::new(tiny3(0x32_03)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    let ha = sim.agents.get(&a).unwrap().kinship.household;
+    let hb = sim.agents.get(&b).unwrap().kinship.household;
+    assert!(ha.is_some());
+    assert_eq!(ha, hb);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    let child = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| *id != a && *id != b && sim.agents.get(id).unwrap().kinship.parents.contains(&a))
+        .unwrap();
+    assert_eq!(sim.agents.get(&child).unwrap().kinship.household, ha);
+    let hid = ha.unwrap();
+    let toml = format!(
+        r#"
+[[incentives]]
+id = "house_food"
+applies_to = "household:{hid}"
+[[incentives.effects]]
+type = "resource_multiplier"
+resource = "food"
+multiplier = 1.4
+"#
+    );
+    sim.inject_schedule_toml(&toml).unwrap();
+    sim.run_ticks(1);
+    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, a, "food"), 1400);
+    let outsider = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| sim.agents.get(id).unwrap().kinship.household != ha)
+        .unwrap();
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, outsider, "food"),
+        1000
+    );
+}
+
+#[test]
+fn aging_off_zero_same_hash() {
+    let cfg = tiny(0x32_04);
+    let mut a = Simulation::new(cfg.clone()).unwrap();
+    let mut b = Simulation::new(cfg).unwrap();
+    a.run_ticks(6);
+    b.run_ticks(6);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert!(a.agents.values().all(|ag| ag.age_ticks == 0));
+}
+
+#[test]
+fn aging_stamps_founders_gates_child() {
+    let mut sim = Simulation::new(tiny(0x32_05)).unwrap();
+    sim.enable_reproduction();
+    sim.enable_aging(80, 200);
+    assert!(sim.agents.values().all(|a| a.age_ticks == 200));
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    let child = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| sim.agents.get(id).unwrap().kinship.parents.contains(&a))
+        .unwrap();
+    assert_eq!(sim.agents.get(&child).unwrap().age_ticks, 0);
+    sim.conflict_enabled = true;
+    let ch = sim.agents.get(&child).unwrap().clone();
+    let legal = legal_actions(&sim, &ch);
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Attack { .. })));
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { .. })));
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Reproduce { .. })));
+    sim.run_ticks(1);
+    assert!(sim.agents.get(&a).unwrap().age_ticks >= 201);
+}
+
+#[test]
+fn aging_load_does_not_restamp_founder_age() {
+    let mut sim = Simulation::new(tiny(0x32_06)).unwrap();
+    sim.enable_aging(80, 200);
+    sim.run_ticks(3);
+    let age = sim.agents.get(&AgentId(0)).unwrap().age_ticks;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.enable_aging(80, 200);
+    assert_eq!(loaded.agents.get(&AgentId(0)).unwrap().age_ticks, age);
+    assert_ne!(age, 200);
 }

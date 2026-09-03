@@ -130,7 +130,7 @@ impl IncentiveSchedule {
             }
             if !valid_scope(&inc.applies_to) {
                 return Err(SimError::Config(format!(
-                    "unsupported applies_to {:?} (use all, agent:N, archetype:name, or supporters_of:proposal_N)",
+                    "unsupported applies_to {:?} (use all, agent:N, archetype:name, supporters_of:proposal_N, kin_of:N, or household:H)",
                     inc.applies_to
                 )));
             }
@@ -176,12 +176,27 @@ fn valid_scope(s: &str) -> bool {
         || s.starts_with("agent:")
         || s.starts_with("archetype:")
         || parse_supporters_of(s).is_some()
+        || parse_kin_of(s).is_some()
+        || parse_household(s).is_some()
 }
 
 /// `supporters_of:proposal_3` or `supporters_of:3` → Some(3).
 fn parse_supporters_of(s: &str) -> Option<u64> {
     let rest = s.strip_prefix("supporters_of:")?;
     let rest = rest.strip_prefix("proposal_").unwrap_or(rest);
+    rest.parse().ok()
+}
+
+/// `kin_of:0` or `kin_of:agent_0` → Some(0).
+fn parse_kin_of(s: &str) -> Option<u64> {
+    let rest = s.strip_prefix("kin_of:")?;
+    let rest = rest.strip_prefix("agent_").unwrap_or(rest);
+    rest.parse().ok()
+}
+
+/// `household:1` → Some(1).
+fn parse_household(s: &str) -> Option<u64> {
+    let rest = s.strip_prefix("household:")?;
     rest.parse().ok()
 }
 
@@ -226,6 +241,22 @@ pub fn in_scope(sim: &Simulation, inc: &Incentive, id: AgentId) -> bool {
             .proposals
             .iter()
             .any(|p| p.id == pid && p.supporters.contains(&id));
+    }
+    if let Some(nid) = parse_kin_of(s) {
+        let Some(src) = sim.agents.get(&AgentId(nid)) else {
+            return false;
+        };
+        return src
+            .kinship
+            .relatives()
+            .into_iter()
+            .any(|rid| rid == id && sim.agents.contains_key(&rid));
+    }
+    if let Some(hid) = parse_household(s) {
+        return sim
+            .agents
+            .get(&id)
+            .is_some_and(|a| a.kinship.household == Some(hid));
     }
     false
 }
@@ -686,6 +717,63 @@ applies_to = "supporters_of:3"
         )
         .unwrap();
         assert_eq!(s2.incentives[0].applies_to, "supporters_of:3");
+    }
+
+    #[test]
+    fn kin_of_and_household_parse() {
+        let s = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "k"
+applies_to = "kin_of:0"
+"#,
+        )
+        .unwrap();
+        assert_eq!(s.incentives[0].applies_to, "kin_of:0");
+        let s2 = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "k"
+applies_to = "kin_of:agent_3"
+"#,
+        )
+        .unwrap();
+        assert_eq!(s2.incentives[0].applies_to, "kin_of:agent_3");
+        let s3 = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "h"
+applies_to = "household:1"
+"#,
+        )
+        .unwrap();
+        assert_eq!(s3.incentives[0].applies_to, "household:1");
+    }
+
+    #[test]
+    fn kin_of_nope_is_load_error() {
+        let err = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "c"
+applies_to = "kin_of:nope"
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("applies_to"), "{err}");
+    }
+
+    #[test]
+    fn household_nope_is_load_error() {
+        let err = IncentiveSchedule::from_toml_str(
+            r#"
+[[incentives]]
+id = "c"
+applies_to = "household:nope"
+"#,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("applies_to"), "{err}");
     }
 
     #[test]

@@ -754,7 +754,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let dist = chebyshev(agent.x, agent.y, other.x, other.y);
-            if dist == 1 && agent.needs.energy >= crate::conflict::ATTACK_ENERGY_COST {
+            if dist == 1
+                && agent.needs.energy >= crate::conflict::ATTACK_ENERGY_COST
+                && !sim.is_child(agent)
+            {
                 legal.push(PrimaryAction::Attack { target: other.id });
             }
             if dist <= vis {
@@ -775,7 +778,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let unbound = agent.kinship.pair_bond.is_none() && other.kinship.pair_bond.is_none();
-            if unbound {
+            if unbound && !sim.is_child(agent) && !sim.is_child(other) {
                 legal.push(PrimaryAction::PairBond { target: other.id });
             }
             let mutual = agent.kinship.pair_bond == Some(other.id)
@@ -783,6 +786,8 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             if mutual
                 && agent.needs.energy >= floor
                 && other.needs.energy >= floor
+                && !sim.is_child(agent)
+                && !sim.is_child(other)
             {
                 legal.push(PrimaryAction::Reproduce { with: other.id });
             }

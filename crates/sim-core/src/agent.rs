@@ -142,6 +142,9 @@ pub struct Agent {
     pub sheet: crate::sheet::AbilitySheet,
     #[serde(default, skip)]
     pub kinship: crate::kinship::Kinship,
+    /// Aging overlay. 0 = unused; packed in the board blob. Not hashed at 0.
+    #[serde(default, skip)]
+    pub age_ticks: u64,
 }
 
 impl Default for Needs {
@@ -187,6 +190,7 @@ impl Agent {
             incapacitated: false,
             sheet: crate::sheet::AbilitySheet::default(),
             kinship: crate::kinship::Kinship::default(),
+            age_ticks: 0,
         }
     }
 
@@ -501,6 +505,9 @@ impl Agent {
         }
         self.sheet.hash_into(hasher);
         self.kinship.hash_into(hasher);
+        if self.age_ticks != 0 {
+            hasher.update(self.age_ticks.to_le_bytes());
+        }
     }
 }
 

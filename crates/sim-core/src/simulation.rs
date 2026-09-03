@@ -101,6 +101,14 @@ pub struct Simulation {
     pub reproduction_enabled: bool,
     /// Next AgentId to assign on birth. Checkpointed in the board blob.
     pub next_agent_id: u64,
+    /// Overlay `[population] aging`. Not hashed.
+    pub aging_enabled: bool,
+    /// Overlay `[population] childhood_ticks`. Default 80. Not hashed.
+    pub childhood_ticks: u64,
+    /// Overlay `[population] founder_age_ticks`. Default 200. Not hashed.
+    pub founder_age_ticks: u64,
+    /// Next household id. Checkpointed in the board blob.
+    pub next_household_id: u64,
 }
 
 impl Simulation {
@@ -171,6 +179,10 @@ impl Simulation {
             sheet_enabled: false,
             reproduction_enabled: false,
             next_agent_id,
+            aging_enabled: false,
+            childhood_ticks: 80,
+            founder_age_ticks: 200,
+            next_household_id: 1,
         })
     }
 
@@ -206,6 +218,22 @@ impl Simulation {
     pub fn enable_reproduction(&mut self) {
         self.reproduction_enabled = true;
         self.enable_sheet();
+    }
+
+    /// Overlay on: stamp founder age once if still 0. Do not re-stamp on `--load`.
+    pub fn enable_aging(&mut self, childhood_ticks: u64, founder_age_ticks: u64) {
+        self.aging_enabled = true;
+        self.childhood_ticks = childhood_ticks;
+        self.founder_age_ticks = founder_age_ticks;
+        for a in self.agents.values_mut() {
+            if a.age_ticks == 0 && a.kinship.parents.is_empty() {
+                a.age_ticks = founder_age_ticks;
+            }
+        }
+    }
+
+    pub fn is_child(&self, agent: &crate::agent::Agent) -> bool {
+        self.aging_enabled && agent.age_ticks < self.childhood_ticks
     }
 
     pub fn refresh_meta(&mut self) {
@@ -712,8 +740,12 @@ impl Simulation {
         let wall0 = Instant::now();
         self.tick += 1;
         self.last_tick_decisions.clear();
+        let aging = self.aging_enabled;
         for a in self.agents.values_mut() {
             a.gathers_this_tick = 0;
+            if aging {
+                a.age_ticks = a.age_ticks.saturating_add(1);
+            }
         }
         if self.config.agents.social.track_relationships {
             let step = self.config.influence_decay_milli();

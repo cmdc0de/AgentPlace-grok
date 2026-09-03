@@ -94,8 +94,12 @@ fn main() {
             if sim_core::SheetParams::from_config_toml(&text).enabled {
                 sim.enable_sheet();
             }
-            if sim_core::PopulationParams::from_config_toml(&text).reproduction {
+            let pop = sim_core::PopulationParams::from_config_toml(&text);
+            if pop.reproduction {
                 sim.enable_reproduction();
+            }
+            if pop.aging {
+                sim.enable_aging(pop.childhood_ticks, pop.founder_age_ticks);
             }
             SimPlugin::from_simulation(sim)
         }

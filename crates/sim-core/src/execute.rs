@@ -302,30 +302,40 @@ fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let Some(a) = sim.agents.get(&id) else {
-        return;
+    let existing = {
+        let Some(a) = sim.agents.get(&id) else {
+            return;
+        };
+        let Some(b) = sim.agents.get(&target) else {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        };
+        if a.incapacitated || b.incapacitated {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+        if crate::observation::chebyshev(a.x, a.y, b.x, b.y) != 1 {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+        if a.kinship.pair_bond.is_some() || b.kinship.pair_bond.is_some() {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+        a.kinship.household.or(b.kinship.household)
     };
-    let Some(b) = sim.agents.get(&target) else {
-        push(sim, id, SimEventKind::Wait);
-        return;
-    };
-    if a.incapacitated || b.incapacitated {
-        push(sim, id, SimEventKind::Wait);
-        return;
-    }
-    if crate::observation::chebyshev(a.x, a.y, b.x, b.y) != 1 {
-        push(sim, id, SimEventKind::Wait);
-        return;
-    }
-    if a.kinship.pair_bond.is_some() || b.kinship.pair_bond.is_some() {
-        push(sim, id, SimEventKind::Wait);
-        return;
-    }
+    let hid = existing.unwrap_or_else(|| {
+        let h = sim.next_household_id;
+        sim.next_household_id = sim.next_household_id.saturating_add(1);
+        h
+    });
     if let Some(ag) = sim.agents.get_mut(&id) {
         ag.kinship.pair_bond = Some(target);
+        ag.kinship.household = Some(hid);
     }
     if let Some(ag) = sim.agents.get_mut(&target) {
         ag.kinship.pair_bond = Some(id);
+        ag.kinship.household = Some(hid);
     }
     push(sim, id, SimEventKind::PairBonded { with: target });
 }
@@ -455,6 +465,12 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     child.sheet = sheet;
     child.health = sheet.health_max();
     child.kinship.parents = vec![parent_a, parent_b];
+    child.kinship.household = sim
+        .agents
+        .get(&id)
+        .and_then(|p| p.kinship.household)
+        .or_else(|| sim.agents.get(&with).and_then(|p| p.kinship.household));
+    child.age_ticks = 0;
     child.influence_factor = sim.config.influence_milli();
     if sim.config.agents.start_with_basic_needs {
         child.goals = vec![

@@ -54,6 +54,10 @@ struct BoardBlob {
     kinship: BTreeMap<u64, crate::kinship::Kinship>,
     #[serde(default)]
     next_agent_id: u64,
+    #[serde(default)]
+    next_household_id: u64,
+    #[serde(default)]
+    ages: BTreeMap<u64, u64>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -130,6 +134,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .map(|(id, a)| (id.0, a.kinship.clone()))
             .collect(),
         next_agent_id: sim.next_agent_id,
+        next_household_id: sim.next_household_id,
+        ages: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.age_ticks))
+            .collect(),
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -142,12 +152,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
 fn board_from_wire(
     wire: &PublicBoard,
     agents: &mut BTreeMap<crate::agent::AgentId, Agent>,
-) -> (RichBoard, u64) {
+) -> (RichBoard, u64, u64) {
     let Some(hex_str) = wire.entries.first() else {
-        return (RichBoard::default(), 0);
+        return (RichBoard::default(), 0, 0);
     };
     let Ok(bytes) = hex::decode(hex_str) else {
-        return (RichBoard::default(), 0);
+        return (RichBoard::default(), 0, 0);
     };
     let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
         Ok(b) => b,
@@ -165,7 +175,7 @@ fn board_from_wire(
                     goals: old.goals,
                     ..BoardBlob::default()
                 },
-                Err(_) => return (RichBoard::default(), 0),
+                Err(_) => return (RichBoard::default(), 0, 0),
             }
         }
     };
@@ -226,7 +236,12 @@ fn board_from_wire(
             agent.kinship = kin;
         }
     }
-    (blob.board, blob.next_agent_id)
+    for (id, age) in blob.ages {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.age_ticks = age;
+        }
+    }
+    (blob.board, blob.next_agent_id, blob.next_household_id)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -325,7 +340,7 @@ impl Simulation {
         }
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
-        let (board, blob_next_id) = board_from_wire(&body.public_board, &mut agents);
+        let (board, blob_next_id, blob_house_id) = board_from_wire(&body.public_board, &mut agents);
         let inf = config.influence_milli();
         for a in agents.values_mut() {
             if a.influence_factor == 0 {
@@ -386,7 +401,14 @@ impl Simulation {
             sheet_enabled: false,
             reproduction_enabled: false,
             next_agent_id: blob_next_id,
+            aging_enabled: false,
+            childhood_ticks: 80,
+            founder_age_ticks: 200,
+            next_household_id: blob_house_id,
         };
+        if sim.next_household_id == 0 {
+            sim.next_household_id = 1;
+        }
         if sim.next_agent_id == 0 {
             sim.next_agent_id = sim
                 .agents
