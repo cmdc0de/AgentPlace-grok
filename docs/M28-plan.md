@@ -58,8 +58,9 @@ type = "force_reflect"
 
 | Later | What |
 |---|---|
-| **M29** | [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| After M29 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; combat particles; **browser client**; PG-1/2/3 post-GA |
+| **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
+| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| After M30 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; PG-1/2/3 post-GA |
 | Not M28 | Browser; CI Win/mac; PROTOCOL bump |
 
 ## Key decisions

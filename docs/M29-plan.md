@@ -66,7 +66,8 @@ Add `.github/workflows/test.yml`:
 
 | Later | What |
 |---|---|
-| After M29 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; combat particles; **browser client**; PG-1/2/3 post-GA |
+| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| After M30 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; PG-1/2/3 post-GA |
 | Not M29 | PROTOCOL bump; flipping shipping `enable_embeddings` |
 
 ## Key decisions
@@ -74,7 +75,7 @@ Add `.github/workflows/test.yml`:
 1. **`PROTOCOL_VERSION` stays 5.**
 2. Embeddings are local projection only; vectors never enter `state_hash`. Shipping default stays false.
 3. Combat death is overlay; new event tag 28 append-only. Do not add fields to `Died`.
-4. CI matrix is mock tests. Browser stays After M29.
+4. CI matrix is mock tests. Browser stays After M30.
 5. Do not change shipping `configs/default.toml` / `coop.toml`. `format_version = 2`.
 
 ## Tests (M29 acceptance bar)

@@ -101,8 +101,9 @@ Hello **v4 vs v5** is Protocol. Old v4 clients cannot talk to a lockstep v5 serv
 | **M26** | Done — [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
 | **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
 | **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
-| **M29** | [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| After M29 | protobuf/TLS; Unix sockets |
+| **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
+| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| After M30 | protobuf/TLS; Unix sockets |
 | Not M24 | Browser; combat; CI Win/mac; hashed pipeline events |
 
 ## Key decisions

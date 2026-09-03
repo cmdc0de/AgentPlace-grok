@@ -103,8 +103,9 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | **M26** | Done — [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
 | **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
 | **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
-| **M29** | [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| After M29 | protobuf/TLS |
+| **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
+| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| After M30 | protobuf/TLS |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M28 are done. **Current next slice:** [`M29-plan.md`](M29-plan.md) (local embeddings, combat death, CI Win/mac). Later work is listed at the bottom of that file.
+M3–M29 are done. **Current next slice:** [`M30-plan.md`](M30-plan.md) (combat particles / meshes). Later work is listed at the bottom of that file.
 
 ## PR Plan
 
