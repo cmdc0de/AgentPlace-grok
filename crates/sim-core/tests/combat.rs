@@ -1,7 +1,9 @@
 //! M27 combat overlay + Attack/Flee.
 
 use sim_core::action::PrimaryAction;
-use sim_core::combat_fx::{CombatRole, combat_hud_line, combat_role};
+use sim_core::combat_fx::{
+    CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role,
+};
 use sim_core::conflict::{ATTACK_DAMAGE, ATTACK_ENERGY_COST, ConflictParams};
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::observation::legal_actions;
@@ -212,6 +214,98 @@ fn combat_role_helper_distinct() {
         format!("{:?}", CombatRole::Attacker),
         format!("{:?}", CombatRole::Defender)
     );
+}
+
+#[test]
+fn combat_fx_jobs_empty_without_events() {
+    assert!(combat_fx_jobs(&[], 1).is_empty());
+    let events = vec![SimEvent {
+        tick: 2,
+        agent: AgentId(0),
+        kind: SimEventKind::Wait,
+    }];
+    assert!(combat_fx_jobs(&events, 2).is_empty());
+    assert!(combat_fx_jobs(&events, 1).is_empty());
+}
+
+#[test]
+fn combat_fx_jobs_from_attack_flee_downed_death() {
+    let a = AgentId(0);
+    let b = AgentId(1);
+    let events = vec![
+        SimEvent {
+            tick: 4,
+            agent: a,
+            kind: SimEventKind::Attack {
+                target: b,
+                damage: 2000,
+            },
+        },
+        SimEvent {
+            tick: 4,
+            agent: a,
+            kind: SimEventKind::Flee,
+        },
+        SimEvent {
+            tick: 4,
+            agent: b,
+            kind: SimEventKind::Incapacitated { by: a },
+        },
+        SimEvent {
+            tick: 4,
+            agent: b,
+            kind: SimEventKind::CombatDeath { by: a },
+        },
+        SimEvent {
+            tick: 5,
+            agent: a,
+            kind: SimEventKind::Attack {
+                target: b,
+                damage: 1,
+            },
+        },
+    ];
+    let jobs = combat_fx_jobs(&events, 4);
+    assert_eq!(
+        jobs,
+        vec![
+            CombatFxJob::Strike { from: a, to: b },
+            CombatFxJob::Flee { agent: a },
+            CombatFxJob::Downed { agent: b },
+            CombatFxJob::Death { agent: b },
+        ]
+    );
+    let later = combat_fx_jobs(&events, 5);
+    assert_eq!(later, vec![CombatFxJob::Strike { from: a, to: b }]);
+    assert!(!later.iter().any(|j| matches!(
+        j,
+        CombatFxJob::Flee { .. } | CombatFxJob::Downed { .. } | CombatFxJob::Death { .. }
+    )));
+}
+
+#[test]
+fn combat_hud_includes_incapacitate_and_death() {
+    let a = AgentId(0);
+    let b = AgentId(1);
+    let events = vec![
+        SimEvent {
+            tick: 7,
+            agent: b,
+            kind: SimEventKind::Incapacitated { by: a },
+        },
+        SimEvent {
+            tick: 8,
+            agent: b,
+            kind: SimEventKind::CombatDeath { by: a },
+        },
+    ];
+    let down = combat_hud_line(&events, 7).unwrap();
+    assert!(down.contains("incapacitated"), "{down}");
+    assert!(down.contains("#1"), "{down}");
+    let dead = combat_hud_lines(&events, 8);
+    assert_eq!(dead.len(), 1);
+    assert!(dead[0].contains("combat_death"), "{dead:?}");
+    assert!(combat_hud_line(&events, 9).is_none());
 }
 
 #[test]

@@ -10,6 +10,7 @@ use shared::protocol::ClientMessage;
 use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev, effective_range};
+use sim_core::combat_fx::CombatFxJob;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -45,6 +46,14 @@ struct StockpileVisual {
 struct SatchelVisual {
     id: AgentId,
     backpack: bool,
+}
+
+#[derive(Component)]
+struct CombatFxVisual {
+    job: CombatFxJob,
+    x: u32,
+    y: u32,
+    id: AgentId,
 }
 
 const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
@@ -131,6 +140,7 @@ fn main() {
                 handle_input,
                 sync_agent_transforms,
                 sync_combat_tints,
+                sync_combat_fx,
                 sync_stockpile_markers,
                 sync_satchel_markers,
                 update_camera,
@@ -709,6 +719,137 @@ fn handle_input(
     }
 }
 
+fn last_agent_cell(
+    sim: &Simulation,
+    cache: &mut std::collections::BTreeMap<AgentId, (u32, u32)>,
+    id: AgentId,
+) -> (u32, u32) {
+    if let Some(a) = sim.agents.get(&id) {
+        cache.insert(id, (a.x, a.y));
+        (a.x, a.y)
+    } else {
+        cache.get(&id).copied().unwrap_or((0, 0))
+    }
+}
+
+fn spawn_combat_fx(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    world: &sim_core::World,
+    job: CombatFxJob,
+    cache: &mut std::collections::BTreeMap<AgentId, (u32, u32)>,
+    sim: &Simulation,
+) {
+    let (mesh, color, transform, x, y, id) = match job {
+        CombatFxJob::Strike { from, to } => {
+            let (ax, ay) = last_agent_cell(sim, cache, from);
+            let (bx, by) = last_agent_cell(sim, cache, to);
+            let a = agent_world_pos(world, ax, ay);
+            let b = agent_world_pos(world, bx, by);
+            let mid = (a + b) * 0.5 + Vec3::Y * 0.25;
+            let len = (b - a).length().max(0.15);
+            let mut t = Transform::from_translation(mid).looking_at(b + Vec3::Y * 0.25, Vec3::Y);
+            t.scale = Vec3::new(0.08, 0.08, len);
+            (
+                Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                Color::srgb(0.92, 0.18, 0.10),
+                t,
+                ax,
+                ay,
+                from,
+            )
+        }
+        CombatFxJob::Flee { agent } => {
+            let (x, y) = last_agent_cell(sim, cache, agent);
+            let pos = agent_world_pos(world, x, y) + Vec3::Y * 0.55;
+            (
+                Mesh3d(meshes.add(Sphere::new(0.16))),
+                Color::srgb(0.92, 0.82, 0.18),
+                Transform::from_translation(pos),
+                x,
+                y,
+                agent,
+            )
+        }
+        CombatFxJob::Downed { agent } => {
+            let (x, y) = last_agent_cell(sim, cache, agent);
+            let pos = agent_world_pos(world, x, y) + Vec3::new(0.0, -0.15, 0.0);
+            (
+                Mesh3d(meshes.add(Cuboid::new(0.55, 0.12, 0.55))),
+                Color::srgb(0.18, 0.10, 0.10),
+                Transform::from_translation(pos),
+                x,
+                y,
+                agent,
+            )
+        }
+        CombatFxJob::Death { agent } => {
+            let (x, y) = last_agent_cell(sim, cache, agent);
+            let pos = agent_world_pos(world, x, y) + Vec3::Y * 0.35;
+            (
+                Mesh3d(meshes.add(Cuboid::new(0.12, 0.85, 0.12))),
+                Color::srgb(0.95, 0.45, 0.75),
+                Transform::from_translation(pos),
+                x,
+                y,
+                agent,
+            )
+        }
+    };
+    let mat = materials.add(StandardMaterial {
+        base_color: color,
+        perceptual_roughness: 0.45,
+        unlit: true,
+        ..default()
+    });
+    commands.spawn((
+        mesh,
+        MeshMaterial3d(mat),
+        transform,
+        CombatFxVisual { job, x, y, id },
+        Visibility::default(),
+    ));
+}
+
+fn sync_combat_fx(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    state: Res<SimState>,
+    existing: Query<(Entity, &CombatFxVisual)>,
+    mut last_cell: Local<std::collections::BTreeMap<AgentId, (u32, u32)>>,
+) {
+    for a in state.sim.agents.values() {
+        last_cell.insert(a.id, (a.x, a.y));
+    }
+    let live: std::collections::BTreeSet<CombatFxJob> =
+        sim_core::combat_fx_jobs(&state.sim.events.events, state.sim.tick)
+            .into_iter()
+            .collect();
+    let have: std::collections::BTreeSet<CombatFxJob> =
+        existing.iter().map(|(_, v)| v.job).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&v.job) {
+            commands.entity(e).despawn();
+        }
+    }
+    for job in live {
+        if have.contains(&job) {
+            continue;
+        }
+        spawn_combat_fx(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &state.sim.world,
+            job,
+            &mut last_cell,
+            &state.sim,
+        );
+    }
+}
+
 fn sync_combat_tints(
     state: Res<SimState>,
     agents: Query<(&AgentVisual, &MeshMaterial3d<StandardMaterial>)>,
@@ -827,6 +968,10 @@ fn update_fog_visibility(
         (&SatchelVisual, &mut Visibility),
         (Without<WorldMarker>, Without<AgentVisual>),
     >,
+    mut fx: Query<
+        (&CombatFxVisual, &mut Visibility),
+        (Without<WorldMarker>, Without<AgentVisual>, Without<SatchelVisual>),
+    >,
 ) {
     let fog_obs = if ui.fog {
         state.follow.map(|id| observation::build(&state.sim, id))
@@ -874,6 +1019,19 @@ fn update_fog_visibility(
                     .map(|a| (a.x, a.y))
                     .unwrap_or((0, 0));
                 observation::agent_visible_in_observation(obs, visual.id, pos.0, pos.1)
+            }
+        };
+        *vis = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for (visual, mut vis) in &mut fx {
+        let show = match &fog_obs {
+            None => true,
+            Some(obs) => {
+                observation::agent_visible_in_observation(obs, visual.id, visual.x, visual.y)
             }
         };
         *vis = if show {

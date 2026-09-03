@@ -1,8 +1,8 @@
 # M30 — Combat particles / meshes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M29 complete (`docs/M29-plan.md`, git tag `M29`, commit `7b3a3bf`)  
-**Walkthrough:** written on implement (`docs/M30-test-plan.md`)  
+**Walkthrough:** [`M30-test-plan.md`](M30-test-plan.md)  
 **Specs:** `medium-priority-specs.md` §2 (physical combat v2-ready), `M28-plan.md` (capsule tints, no meshes), `M29-plan.md` (`CombatDeath` tag 28)
 
 ## Context

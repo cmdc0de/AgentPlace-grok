@@ -200,9 +200,10 @@ fn draw_status(
                 "{tick_line}  {}  follow {follow}  hash {short}",
                 if state.paused { "paused" } else { "running" }
             ));
-            if let Some(line) =
-                sim_core::combat_fx::combat_hud_line(&state.sim.events.events, state.sim.tick)
-            {
+            for line in sim_core::combat_fx::combat_hud_lines(
+                &state.sim.events.events,
+                state.sim.tick,
+            ) {
                 ui.text(line);
             }
             ui.text(format!(
