@@ -5,6 +5,7 @@ use sim_core::event_log::SimEventKind;
 use sim_core::kinship::PopulationParams;
 use sim_core::observation::legal_actions;
 use sim_core::sheet::{AbilitySheet, SheetParams};
+use sim_core::voting::VotingParams;
 use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation};
 
 fn tiny(seed: u64) -> ExperimentConfig {
@@ -590,4 +591,177 @@ fn culture_founders_child_copies_load_no_reroll() {
         loaded.agents.get(&child).unwrap().culture,
         sim.agents.get(&child).unwrap().culture
     );
+}
+
+fn scores(str: u8, dex: u8, wis: u8, cha: u8) -> AbilitySheet {
+    AbilitySheet {
+        strength: str,
+        dexterity: dex,
+        constitution: 10,
+        intelligence: 10,
+        wisdom: wis,
+        charisma: cha,
+    }
+}
+
+#[test]
+fn sheet_unused_mods_zero_same_as_today() {
+    let mut sim = Simulation::new(tiny(0x34_01)).unwrap();
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert!(a.sheet.is_unused());
+    assert_eq!(a.sheet.attack_damage(), 2000);
+    let move0 = a.move_cost_milli(&sim.storage);
+    let obs = sim_core::observation::build(&sim, id);
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 10, 10, 10);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(a.sheet.attack_damage(), 2000);
+    assert_eq!(a.move_cost_milli(&sim.storage), move0);
+    let obs2 = sim_core::observation::build(&sim, id);
+    assert_eq!(obs.vision, obs2.vision);
+    assert_eq!(obs.identity, obs2.identity);
+}
+
+#[test]
+fn str_18_vs_10_attack_damage() {
+    let mut sim = Simulation::new(tiny(0x34_02)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim.agents.get_mut(&a).unwrap().sheet = scores(18, 10, 10, 10);
+    sim.agents.get_mut(&b).unwrap().health = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::Attack { target, damage } if target == b && damage == 3000
+    )));
+    sim.agents.get_mut(&a).unwrap().sheet = scores(10, 10, 10, 10);
+    fill_energy(&mut sim);
+    sim.agents.get_mut(&b).unwrap().health = 10_000;
+    sim.agents.get_mut(&b).unwrap().needs.energy = sim.config.energy_max_milli();
+    sim.agents.get_mut(&b).unwrap().incapacitated = false;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::Attack { target, damage } if target == b && damage == 2000
+    )));
+}
+
+#[test]
+fn dex_18_vs_3_move_cost() {
+    let mut sim = Simulation::new(tiny(0x34_03)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().try_add_item(ItemId::Stone, 4);
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 18, 10, 10);
+    let hi = sim.agents.get(&id).unwrap().move_cost_milli(&sim.storage);
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 3, 10, 10);
+    let lo = sim.agents.get(&id).unwrap().move_cost_milli(&sim.storage);
+    assert!(hi < lo, "DEX 18 {hi} vs DEX 3 {lo}");
+    assert!(hi > 0, "loaded move cost");
+}
+
+#[test]
+fn wis_18_vs_3_range() {
+    let mut sim = Simulation::new(tiny(0x34_04)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 10, 18, 10);
+    let hi = sim_core::observation::build(&sim, id);
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 10, 3, 10);
+    let lo = sim_core::observation::build(&sim, id);
+    assert!(hi.vision > lo.vision, "vis {} vs {}", hi.vision, lo.vision);
+    assert!(
+        hi.identity > lo.identity,
+        "ident {} vs {}",
+        hi.identity,
+        lo.identity
+    );
+}
+
+#[test]
+fn cha_18_influence_vote_weight() {
+    let mut sim = Simulation::new(tiny(0x34_05)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().influence_factor = 1000;
+    sim.agents.get_mut(&id).unwrap().sheet = scores(10, 10, 10, 18);
+    sim.voting = VotingParams::influence();
+    assert_eq!(sim.vote_weight_of(id), 1400);
+    sim.voting = VotingParams::equal();
+    assert_eq!(sim.vote_weight_of(id), 1);
+    sim.voting = VotingParams::influence();
+    sim.agents.get_mut(&id).unwrap().sheet = AbilitySheet::default();
+    assert_eq!(sim.vote_weight_of(id), 1000);
+}
+
+#[test]
+fn close_kin_pair_bond_illegal() {
+    let mut sim = Simulation::new(tiny(0x34_06)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    let kids: Vec<AgentId> = sim.agents.get(&a).unwrap().kinship.children.clone();
+    assert!(kids.len() >= 2, "{kids:?}");
+    let c0 = kids[0];
+    let c1 = kids[1];
+    let (x, y) = {
+        let ag = sim.agents.get(&c0).unwrap();
+        (ag.x, ag.y)
+    };
+    if let Some(ag) = sim.agents.get_mut(&c1) {
+        let mut nx = x.saturating_add(1);
+        let mut ny = y;
+        if !sim.world.is_land(nx, ny) {
+            nx = x.saturating_sub(1);
+        }
+        if !sim.world.is_land(nx, ny) {
+            ny = y.saturating_add(1);
+            nx = x;
+        }
+        ag.x = nx;
+        ag.y = ny;
+    }
+    let ch = sim.agents.get(&c0).unwrap().clone();
+    let legal = legal_actions(&sim, &ch);
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == c1)));
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, c0, &PrimaryAction::PairBond { target: c1 });
+    assert!(matches!(
+        sim.events.events.last().map(|e| &e.kind),
+        Some(SimEventKind::Wait)
+    ));
+
+    sim.agents.get_mut(&a).unwrap().kinship.pair_bond = None;
+    sim.agents.get_mut(&b).unwrap().kinship.pair_bond = None;
+    let (px, py) = {
+        let ag = sim.agents.get(&a).unwrap();
+        (ag.x, ag.y)
+    };
+    if let Some(ag) = sim.agents.get_mut(&c0) {
+        let mut nx = px.saturating_add(1);
+        let ny = py;
+        if !sim.world.is_land(nx, ny) || (nx, ny) == (px, py) {
+            nx = px.saturating_sub(1);
+        }
+        ag.x = nx;
+        ag.y = ny;
+        ag.kinship.pair_bond = None;
+    }
+    let ch = sim.agents.get(&c0).unwrap().clone();
+    let legal = legal_actions(&sim, &ch);
+    assert!(!legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == a)));
+}
+
+#[test]
+fn unrelated_founders_pair_bond_still_legal() {
+    let mut sim = Simulation::new(tiny(0x34_07)).unwrap();
+    sim.enable_reproduction();
+    let (a, _) = place_adjacent(&mut sim);
+    let agent = sim.agents.get(&a).unwrap().clone();
+    let legal = legal_actions(&sim, &agent);
+    assert!(legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { .. })));
 }

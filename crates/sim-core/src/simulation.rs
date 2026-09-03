@@ -814,7 +814,7 @@ impl Simulation {
             VoteWeight::Influence => self
                 .agents
                 .get(&id)
-                .map(|a| u64::from(a.influence_factor.max(1)))
+                .map(|a| a.sheet.influence_vote_weight(a.influence_factor))
                 .unwrap_or(1),
             VoteWeight::Respect => self.incoming_respect_sum(id).max(1),
         }
@@ -1329,9 +1329,10 @@ impl Simulation {
         let (broadcast, targets) = match speak.to {
             SpeakTarget::Broadcast => (true, Vec::new()),
             SpeakTarget::Directed(ids) => {
-                let ident = crate::observation::effective_range(
+                let ident = crate::observation::perceive_range(
                     self.config.observation.base_agent_identity_range,
                     speaker.personality.perceptiveness,
+                    speaker.sheet.wisdom,
                 );
                 let valid: Vec<AgentId> = ids
                     .into_iter()
@@ -1346,21 +1347,23 @@ impl Simulation {
         };
         if self.config.agents.social.track_relationships {
             let partners: Vec<AgentId> = if broadcast {
-                let hear = crate::observation::effective_range(
+                let hear = crate::observation::perceive_range(
                     self.config
                         .communication
                         .base_speech_range
                         .max(self.config.observation.base_hearing_range),
                     speaker.personality.perceptiveness,
+                    speaker.sheet.wisdom,
                 );
                 self.agents
                     .values()
                     .filter(|t| t.id != id)
                     .filter(|t| {
                         let dist = crate::observation::chebyshev(speaker.x, speaker.y, t.x, t.y);
-                        let ident = crate::observation::effective_range(
+                        let ident = crate::observation::perceive_range(
                             self.config.observation.base_agent_identity_range,
                             t.personality.perceptiveness,
+                            t.sheet.wisdom,
                         );
                         dist <= hear && dist <= ident
                     })

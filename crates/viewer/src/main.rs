@@ -9,7 +9,7 @@ use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
 use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
-use sim_core::observation::{self, chebyshev, effective_range};
+use sim_core::observation::{self, chebyshev};
 use sim_core::combat_fx::CombatFxJob;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::env;
@@ -945,9 +945,10 @@ fn update_vision_overlay(
     let vis = if state.sim.config.observation.full_information {
         state.sim.world.width.max(state.sim.world.height)
     } else {
-        effective_range(
+        sim_core::observation::perceive_range(
             state.sim.config.observation.base_vision_range,
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
     let mesh = meshes.add(Cuboid::new(0.92, 0.04, 0.92));

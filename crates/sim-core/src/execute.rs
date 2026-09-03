@@ -256,7 +256,7 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         return;
     }
     let cost = crate::conflict::ATTACK_ENERGY_COST;
-    let damage = crate::conflict::ATTACK_DAMAGE;
+    let damage = atk.sheet.attack_damage();
     if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;
@@ -319,6 +319,10 @@ fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
             return;
         }
         if a.kinship.pair_bond.is_some() || b.kinship.pair_bond.is_some() {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+        if crate::kinship::close_kin(a, b) {
             push(sim, id, SimEventKind::Wait);
             return;
         }

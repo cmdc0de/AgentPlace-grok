@@ -1,6 +1,6 @@
 //! Kinship links and overlay `[population]`. Not `RelationshipSummary`.
 
-use crate::agent::AgentId;
+use crate::agent::{Agent, AgentId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,6 +87,15 @@ pub fn push_unique(ids: &mut Vec<AgentId>, id: AgentId) {
         ids.push(id);
         ids.sort_by_key(|x| x.0);
     }
+}
+
+/// Blood kin only: parents, children, siblings. Not pair-bond or household.
+pub fn close_kin(a: &Agent, b: &Agent) -> bool {
+    a.id != b.id && (blood(&a.kinship, b.id) || blood(&b.kinship, a.id))
+}
+
+fn blood(k: &Kinship, id: AgentId) -> bool {
+    k.parents.contains(&id) || k.children.contains(&id) || k.siblings.contains(&id)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

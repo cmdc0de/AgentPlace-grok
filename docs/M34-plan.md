@@ -1,8 +1,8 @@
 # M34 — Sheet effects, close-kin PairBond
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M33 complete (`docs/M33-plan.md`, git tag `M33`, commit `6a884fb`)  
-**Walkthrough:** written on implement (`docs/M34-test-plan.md`)  
+**Walkthrough:** [`docs/M34-test-plan.md`](M34-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-3 effects, PG-2 incest), `docs/M31-plan.md` (sheet + PairBond)
 
 ## Context
@@ -53,7 +53,8 @@ Inspector already shows `STR 14 (+2)`. No new Observation field required.
 
 | Later | What |
 |---|---|
-| After M34 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client**; INT/memory; haul inventory from STR; dialects; seasons |
+| **M35** | [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
+| After M35 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; extra invention kinds |
 | Not M34 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions
@@ -101,7 +102,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M34-test-plan.md`).
+Walkthrough: [`docs/M34-test-plan.md`](M34-test-plan.md).
 
 ```bash
 cargo test -p sim-core

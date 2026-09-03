@@ -163,6 +163,13 @@ pub fn effective_range(base: f64, perceptiveness: u8) -> u32 {
     (base * factor).round().max(0.0) as u32
 }
 
+/// Perception range after personality, then WIS modifier (0 unused).
+pub fn perceive_range(base: f64, perceptiveness: u8, wisdom: u8) -> u32 {
+    let mut sheet = crate::sheet::AbilitySheet::default();
+    sheet.wisdom = wisdom;
+    sheet.adjust_range(effective_range(base, perceptiveness))
+}
+
 pub fn neighbors4(world: &World, x: u32, y: u32) -> Vec<(u32, u32)> {
     let mut out = vec![(x, y)];
     for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
@@ -181,27 +188,30 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
     let vis = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        effective_range(
+        perceive_range(
             cfg.observation.base_vision_range,
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
     let hear = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        effective_range(
+        perceive_range(
             cfg.communication
                 .base_speech_range
                 .max(cfg.observation.base_hearing_range),
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
     let ident = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        effective_range(
+        perceive_range(
             cfg.observation.base_agent_identity_range,
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
 
@@ -448,10 +458,11 @@ fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) ->
             continue;
         };
         let range = if *shout {
-            effective_range(
+            perceive_range(
                 sim.config.observation.base_hearing_range
                     * sim.config.communication.shout_range_multiplier,
                 listener.personality.perceptiveness,
+                listener.sheet.wisdom,
             )
         } else {
             hear
@@ -615,9 +626,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let ident = if sim.config.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        effective_range(
+        perceive_range(
             sim.config.observation.base_agent_identity_range,
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
     for p in sim.board.open() {
@@ -711,9 +723,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let ident = if sim.config.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        effective_range(
+        perceive_range(
             sim.config.observation.base_agent_identity_range,
             agent.personality.perceptiveness,
+            agent.sheet.wisdom,
         )
     };
     for other in sim.agents.values() {
@@ -773,9 +786,10 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         let vis = if sim.config.observation.full_information {
             sim.world.width.max(sim.world.height)
         } else {
-            effective_range(
+            perceive_range(
                 sim.config.observation.base_vision_range,
                 agent.personality.perceptiveness,
+                agent.sheet.wisdom,
             )
         };
         let mut any_visible = false;
@@ -808,7 +822,11 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let unbound = agent.kinship.pair_bond.is_none() && other.kinship.pair_bond.is_none();
-            if unbound && !sim.is_child(agent) && !sim.is_child(other) {
+            if unbound
+                && !sim.is_child(agent)
+                && !sim.is_child(other)
+                && !crate::kinship::close_kin(agent, other)
+            {
                 legal.push(PrimaryAction::PairBond { target: other.id });
             }
             let mutual = agent.kinship.pair_bond == Some(other.id)

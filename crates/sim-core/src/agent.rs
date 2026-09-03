@@ -395,7 +395,7 @@ impl Agent {
     }
 
     pub fn move_cost_milli(&self, params: &crate::haul::StorageParams) -> u32 {
-        crate::haul::move_cargo_cost_milli(
+        let base = crate::haul::move_cargo_cost_milli(
             self.pocket_weight_milli(),
             if self.has_basket() {
                 self.pack_weight_milli()
@@ -405,7 +405,8 @@ impl Agent {
             params.haul_milli,
             params.pack_haul_milli,
             params.move_step_k_milli,
-        )
+        );
+        self.sheet.adjust_move_cost(base)
     }
 
     pub fn try_add_item(&mut self, item: ItemId, qty: u32) -> u32 {

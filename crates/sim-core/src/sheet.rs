@@ -1,6 +1,7 @@
 //! Overlay `[agents.sheet]`. Not on `ExperimentConfig` (not hashed).
 
 use crate::agent::HEALTH_MAX;
+use crate::conflict::ATTACK_DAMAGE;
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
@@ -39,6 +40,29 @@ impl AbilitySheet {
         }
         let m = Self::modifier(self.constitution);
         (HEALTH_MAX as i32 + m * 500).max(1) as u32
+    }
+
+    /// Attack damage millipoints. Unused STR (0) keeps `ATTACK_DAMAGE`.
+    pub fn attack_damage(&self) -> u32 {
+        (ATTACK_DAMAGE as i32 + Self::modifier(self.strength) * 250).max(1) as u32
+    }
+
+    /// Move energy after DEX. Unused DEX leaves `base`. Zero base stays 0.
+    pub fn adjust_move_cost(&self, base: u32) -> u32 {
+        if base == 0 {
+            return 0;
+        }
+        (base as i32 - Self::modifier(self.dexterity) * 40).max(1) as u32
+    }
+
+    /// Vision/hearing/identity cells after WIS. Unused WIS leaves `base`.
+    pub fn adjust_range(&self, base: u32) -> u32 {
+        (base as i32 + Self::modifier(self.wisdom)).max(0) as u32
+    }
+
+    /// Influence vote weight. Does not write `influence_factor`.
+    pub fn influence_vote_weight(&self, influence_factor: u32) -> u64 {
+        (influence_factor as i32 + Self::modifier(self.charisma) * 100).max(1) as u64
     }
 
     pub fn roll_3d6(rng: &mut ChaCha20Rng) -> Self {
@@ -136,5 +160,57 @@ impl SheetParams {
         Self {
             enabled: slice.agents.sheet.enabled.unwrap_or(false),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unused_sheet_keeps_constants() {
+        let s = AbilitySheet::default();
+        assert_eq!(s.attack_damage(), ATTACK_DAMAGE);
+        assert_eq!(s.adjust_move_cost(200), 200);
+        assert_eq!(s.adjust_move_cost(0), 0);
+        assert_eq!(s.adjust_range(8), 8);
+        assert_eq!(s.influence_vote_weight(50), 50);
+        assert_eq!(s.influence_vote_weight(0), 1);
+    }
+
+    #[test]
+    fn str_dex_wis_cha_mods() {
+        let high = AbilitySheet {
+            strength: 18,
+            dexterity: 18,
+            constitution: 10,
+            intelligence: 10,
+            wisdom: 18,
+            charisma: 18,
+        };
+        let mid = AbilitySheet {
+            strength: 10,
+            dexterity: 10,
+            constitution: 10,
+            intelligence: 10,
+            wisdom: 10,
+            charisma: 10,
+        };
+        let low = AbilitySheet {
+            strength: 3,
+            dexterity: 3,
+            constitution: 10,
+            intelligence: 10,
+            wisdom: 3,
+            charisma: 3,
+        };
+        assert_eq!(high.attack_damage(), 3000);
+        assert_eq!(mid.attack_damage(), 2000);
+        assert_eq!(high.adjust_move_cost(200), 40);
+        assert!(high.adjust_move_cost(200) < low.adjust_move_cost(200));
+        assert_eq!(high.adjust_range(8), 12);
+        assert_eq!(low.adjust_range(8), 5);
+        assert_eq!(high.influence_vote_weight(1000), 1400);
+        assert_eq!(mid.influence_vote_weight(1000), 1000);
     }
 }
