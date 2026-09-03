@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M25 are done. **Current next slice:** [`M26-plan.md`](M26-plan.md) (Reflect/Plan every-N-ticks, record/replay of reflection text). Later work is listed at the bottom of that file.
+M3–M26 are done. **Current next slice:** [`M27-plan.md`](M27-plan.md) (auto-execute plan, combat). Later work is listed at the bottom of that file.
 
 ## PR Plan
 

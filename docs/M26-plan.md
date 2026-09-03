@@ -77,7 +77,8 @@ Live `OpenAiCompatClient`: short JSON `{"reflection":"..."}` / `{"plan":["...", 
 
 | Later | What |
 |---|---|
-| After M26 | protobuf/TLS; embeddings; Unix sockets; reflection importance-adjust; incentive-forced reflect; hashed pipeline events |
+| **M27** | [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
+| After M27 | protobuf/TLS; embeddings; Unix sockets; reflection importance-adjust; incentive-forced reflect; hashed pipeline events; `health` / incapacitation; combat viewer FX |
 | Not M26 | Browser; combat; CI Win/mac; PROTOCOL bump; auto-execute plan |
 
 ## Key decisions

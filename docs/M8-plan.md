@@ -108,8 +108,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M23** | Done — [`M23-plan.md`](M23-plan.md) — see every tick, LLM pipeline barrier, sim-cli Control |
 | **M24** | Done — [`M24-plan.md`](M24-plan.md) — wire /set, connect /inject, lockstep ack |
 | **M25** | Done — [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
-| **M26** | [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
-| After M26 | Protobuf/TLS; embeddings |
+| **M26** | Done — [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
+| **M27** | [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
+| After M27 | Protobuf/TLS; embeddings |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions
