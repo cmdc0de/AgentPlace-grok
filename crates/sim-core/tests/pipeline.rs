@@ -364,3 +364,97 @@ fn record_replay_execute_plan_same_hash() {
     let _ = std::fs::remove_file(&rec);
 }
 
+#[test]
+fn force_reflect_parses() {
+    let s = sim_core::IncentiveSchedule::from_toml_str(
+        r#"
+[[incentives]]
+id = "reflect_now"
+start_tick = 1
+[[incentives.effects]]
+type = "force_reflect"
+"#,
+    )
+    .unwrap();
+    assert_eq!(s.incentives.len(), 1);
+}
+
+#[test]
+fn force_reflect_mock_skips_llm() {
+    let bare = r#"
+[[incentives]]
+id = "reflect_now"
+start_tick = 1
+"#;
+    let forced = r#"
+[[incentives]]
+id = "reflect_now"
+start_tick = 1
+[[incentives.effects]]
+type = "force_reflect"
+"#;
+    let mut a = Simulation::new(tiny(0x28_10)).unwrap();
+    a.inject_schedule_toml(bare).unwrap();
+    let mut b = Simulation::new(tiny(0x28_10)).unwrap();
+    b.inject_schedule_toml(forced).unwrap();
+    a.run_ticks(3);
+    b.run_ticks(3);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert!(!b
+        .agents
+        .values()
+        .any(|ag| ag.memory.iter().any(|e| e.kind == MemoryKind::Reflection)));
+}
+
+#[test]
+fn force_reflect_custom_writes_memory() {
+    let stub = PipelineStub::new(true, false);
+    let mut sim = Simulation::new(tiny(0x28_11)).unwrap();
+    sim.chooser = Chooser::Custom(stub.clone());
+    sim.inject_schedule_toml(
+        r#"
+[[incentives]]
+id = "reflect_now"
+start_tick = 1
+[[incentives.effects]]
+type = "force_reflect"
+"#,
+    )
+    .unwrap();
+    sim.run_ticks(1);
+    assert!(stub.insight.load(Ordering::SeqCst) >= 1);
+    assert!(sim.agents.values().any(|a| a
+        .memory
+        .iter()
+        .any(|e| e.kind == MemoryKind::Reflection && e.text.contains("quiet"))));
+}
+
+#[test]
+fn force_reflect_record_replay_same_hash() {
+    let rec = tmp("m28-force");
+    let _ = std::fs::remove_file(&rec);
+    let mut cfg = tiny(0x28_12);
+    cfg.llm.replay_file = rec.to_string_lossy().into();
+    let toml = r#"
+[[incentives]]
+id = "reflect_now"
+start_tick = 1
+[[incentives.effects]]
+type = "force_reflect"
+"#;
+    let mut writer = Simulation::new(cfg.clone()).unwrap();
+    writer.chooser = Chooser::Custom(PipelineStub::new(true, false));
+    writer.inject_schedule_toml(toml).unwrap();
+    writer.run_ticks(2);
+    let hash = writer.state_hash();
+
+    let replay_stub = PipelineStub::new(true, false);
+    let mut replayed = Simulation::new(cfg).unwrap();
+    replayed.chooser = Chooser::Custom(replay_stub.clone());
+    replayed.inject_schedule_toml(toml).unwrap();
+    replayed.run_ticks(2);
+    assert_eq!(replayed.state_hash(), hash);
+    assert_eq!(replay_stub.insight.load(Ordering::SeqCst), 0);
+    let _ = std::fs::remove_file(&rec);
+}
+

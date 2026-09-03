@@ -249,20 +249,37 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    if def.incapacitated {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
     let cost = crate::conflict::ATTACK_ENERGY_COST;
     let damage = crate::conflict::ATTACK_DAMAGE;
     if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    let mut down = false;
     if let Some(d) = sim.agents.get_mut(&target) {
         d.needs.energy = d.needs.energy.saturating_sub(damage);
+        d.health = d.health.saturating_sub(damage);
+        if d.health == 0 && !d.incapacitated {
+            d.incapacitated = true;
+            down = true;
+        }
     }
     push(
         sim,
         id,
         SimEventKind::Attack { target, damage },
     );
+    if down {
+        push(
+            sim,
+            target,
+            SimEventKind::Incapacitated { by: id },
+        );
+    }
 }
 
 fn flee(sim: &mut Simulation, id: AgentId) {

@@ -734,7 +734,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             });
         }
     }
-    if sim.conflict_enabled {
+    if sim.conflict_enabled && !agent.incapacitated {
         let vis = if sim.config.observation.full_information {
             sim.world.width.max(sim.world.height)
         } else {
@@ -745,7 +745,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         };
         let mut any_visible = false;
         for other in sim.agents.values() {
-            if other.id == agent.id {
+            if other.id == agent.id || other.incapacitated {
                 continue;
             }
             let dist = chebyshev(agent.x, agent.y, other.x, other.y);

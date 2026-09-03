@@ -1,8 +1,8 @@
 # M28 — Health/incapacitation, combat viewer FX, force_reflect
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M27 complete (`docs/M27-plan.md`, git tag `M27`, commit `9fb175e`)  
-**Walkthrough:** written on implement (`docs/M28-test-plan.md`)  
+**Walkthrough:** [`M28-test-plan.md`](M28-test-plan.md)  
 **Specs:** `medium-priority-specs.md` §2 (`health` / incapacitation; `injury_reduces_energy`), `decision-observation-llm-economy-metrics-spec.md` §1 (incentive-forced Reflect), `incentive-schedule-format.md` (closed effect types), `M27-plan.md` (energy-only Attack)
 
 ## Context
@@ -113,7 +113,7 @@ cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M28-test-plan.md`).
+Walkthrough: [`M28-test-plan.md`](M28-test-plan.md).
 
 ```bash
 cargo test -p sim-core

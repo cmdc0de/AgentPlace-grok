@@ -132,6 +132,11 @@ pub struct Agent {
     /// Short-term plan (not executed). Packed in the checkpoint board blob.
     #[serde(default, skip)]
     pub plan: Vec<String>,
+    /// Combat HP. Default 10_000; packed in the board blob. Not hashed at default.
+    #[serde(default = "default_health", skip)]
+    pub health: u32,
+    #[serde(default, skip)]
+    pub incapacitated: bool,
 }
 
 impl Default for Needs {
@@ -142,6 +147,13 @@ impl Default for Needs {
             energy: 10_000,
         }
     }
+}
+
+/// Full health (millipoints). Default is hash-neutral.
+pub const HEALTH_MAX: u32 = 10_000;
+
+fn default_health() -> u32 {
+    HEALTH_MAX
 }
 
 impl Agent {
@@ -166,6 +178,8 @@ impl Agent {
             next_memory_id: 1,
             influence_factor: 0,
             plan: Vec::new(),
+            health: HEALTH_MAX,
+            incapacitated: false,
         }
     }
 
@@ -471,6 +485,12 @@ impl Agent {
         for step in &self.plan {
             hasher.update(step.as_bytes());
             hasher.update([0]);
+        }
+        if self.health != HEALTH_MAX {
+            hasher.update(self.health.to_le_bytes());
+        }
+        if self.incapacitated {
+            hasher.update([1u8]);
         }
     }
 }

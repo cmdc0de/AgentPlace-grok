@@ -44,6 +44,10 @@ struct BoardBlob {
     influence: BTreeMap<u64, u32>,
     #[serde(default)]
     plans: BTreeMap<u64, Vec<String>>,
+    #[serde(default)]
+    health: BTreeMap<u64, u32>,
+    #[serde(default)]
+    incapacitated: BTreeMap<u64, bool>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -98,6 +102,16 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .agents
             .iter()
             .map(|(id, a)| (id.0, a.plan.clone()))
+            .collect(),
+        health: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.health))
+            .collect(),
+        incapacitated: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.incapacitated))
             .collect(),
     };
     match postcard::to_allocvec(&blob) {
@@ -173,6 +187,16 @@ fn board_from_wire(
     for (id, plan) in blob.plans {
         if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
             agent.plan = plan;
+        }
+    }
+    for (id, hp) in blob.health {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.health = hp;
+        }
+    }
+    for (id, down) in blob.incapacitated {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.incapacitated = down;
         }
     }
     blob.board
@@ -623,6 +647,9 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
             )
         }
         SimEventKind::Flee => "{\"type\":\"flee\"}".to_string(),
+        SimEventKind::Incapacitated { by } => {
+            format!("{{\"type\":\"incapacitated\",\"by\":{}}}", by.0)
+        }
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

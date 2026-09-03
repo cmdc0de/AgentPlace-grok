@@ -1,10 +1,11 @@
 //! M27 combat overlay + Attack/Flee.
 
 use sim_core::action::PrimaryAction;
+use sim_core::combat_fx::{CombatRole, combat_hud_line, combat_role};
 use sim_core::conflict::{ATTACK_DAMAGE, ATTACK_ENERGY_COST, ConflictParams};
-use sim_core::event_log::SimEventKind;
+use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::observation::legal_actions;
-use sim_core::{AgentId, ExperimentConfig, Simulation};
+use sim_core::{AgentId, HEALTH_MAX, ExperimentConfig, Simulation};
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -130,4 +131,84 @@ fn flee_moves_away_or_waits() {
         .any(|e| e.agent == a && matches!(e.kind, SimEventKind::Flee));
     assert!(moved || waited, "pos ({},{}) vs start ({ax},{ay}) vs other ({bx},{by})", ag.x, ag.y);
     assert!(fled || waited, "{:?}", sim.events.events);
+}
+
+#[test]
+fn attack_drops_health_and_energy() {
+    let mut sim = Simulation::new(tiny(0x28_01)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    let before_e = sim.agents.get(&b).unwrap().needs.energy;
+    let before_h = sim.agents.get(&b).unwrap().health;
+    assert_eq!(before_h, HEALTH_MAX);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let def = sim.agents.get(&b).unwrap();
+    assert_eq!(def.needs.energy, before_e.saturating_sub(ATTACK_DAMAGE));
+    assert_eq!(def.health, before_h.saturating_sub(ATTACK_DAMAGE));
+    let _ = ATTACK_ENERGY_COST;
+}
+
+#[test]
+fn health_zero_incapacitates() {
+    let mut sim = Simulation::new(tiny(0x28_02)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim.agents.get_mut(&b).unwrap().health = ATTACK_DAMAGE;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let def = sim.agents.get(&b).unwrap();
+    assert_eq!(def.health, 0);
+    assert!(def.incapacitated);
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::Incapacitated { by } if by == a
+    )));
+    sim.tick();
+    let agent = sim.agents.get(&b).unwrap().clone();
+    let legal = legal_actions(&sim, &agent);
+    assert!(
+        !legal.iter().any(|x| matches!(x, PrimaryAction::Attack { .. })),
+        "{legal:?}"
+    );
+    let atk = sim.agents.get(&a).unwrap().clone();
+    let al = legal_actions(&sim, &atk);
+    assert!(
+        !al.iter()
+            .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b)),
+        "{al:?}"
+    );
+}
+
+#[test]
+fn combat_role_helper_distinct() {
+    let a = AgentId(0);
+    let b = AgentId(1);
+    let events = vec![SimEvent {
+        tick: 3,
+        agent: a,
+        kind: SimEventKind::Attack {
+            target: b,
+            damage: 1,
+        },
+    }];
+    assert_eq!(combat_role(&events, 3, a), CombatRole::Attacker);
+    assert_eq!(combat_role(&events, 3, b), CombatRole::Defender);
+    assert_eq!(combat_role(&events, 3, AgentId(9)), CombatRole::None);
+    let line = combat_hud_line(&events, 3).unwrap();
+    assert!(line.contains("attack"), "{line}");
+    assert_ne!(
+        format!("{:?}", CombatRole::Attacker),
+        format!("{:?}", CombatRole::Defender)
+    );
+}
+
+#[test]
+fn checkpoint_round_trip_default_health() {
+    let mut sim = Simulation::new(tiny(0x28_03)).unwrap();
+    sim.run_ticks(4);
+    let restored = Simulation::decode_checkpoint(&sim.encode_checkpoint().unwrap()).unwrap();
+    assert!(restored.agents.values().all(|a| a.health == HEALTH_MAX));
+    assert!(restored.agents.values().all(|a| !a.incapacitated));
+    assert_eq!(restored.state_hash(), sim.state_hash());
 }

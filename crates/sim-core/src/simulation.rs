@@ -430,7 +430,8 @@ impl Simulation {
     }
 
     fn step_insight(&mut self, id: AgentId, obs: &observation::Observation) {
-        if !Self::every_n_fires(self.llm_reflect_every_n, self.tick) {
+        let forced = crate::incentive::force_reflect(self, id);
+        if !Self::every_n_fires(self.llm_reflect_every_n, self.tick) && !forced {
             return;
         }
         let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
@@ -833,6 +834,14 @@ impl Simulation {
 
     fn step_agent(&mut self, id: AgentId) -> AgentTiming {
         let mut timing = AgentTiming::new(id);
+        if self
+            .agents
+            .get(&id)
+            .is_some_and(|a| a.incapacitated)
+        {
+            execute_primary(self, id, &crate::action::PrimaryAction::Wait);
+            return timing;
+        }
         let p0 = Instant::now();
         let mut obs = observation::build(self, id);
         apply_heard_memories(self, id, &obs.heard);

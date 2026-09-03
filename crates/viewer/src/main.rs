@@ -128,6 +128,7 @@ fn main() {
                 net::apply_remote,
                 handle_input,
                 sync_agent_transforms,
+                sync_combat_tints,
                 sync_stockpile_markers,
                 sync_satchel_markers,
                 update_camera,
@@ -703,6 +704,28 @@ fn handle_input(
         if keys.just_pressed(digit) {
             state.follow = Some(AgentId(id));
         }
+    }
+}
+
+fn sync_combat_tints(
+    state: Res<SimState>,
+    agents: Query<(&AgentVisual, &MeshMaterial3d<StandardMaterial>)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let tick = state.sim.tick;
+    let events = &state.sim.events.events;
+    for (visual, handle) in &agents {
+        let Some(mut mat) = materials.get_mut(&handle.0) else {
+            continue;
+        };
+        let hue = (visual.id.0 as f32 * 47.0) % 360.0;
+        let base = Color::hsl(hue, 0.7, 0.55);
+        mat.base_color = match sim_core::combat_fx::combat_role(events, tick, visual.id) {
+            sim_core::combat_fx::CombatRole::Attacker => Color::srgb(0.85, 0.15, 0.12),
+            sim_core::combat_fx::CombatRole::Defender => Color::srgb(0.25, 0.12, 0.12),
+            sim_core::combat_fx::CombatRole::Flee => Color::srgb(0.85, 0.75, 0.2),
+            sim_core::combat_fx::CombatRole::None => base,
+        };
     }
 }
 

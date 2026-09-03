@@ -93,6 +93,7 @@ pub enum EffectSpec {
         #[serde(default)]
         toward: String,
     },
+    ForceReflect,
 }
 
 fn default_personal() -> String {
@@ -182,6 +183,22 @@ fn parse_supporters_of(s: &str) -> Option<u64> {
     let rest = s.strip_prefix("supporters_of:")?;
     let rest = rest.strip_prefix("proposal_").unwrap_or(rest);
     rest.parse().ok()
+}
+
+pub fn force_reflect(sim: &Simulation, id: AgentId) -> bool {
+    for inc in &sim.incentives.incentives {
+        if !sim.incentive_active.contains(&inc.id) || !in_scope(sim, inc, id) {
+            continue;
+        }
+        if inc
+            .effects
+            .iter()
+            .any(|e| matches!(e, EffectSpec::ForceReflect))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 pub fn in_scope(sim: &Simulation, inc: &Incentive, id: AgentId) -> bool {

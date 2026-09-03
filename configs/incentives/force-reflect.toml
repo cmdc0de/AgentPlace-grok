@@ -1,0 +1,14 @@
+# Overlay schedule — not ExperimentConfig / state_hash.
+#   sim-cli --incentives configs/incentives/force-reflect.toml --llm ollama
+#
+# While active, in-scope Custom agents get one insight per tick (M28).
+# Mock skips the LLM call.
+
+[[incentives]]
+id = "reflect_now"
+description = "Force a Reflect each tick while this incentive is on"
+start_tick = 1
+applies_to = "all"
+
+[[incentives.effects]]
+type = "force_reflect"

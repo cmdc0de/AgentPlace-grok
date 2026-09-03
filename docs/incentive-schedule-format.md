@@ -78,6 +78,10 @@ Every effect **must** have `type`. Extra unknown types are a load error.
 |---|---|---|
 | `delta` | yes | Added to `influence_factor` while active (`0.15` → +15 millipoints). Reverted on **leave** and when the incentive **ends**. |
 
+### `force_reflect`
+
+No extra fields. While the incentive is **active**, each in-scope living agent with a live/`Custom` chooser gets **at most one** insight this tick (same replay slot as `[llm] reflect_every_n_ticks`). Mock/Wait skip the LLM. Example: [`configs/incentives/force-reflect.toml`](../configs/incentives/force-reflect.toml).
+
 ### `memory_importance_boost`
 
 | Field | Required | Notes |

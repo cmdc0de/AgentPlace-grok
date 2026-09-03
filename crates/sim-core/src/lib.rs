@@ -4,6 +4,7 @@ pub mod action;
 pub mod agent;
 pub mod board;
 pub mod checkpoint;
+pub mod combat_fx;
 pub mod compare;
 pub mod config;
 pub mod conflict;
@@ -27,7 +28,7 @@ pub mod timing;
 pub mod voting;
 pub mod world;
 
-pub use agent::{Abilities, Agent, AgentId, ItemId, Needs, Personality};
+pub use agent::{Abilities, Agent, AgentId, HEALTH_MAX, ItemId, Needs, Personality};
 pub use board::{
     AdoptedRule, Goal, Proposal, ProposalStatus, ProposalView, PublicBoard, StructuredRule,
 };
@@ -36,6 +37,7 @@ pub use checkpoint::{
     ckpt_at_or_before, decode_checkpoint, encode_checkpoint, experiment_id, list_checkpoints,
     summary_markdown, write_run_checkpoint,
 };
+pub use combat_fx::{CombatRole, combat_hud_line, combat_role};
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
 pub use conflict::ConflictParams;
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};

@@ -200,6 +200,11 @@ fn draw_status(
                 "{tick_line}  {}  follow {follow}  hash {short}",
                 if state.paused { "paused" } else { "running" }
             ));
+            if let Some(line) =
+                sim_core::combat_fx::combat_hud_line(&state.sim.events.events, state.sim.tick)
+            {
+                ui.text(line);
+            }
             ui.text(format!(
                 "open proposals {}  water {} veg {} animals {} fish {}",
                 state.sim.board.open().count(),
@@ -822,6 +827,7 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Unpack { .. } => "unpack",
         SimEventKind::Attack { .. } => "attack",
         SimEventKind::Flee => "flee",
+        SimEventKind::Incapacitated { .. } => "incapacitated",
     }
 }
 
