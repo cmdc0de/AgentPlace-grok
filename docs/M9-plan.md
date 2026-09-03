@@ -105,8 +105,9 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 | **M25** | Done — [`M25-plan.md`](M25-plan.md) — reflection-on-evict, lockstep Ack timeout |
 | **M26** | Done — [`M26-plan.md`](M26-plan.md) — Reflect/Plan every-N-ticks, record/replay of reflection text |
 | **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
-| **M28** | [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
-| After M28 | Protobuf / JSON envelope; TLS/`wss`; embeddings |
+| **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
+| **M29** | [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
+| After M29 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions

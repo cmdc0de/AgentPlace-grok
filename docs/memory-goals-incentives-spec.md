@@ -1,6 +1,6 @@
 # Memory, Public Goals / Rule Proposals, and Incentive Schedules
 
-> **Current slice:** [`M28-plan.md`](M28-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+> **Current slice:** [`M29-plan.md`](M29-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
 
 **Purpose**: Lock down the three open design questions that most directly determine whether interesting governance can emerge and whether incentive interventions are cleanly testable.
 
