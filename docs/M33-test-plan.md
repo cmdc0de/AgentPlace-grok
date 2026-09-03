@@ -1,6 +1,6 @@
 # M33 test plan — see each new feature
 
-Walkthrough for [`M33-plan.md`](M33-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (household crates, culture, reflect importance). Next slice: later work at the bottom of [`M33-plan.md`](M33-plan.md).
+Walkthrough for [`M33-plan.md`](M33-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (household crates, culture, reflect importance). Next slice: [`M34-plan.md`](M34-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

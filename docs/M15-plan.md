@@ -108,8 +108,9 @@ Board UI: in `respect` mode show `yes_w / need` plus head counts (same as influe
 | **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
-| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| After M33 | protobuf/TLS |
+| **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| After M34 | protobuf/TLS |
 | Not M15 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

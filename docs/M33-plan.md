@@ -69,7 +69,8 @@ CLI: `--llm-reflect-importance`.
 
 | Later | What |
 |---|---|
-| After M33 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
+| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| After M34 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client**; INT/memory; haul inventory from STR; dialects; seasons |
 | Not M33 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

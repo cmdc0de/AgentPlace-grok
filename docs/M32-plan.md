@@ -71,8 +71,9 @@ CLI: `--aging` (does **not** imply `--sheet` / `--reproduction`).
 
 | Later | What |
 |---|---|
-| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| After M33 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
+| **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| After M34 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
 | Not M32 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

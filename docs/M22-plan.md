@@ -85,8 +85,9 @@ Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Vi
 | **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
-| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| After M33 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
+| **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| After M34 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
 | Not M22 | Browser; combat; CI Win/mac; **wire `/set`** |
 
 ## Key decisions

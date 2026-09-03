@@ -49,7 +49,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M31** | Done (tag `M31`) | [`M31-plan.md`](M31-plan.md), walkthrough [`M31-test-plan.md`](M31-test-plan.md) | Kinship, reproduction, D&D-like sheet |
 | **M32** | Done (tag `M32`) | [`M32-plan.md`](M32-plan.md), walkthrough [`M32-test-plan.md`](M32-test-plan.md) | kin_of incentives, household, aging |
 | **M33** | Done (tag `M33`) | [`M33-plan.md`](M33-plan.md), walkthrough [`M33-test-plan.md`](M33-test-plan.md) | Household crates, culture inheritance, reflect importance |
-| After M33 | Not started | listed at the bottom of `M33-plan.md` | protobuf/TLS |
+| **M34** | Planned — next | [`M34-plan.md`](M34-plan.md) | Sheet effects, close-kin PairBond |
+| After M34 | Not started | listed at the bottom of `M34-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -124,15 +125,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 37b | `M32-test-plan.md` | M32 walkthrough (kin_of incentives, household, aging) |
 | 38 | `M33-plan.md` | Milestone 33 (done, tag `M33`): household crates, culture inheritance, reflect importance |
 | 38b | `M33-test-plan.md` | M33 walkthrough (household crates, culture inheritance, reflect importance) |
+| 39 | `M34-plan.md` | Milestone 34 (planned): sheet effects, close-kin PairBond |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M33-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M34-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M33 is the current slice (`M33-plan.md`). Do not expand into items it defers (protobuf/TLS, browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M34 is the current slice (`M34-plan.md`). Do not expand into items it defers (protobuf/TLS, browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -160,13 +162,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M33 are done. M33 is implemented (`docs/M33-plan.md`, walkthrough `docs/M33-test-plan.md`). Later work is at the bottom of that file.
+M1–M33 are done. Current slice is [`M34-plan.md`](M34-plan.md) (planned, not yet implemented).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M33-plan.md and docs/M33-test-plan.md.
-M33 is implemented (household crates; culture inheritance;
-reflect importance; PROTOCOL_VERSION=5). Later work is at the bottom
-of M33-plan.md. Do not add protobuf, TLS, or a browser client. CI stays
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M34-plan.md.
+M34 is the current slice (sheet effects; close-kin PairBond;
+PROTOCOL_VERSION=5). Later work is at the bottom of that file.
+Do not add protobuf, TLS, or a browser client. CI stays
 provider=mock with no network.
 ```
 

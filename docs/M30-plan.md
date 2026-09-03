@@ -56,8 +56,9 @@ Spawn/despawn **Bevy meshes** (simple primitives / short-lived particles) from t
 |---|---|
 | **M31** | Done — [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
 | **M32** | Done — [`M32-plan.md`](M32-plan.md) — kin_of incentives, household, aging |
-| **M33** | [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
-| After M33 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
+| **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
+| **M34** | [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
+| After M34 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
 | Not M30 | PROTOCOL bump; PG sheet; reproduction; kinship |
 
 ## Key decisions
