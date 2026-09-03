@@ -234,6 +234,29 @@ impl ActionChooser for OpenAiCompatClient {
         let payload = extract_json_payload(&text);
         sim_core::llm::parse_plan_json(&payload, n).ok_or(ChooseError::Malformed)
     }
+
+    fn importance(
+        &self,
+        seed: u64,
+        retrieved: &[(u64, u8, String)],
+    ) -> Result<String, ChooseError> {
+        if retrieved.is_empty() {
+            return Err(ChooseError::Malformed);
+        }
+        let mut lines = String::new();
+        for (id, imp, text) in retrieved.iter().take(12) {
+            let snippet: String = text.chars().take(80).collect();
+            lines.push_str(&format!("id={id} importance={imp} {snippet}\n"));
+        }
+        let prompt = format!(
+            "Adjust importance of one retrieved memory (0-255).\n{lines}Reply JSON only: {{\"id\":0,\"importance\":0}}"
+        );
+        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let payload = extract_json_payload(&text);
+        sim_core::llm::parse_importance_json(&payload)
+            .map(|(id, imp)| sim_core::llm::importance_record_json(id, imp))
+            .ok_or(ChooseError::Malformed)
+    }
 }
 
 const PROMPT_LINE_CAP: usize = 16;

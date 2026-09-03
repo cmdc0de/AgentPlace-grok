@@ -5,7 +5,7 @@ use sim_core::event_log::SimEventKind;
 use sim_core::kinship::PopulationParams;
 use sim_core::observation::legal_actions;
 use sim_core::sheet::{AbilitySheet, SheetParams};
-use sim_core::{AgentId, ExperimentConfig, Simulation};
+use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation};
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -66,12 +66,20 @@ fn overlay_parses_sheet_and_population() {
     let po = PopulationParams::from_config_toml("[conflict]\nenabled = true\n");
     assert!(!po.reproduction);
     assert!(!po.aging);
+    assert!(!po.household_crates);
+    assert!(!po.culture);
     let ag = PopulationParams::from_config_toml(
         "[population]\naging = true\nchildhood_ticks = 10\nfounder_age_ticks = 50\n",
     );
     assert!(ag.aging);
     assert_eq!(ag.childhood_ticks, 10);
     assert_eq!(ag.founder_age_ticks, 50);
+    let hc = PopulationParams::from_config_toml(
+        "[population]\nhousehold_crates = true\nculture = true\nculture_count = 6\n",
+    );
+    assert!(hc.household_crates);
+    assert!(hc.culture);
+    assert_eq!(hc.culture_count, 6);
 }
 
 #[test]
@@ -353,4 +361,233 @@ fn aging_load_does_not_restamp_founder_age() {
     loaded.enable_aging(80, 200);
     assert_eq!(loaded.agents.get(&AgentId(0)).unwrap().age_ticks, age);
     assert_ne!(age, 200);
+}
+
+fn land_neighbor(
+    sim: &Simulation,
+    x: u32,
+    y: u32,
+    occupied: &[(u32, u32)],
+) -> Option<(u32, u32)> {
+    for dx in -1i32..=1 {
+        for dy in -1i32..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let nx = x as i32 + dx;
+            let ny = y as i32 + dy;
+            if !sim.world.in_bounds(nx, ny) {
+                continue;
+            }
+            let ux = nx as u32;
+            let uy = ny as u32;
+            if sim.world.is_land(ux, uy) && !occupied.contains(&(ux, uy)) {
+                return Some((ux, uy));
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn household_crates_off_no_pairbond_same_hash() {
+    let cfg = tiny(0x33_01);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.enable_household_crates();
+    off.run_ticks(6);
+    on.run_ticks(6);
+    assert_eq!(off.state_hash(), on.state_hash());
+    assert!(on.household_home.is_empty());
+}
+
+#[test]
+fn pair_bond_without_crates_overlay_mints_no_home() {
+    let mut sim = Simulation::new(tiny(0x33_02)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    assert!(sim.household_home.is_empty());
+}
+
+#[test]
+fn pair_bond_home_member_store_outsider_cannot() {
+    let mut sim = Simulation::new(tiny3(0x33_03)).unwrap();
+    sim.enable_reproduction();
+    sim.enable_household_crates();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    let hid = sim.agents.get(&a).unwrap().kinship.household.unwrap();
+    let home = *sim.household_home.get(&hid).expect("home minted");
+    assert_eq!(sim.household_home.get(&hid), Some(&home));
+    let actor = sim.agents.get(&a).unwrap();
+    assert_eq!((actor.x, actor.y), home);
+    let partner = sim.agents.get(&b).unwrap();
+    assert_eq!(
+        sim_core::observation::chebyshev(partner.x, partner.y, home.0, home.1),
+        1
+    );
+
+    let outsider = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| *id != a && *id != b)
+        .unwrap();
+    let occupied = [
+        (sim.agents.get(&a).unwrap().x, sim.agents.get(&a).unwrap().y),
+        (sim.agents.get(&b).unwrap().x, sim.agents.get(&b).unwrap().y),
+    ];
+    let cell = land_neighbor(&sim, home.0, home.1, &occupied).expect("outsider cell");
+    if let Some(ag) = sim.agents.get_mut(&outsider) {
+        ag.x = cell.0;
+        ag.y = cell.1;
+        ag.inventory.clear();
+        ag.try_add_item(ItemId::Food(1), 2);
+        ag.needs.energy = sim.config.energy_max_milli();
+    }
+    if let Some(ag) = sim.agents.get_mut(&b) {
+        ag.inventory.clear();
+        ag.try_add_item(ItemId::Food(1), 2);
+        ag.needs.energy = sim.config.energy_max_milli();
+    }
+
+    sim_core::execute::execute_primary(
+        &mut sim,
+        b,
+        &PrimaryAction::Store {
+            item: ItemId::Food(1),
+            qty: 1,
+        },
+    );
+    assert!(sim.world.has_stockpile(home.0, home.1), "member stores at home");
+    let home_qty = sim
+        .world
+        .stockpile_at(home.0, home.1)
+        .and_then(|c| c.items.get(&ItemId::Food(1)).copied())
+        .unwrap_or(0);
+    assert_eq!(home_qty, 1);
+
+    let member = sim.agents.get(&b).unwrap().clone();
+    let legal = legal_actions(&sim, &member);
+    assert!(legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Retrieve {
+            item: ItemId::Food(1),
+            ..
+        }
+    )));
+    let out = sim.agents.get(&outsider).unwrap().clone();
+    let out_legal = legal_actions(&sim, &out);
+    assert!(!out_legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Retrieve {
+            item: ItemId::Food(1),
+            ..
+        }
+    )));
+
+    sim_core::execute::execute_primary(
+        &mut sim,
+        outsider,
+        &PrimaryAction::Store {
+            item: ItemId::Food(1),
+            qty: 1,
+        },
+    );
+    let home_qty2 = sim
+        .world
+        .stockpile_at(home.0, home.1)
+        .and_then(|c| c.items.get(&ItemId::Food(1)).copied())
+        .unwrap_or(0);
+    assert_eq!(home_qty2, 1, "outsider must not store at home via household rule");
+    let (ox, oy) = {
+        let ag = sim.agents.get(&outsider).unwrap();
+        (ag.x, ag.y)
+    };
+    assert_ne!((ox, oy), home);
+    assert!(
+        sim.world.has_stockpile(ox, oy),
+        "outsider stores on standing cell"
+    );
+}
+
+#[test]
+fn household_home_load_does_not_remint() {
+    let mut sim = Simulation::new(tiny(0x33_04)).unwrap();
+    sim.enable_reproduction();
+    sim.enable_household_crates();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    let hid = sim.agents.get(&a).unwrap().kinship.household.unwrap();
+    let home = *sim.household_home.get(&hid).unwrap();
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.x = ag.x.saturating_add(2);
+    }
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.enable_household_crates();
+    assert_eq!(loaded.household_home.get(&hid), Some(&home));
+    assert_eq!(loaded.household_home.len(), 1);
+}
+
+#[test]
+fn culture_off_zero_same_hash() {
+    let cfg = tiny(0x33_05);
+    let mut a = Simulation::new(cfg.clone()).unwrap();
+    let mut b = Simulation::new(cfg).unwrap();
+    a.run_ticks(6);
+    b.run_ticks(6);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert!(a.agents.values().all(|ag| ag.culture == 0));
+}
+
+#[test]
+fn culture_founders_child_copies_load_no_reroll() {
+    let cfg = tiny(0x33_06);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.enable_culture(4);
+    assert!(on.agents.values().all(|a| (1..=4).contains(&a.culture)));
+    off.run_ticks(2);
+    on.run_ticks(2);
+    assert_ne!(off.state_hash(), on.state_hash());
+
+    let mut sim = Simulation::new(tiny(0x33_07)).unwrap();
+    sim.enable_reproduction();
+    sim.enable_culture(4);
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    let ca = sim.agents.get(&a).unwrap().culture;
+    let cb = sim.agents.get(&b).unwrap().culture;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
+    let child = sim
+        .agents
+        .keys()
+        .copied()
+        .find(|id| sim.agents.get(id).unwrap().kinship.parents.contains(&a))
+        .unwrap();
+    let (pa, pb) = if a.0 <= b.0 { (ca, cb) } else { (cb, ca) };
+    let expect = if pa != 0 { pa } else { pb };
+    assert_eq!(sim.agents.get(&child).unwrap().culture, expect);
+    let obs = sim_core::observation::build(&sim, a);
+    assert!(
+        obs.kin.iter().any(|s| s.starts_with("culture ")),
+        "{:?}",
+        obs.kin
+    );
+
+    let before = sim.agents.get(&AgentId(0)).unwrap().culture;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.enable_culture(4);
+    assert_eq!(loaded.agents.get(&AgentId(0)).unwrap().culture, before);
+    assert_eq!(
+        loaded.agents.get(&child).unwrap().culture,
+        sim.agents.get(&child).unwrap().culture
+    );
 }

@@ -1,8 +1,8 @@
 # M33 — Household crates, culture inheritance, reflect importance
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M32 complete (`docs/M32-plan.md`, git tag `M32`, commit `7b14400`)  
-**Walkthrough:** written on implement (`docs/M33-test-plan.md`)  
+**Walkthrough:** [`docs/M33-test-plan.md`](M33-test-plan.md)  
 **Specs:** `docs/M32-plan.md` (household), `docs/M31-plan.md` (birth), `docs/M25-plan.md` (reflect-on-evict / extra LLM call)
 
 ## Context
@@ -122,7 +122,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M33-test-plan.md`).
+Walkthrough: [`docs/M33-test-plan.md`](M33-test-plan.md).
 
 ```bash
 cargo test -p sim-core

@@ -58,6 +58,10 @@ struct BoardBlob {
     next_household_id: u64,
     #[serde(default)]
     ages: BTreeMap<u64, u64>,
+    #[serde(default)]
+    household_home: BTreeMap<u64, (u32, u32)>,
+    #[serde(default)]
+    cultures: BTreeMap<u64, u8>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -140,6 +144,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .iter()
             .map(|(id, a)| (id.0, a.age_ticks))
             .collect(),
+        household_home: sim.household_home.clone(),
+        cultures: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.culture))
+            .collect(),
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -152,12 +162,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
 fn board_from_wire(
     wire: &PublicBoard,
     agents: &mut BTreeMap<crate::agent::AgentId, Agent>,
-) -> (RichBoard, u64, u64) {
+) -> (RichBoard, u64, u64, BTreeMap<u64, (u32, u32)>) {
     let Some(hex_str) = wire.entries.first() else {
-        return (RichBoard::default(), 0, 0);
+        return (RichBoard::default(), 0, 0, BTreeMap::new());
     };
     let Ok(bytes) = hex::decode(hex_str) else {
-        return (RichBoard::default(), 0, 0);
+        return (RichBoard::default(), 0, 0, BTreeMap::new());
     };
     let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
         Ok(b) => b,
@@ -175,7 +185,7 @@ fn board_from_wire(
                     goals: old.goals,
                     ..BoardBlob::default()
                 },
-                Err(_) => return (RichBoard::default(), 0, 0),
+                Err(_) => return (RichBoard::default(), 0, 0, BTreeMap::new()),
             }
         }
     };
@@ -241,7 +251,17 @@ fn board_from_wire(
             agent.age_ticks = age;
         }
     }
-    (blob.board, blob.next_agent_id, blob.next_household_id)
+    for (id, culture) in blob.cultures {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.culture = culture;
+        }
+    }
+    (
+        blob.board,
+        blob.next_agent_id,
+        blob.next_household_id,
+        blob.household_home,
+    )
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -340,7 +360,8 @@ impl Simulation {
         }
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
-        let (board, blob_next_id, blob_house_id) = board_from_wire(&body.public_board, &mut agents);
+        let (board, blob_next_id, blob_house_id, blob_homes) =
+            board_from_wire(&body.public_board, &mut agents);
         let inf = config.influence_milli();
         for a in agents.values_mut() {
             if a.influence_factor == 0 {
@@ -396,6 +417,7 @@ impl Simulation {
             llm_plan_every_n: 0,
             llm_plan_length: 4,
             llm_execute_plan: false,
+            llm_reflect_importance: false,
             conflict_enabled: false,
             conflict_death_enabled: false,
             sheet_enabled: false,
@@ -405,6 +427,10 @@ impl Simulation {
             childhood_ticks: 80,
             founder_age_ticks: 200,
             next_household_id: blob_house_id,
+            household_crates_enabled: false,
+            household_home: blob_homes,
+            culture_enabled: false,
+            culture_count: 4,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;

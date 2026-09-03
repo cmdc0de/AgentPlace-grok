@@ -2,7 +2,7 @@ use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
 use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
-use crate::observation::neighbors4;
+use crate::observation::{crate_cell, neighbors4};
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
 use rand::Rng;
@@ -337,6 +337,13 @@ fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
         ag.kinship.pair_bond = Some(id);
         ag.kinship.household = Some(hid);
     }
+    if sim.household_crates_enabled && !sim.household_home.contains_key(&hid) {
+        if let Some(ag) = sim.agents.get(&id) {
+            if sim.world.is_land(ag.x, ag.y) {
+                sim.household_home.insert(hid, (ag.x, ag.y));
+            }
+        }
+    }
     push(sim, id, SimEventKind::PairBonded { with: target });
 }
 
@@ -464,6 +471,15 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     };
     child.sheet = sheet;
     child.health = sheet.health_max();
+    child.culture = {
+        let ca = sim.agents.get(&parent_a).map(|p| p.culture).unwrap_or(0);
+        let cb = sim.agents.get(&parent_b).map(|p| p.culture).unwrap_or(0);
+        if ca != 0 {
+            ca
+        } else {
+            cb
+        }
+    };
     child.kinship.parents = vec![parent_a, parent_b];
     child.kinship.household = sim
         .agents
@@ -649,7 +665,10 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let (x, y) = (agent.x, agent.y);
+    let Some((x, y)) = crate_cell(sim, agent) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
     let have_pockets = agent.inventory.get(&item).copied().unwrap_or(0);
     let have_pack = agent.pack.get(&item).copied().unwrap_or(0);
     if have_pockets + have_pack < qty {
@@ -700,7 +719,10 @@ fn retrieve(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let (x, y) = (agent.x, agent.y);
+    let Some((x, y)) = crate_cell(sim, agent) else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
     if !sim.world.try_retrieve(x, y, item, qty) {
         push(sim, id, SimEventKind::Wait);
         return;

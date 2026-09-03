@@ -139,6 +139,25 @@ pub fn chebyshev(ax: u32, ay: u32, bx: u32, by: u32) -> u32 {
     dx.max(dy)
 }
 
+/// Cell used for Store/Retrieve. Overlay off: standing land. Overlay on:
+/// household home when the agent is a living member within Chebyshev 1.
+pub fn crate_cell(sim: &Simulation, agent: &Agent) -> Option<(u32, u32)> {
+    if sim.household_crates_enabled {
+        if let Some(hid) = agent.kinship.household {
+            if let Some(&(hx, hy)) = sim.household_home.get(&hid) {
+                if chebyshev(agent.x, agent.y, hx, hy) <= 1 {
+                    return Some((hx, hy));
+                }
+            }
+        }
+    }
+    if sim.world.is_land(agent.x, agent.y) {
+        Some((agent.x, agent.y))
+    } else {
+        None
+    }
+}
+
 pub fn effective_range(base: f64, perceptiveness: u8) -> u32 {
     let factor = 0.5 + f64::from(perceptiveness) / 100.0;
     (base * factor).round().max(0.0) as u32
@@ -328,7 +347,18 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         toxins,
         incentives,
         plan: agent.plan.clone(),
-        kin: agent.kinship.lines(),
+        kin: {
+            let mut kin = agent.kinship.lines();
+            if let Some(hid) = agent.kinship.household {
+                if let Some(&(hx, hy)) = sim.household_home.get(&hid) {
+                    kin.push(format!("home ({hx},{hy})"));
+                }
+            }
+            if agent.culture != 0 {
+                kin.push(format!("culture {}", agent.culture));
+            }
+            kin
+        },
     }
 }
 
@@ -597,11 +627,11 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         legal.push(PrimaryAction::Support { proposal_id: p.id });
         legal.push(PrimaryAction::Oppose { proposal_id: p.id });
     }
-    if sim.world.is_land(agent.x, agent.y) {
+    if let Some((cx, cy)) = crate_cell(sim, agent) {
         let cell = sim
             .world
             .stockpiles
-            .get(&(agent.x, agent.y))
+            .get(&(cx, cy))
             .cloned()
             .unwrap_or_default();
         let mut store_seen = Vec::new();
@@ -822,10 +852,15 @@ pub(crate) fn can_drop_worn_carrier(
     }
     let extra = if crate_reserved.is_some() { 1 } else { qty };
     let leftover = agent.split_pack_unload(extra).1;
+    let (cx, cy) = if crate_reserved.is_some() {
+        crate_cell(sim, agent).unwrap_or((agent.x, agent.y))
+    } else {
+        (agent.x, agent.y)
+    };
     leftover.is_empty()
         || sim
             .world
-            .crate_can_take(agent.x, agent.y, crate_reserved, &leftover, &sim.storage)
+            .crate_can_take(cx, cy, crate_reserved, &leftover, &sim.storage)
 }
 
 pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {

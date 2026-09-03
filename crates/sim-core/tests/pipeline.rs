@@ -2,10 +2,10 @@
 
 use sim_core::action::ChosenAction;
 use sim_core::llm::{
-    ActionChooser, ChooseError, LlmBarrierParams, REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT,
-    ReplayTable,
+    ActionChooser, ChooseError, LlmBarrierParams, REPLAY_CALL_IMPORTANCE, REPLAY_CALL_PLAN,
+    REPLAY_CALL_REFLECT, ReplayTable,
 };
-use sim_core::memory::MemoryKind;
+use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::observation::Observation;
 use sim_core::{AgentId, Chooser, ExperimentConfig, Simulation};
 use std::sync::Arc;
@@ -456,5 +456,148 @@ type = "force_reflect"
     assert_eq!(replayed.state_hash(), hash);
     assert_eq!(replay_stub.insight.load(Ordering::SeqCst), 0);
     let _ = std::fs::remove_file(&rec);
+}
+
+struct ImportanceStub {
+    calls: AtomicU32,
+}
+
+impl ImportanceStub {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            calls: AtomicU32::new(0),
+        })
+    }
+}
+
+impl ActionChooser for ImportanceStub {
+    fn choose(
+        &self,
+        _call_seed: u64,
+        _obs: &Observation,
+    ) -> Result<(ChosenAction, String), ChooseError> {
+        Ok((ChosenAction::wait(), r#"{"action":"Wait"}"#.into()))
+    }
+
+    fn importance(
+        &self,
+        _seed: u64,
+        retrieved: &[(u64, u8, String)],
+    ) -> Result<String, ChooseError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let (id, _, _) = retrieved
+            .iter()
+            .find(|(_, _, t)| t.contains("adjust-me"))
+            .or(retrieved.first())
+            .cloned()
+            .unwrap_or((1, 0, String::new()));
+        Ok(format!(r#"{{"id":{id},"importance":7}}"#))
+    }
+}
+
+fn plant_named(sim: &mut Simulation, id: AgentId) {
+    sim.remember_entry(
+        id,
+        MemoryEntry {
+            tick: 0,
+            kind: MemoryKind::Observation,
+            text: "adjust-me".into(),
+            importance: 200,
+            last_accessed: 0,
+            species_tag: 0,
+            id: 0,
+            participants: Vec::new(),
+            valence: 0,
+            ..Default::default()
+        },
+    );
+}
+
+#[test]
+fn overlay_parses_reflect_importance() {
+    let p = LlmBarrierParams::from_config_toml("[llm]\nreflect_importance = true\n");
+    assert!(p.reflect_importance);
+    let d = LlmBarrierParams::from_config_toml("[llm]\nprovider = \"mock\"\n");
+    assert!(!d.reflect_importance);
+}
+
+#[test]
+fn mock_importance_overlay_same_hash() {
+    let cfg = tiny(0x33_10);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.llm_reflect_importance = true;
+    off.run_ticks(6);
+    on.run_ticks(6);
+    assert_eq!(off.state_hash(), on.state_hash());
+}
+
+#[test]
+fn custom_importance_rewrites_named_memory() {
+    let stub = ImportanceStub::new();
+    let mut sim = Simulation::new(tiny(0x33_11)).unwrap();
+    sim.chooser = Chooser::Custom(stub.clone());
+    sim.llm_reflect_importance = true;
+    let id = AgentId(0);
+    plant_named(&mut sim, id);
+    sim.run_ticks(1);
+    assert!(stub.calls.load(Ordering::SeqCst) >= 1);
+    let mem = sim
+        .agents
+        .get(&id)
+        .unwrap()
+        .memory
+        .iter()
+        .find(|e| e.text.contains("adjust-me"))
+        .unwrap();
+    assert_eq!(mem.importance, 7);
+}
+
+#[test]
+fn record_replay_importance_same_hash() {
+    let rec = tmp("m33-imp");
+    let _ = std::fs::remove_file(&rec);
+    let mut cfg = tiny(0x33_12);
+    cfg.llm.replay_file = rec.to_string_lossy().into();
+
+    let mut writer = Simulation::new(cfg.clone()).unwrap();
+    writer.chooser = Chooser::Custom(ImportanceStub::new());
+    writer.llm_reflect_importance = true;
+    plant_named(&mut writer, AgentId(0));
+    writer.run_ticks(1);
+    let hash = writer.state_hash();
+    let text = std::fs::read_to_string(&rec).unwrap();
+    assert!(text.contains("\"call\":\"importance\""), "{text}");
+
+    let replay_stub = ImportanceStub::new();
+    let mut replayed = Simulation::new(cfg).unwrap();
+    replayed.chooser = Chooser::Custom(replay_stub.clone());
+    replayed.llm_reflect_importance = true;
+    plant_named(&mut replayed, AgentId(0));
+    replayed.run_ticks(1);
+    assert_eq!(replayed.state_hash(), hash);
+    assert_eq!(replay_stub.calls.load(Ordering::SeqCst), 0);
+    let mem = replayed
+        .agents
+        .get(&AgentId(0))
+        .unwrap()
+        .memory
+        .iter()
+        .find(|e| e.text.contains("adjust-me"))
+        .unwrap();
+    assert_eq!(mem.importance, 7);
+    let _ = std::fs::remove_file(&rec);
+}
+
+#[test]
+fn old_jsonl_importance_call_round_trips() {
+    let jsonl = r#"{"tick":1,"agent":0,"call_seed":1,"prompt_hash":"","response":"{\"id\":1,\"importance\":9}","call":"importance"}"#;
+    let table = ReplayTable::from_jsonl(jsonl);
+    assert!(
+        table
+            .get_call(1, 0, REPLAY_CALL_IMPORTANCE)
+            .unwrap()
+            .contains("importance")
+    );
 }
 

@@ -416,6 +416,14 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 for line in a.kinship.lines() {
                     ui.text(format!("  {line}"));
                 }
+                if let Some(hid) = a.kinship.household {
+                    if let Some(&(hx, hy)) = state.sim.household_home.get(&hid) {
+                        ui.text(format!("  home ({hx},{hy})"));
+                    }
+                }
+            }
+            if a.culture != 0 {
+                ui.text(format!("culture {}", a.culture));
             }
             ui.separator();
             ui.text(format!(

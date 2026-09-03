@@ -10,8 +10,9 @@ use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
     ActionChooser, ChooseError, Chooser, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL, REPLAY_CALL_CHOOSE,
-    REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT, REPLAY_CALL_REFLECT_EVICT, ReplayRecord, ReplayTable,
-    chosen_to_json, insight_record_json, is_llm_wait_response, is_skip_response, parse_choice_json,
+    REPLAY_CALL_IMPORTANCE, REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT, REPLAY_CALL_REFLECT_EVICT,
+    ReplayRecord, ReplayTable, chosen_to_json, importance_record_json, insight_record_json,
+    is_llm_wait_response, is_skip_response, parse_choice_json, parse_importance_json,
     parse_insight_json, parse_plan_json, plan_record_json, prompt_hash, try_parse_plan_step,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
@@ -91,6 +92,8 @@ pub struct Simulation {
     pub llm_plan_length: u32,
     /// Overlay `[llm] execute_plan`. Not hashed.
     pub llm_execute_plan: bool,
+    /// Overlay `[llm] reflect_importance`. Not hashed.
+    pub llm_reflect_importance: bool,
     /// Overlay `[conflict] enabled`. Not hashed.
     pub conflict_enabled: bool,
     /// Overlay `[conflict] death_enabled`. Not hashed.
@@ -109,6 +112,14 @@ pub struct Simulation {
     pub founder_age_ticks: u64,
     /// Next household id. Checkpointed in the board blob.
     pub next_household_id: u64,
+    /// Overlay `[population] household_crates`. Not hashed.
+    pub household_crates_enabled: bool,
+    /// Household id → home cell. Checkpointed. Hashed when non-empty.
+    pub household_home: BTreeMap<u64, (u32, u32)>,
+    /// Overlay `[population] culture`. Not hashed.
+    pub culture_enabled: bool,
+    /// Overlay `[population] culture_count`. Default 4. Not hashed.
+    pub culture_count: u8,
 }
 
 impl Simulation {
@@ -174,6 +185,7 @@ impl Simulation {
             llm_plan_every_n: 0,
             llm_plan_length: 4,
             llm_execute_plan: false,
+            llm_reflect_importance: false,
             conflict_enabled: false,
             conflict_death_enabled: false,
             sheet_enabled: false,
@@ -183,6 +195,10 @@ impl Simulation {
             childhood_ticks: 80,
             founder_age_ticks: 200,
             next_household_id: 1,
+            household_crates_enabled: false,
+            household_home: BTreeMap::new(),
+            culture_enabled: false,
+            culture_count: 4,
         })
     }
 
@@ -234,6 +250,39 @@ impl Simulation {
 
     pub fn is_child(&self, agent: &crate::agent::Agent) -> bool {
         self.aging_enabled && agent.age_ticks < self.childhood_ticks
+    }
+
+    pub fn enable_household_crates(&mut self) {
+        self.household_crates_enabled = true;
+    }
+
+    /// Overlay on: assign unused founder culture from `agent_init`. Do not re-roll on `--load`.
+    pub fn enable_culture(&mut self, culture_count: u8) {
+        self.culture_enabled = true;
+        self.culture_count = culture_count.max(1);
+        let spawn = self
+            .rngs
+            .derived_seeds
+            .get("agent_init")
+            .copied()
+            .unwrap_or(self.config.master_seed);
+        let count = u32::from(self.culture_count);
+        let ids: Vec<AgentId> = self.agents.keys().copied().collect();
+        for id in ids {
+            let skip = self
+                .agents
+                .get(&id)
+                .is_some_and(|a| a.culture != 0 || !a.kinship.parents.is_empty());
+            if skip {
+                continue;
+            }
+            let seed = derive_seed(spawn, &format!("culture_{}", id.0));
+            let mut rng = crate::seeding::rng_from_seed(seed);
+            let n: u32 = rng.random();
+            if let Some(a) = self.agents.get_mut(&id) {
+                a.culture = (1 + (n % count)) as u8;
+            }
+        }
     }
 
     pub fn refresh_meta(&mut self) {
@@ -503,6 +552,89 @@ impl Simulation {
 
     fn every_n_fires(n: u64, tick: u64) -> bool {
         n > 0 && tick > 0 && tick % n == 0
+    }
+
+    fn step_importance(&mut self, id: AgentId, retrieved_ids: &[u64]) {
+        if !self.llm_reflect_importance {
+            return;
+        }
+        let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
+        let seed = derive_seed(
+            llm_base,
+            &format!("tick_{}_agent_{}_importance_0", self.tick, id.0),
+        );
+        let raw = if self.replay.is_some() {
+            let Some(raw) = self.replay_call(id, REPLAY_CALL_IMPORTANCE) else {
+                return;
+            };
+            raw
+        } else {
+            let Chooser::Custom(ch) = &self.chooser else {
+                return;
+            };
+            let ch = Arc::clone(ch);
+            let hints: Vec<(u64, u8, String)> = self
+                .agents
+                .get(&id)
+                .map(|a| {
+                    retrieved_ids
+                        .iter()
+                        .filter_map(|mid| {
+                            a.memory
+                                .iter()
+                                .find(|e| e.id == *mid)
+                                .map(|e| (e.id, e.importance, e.text.clone()))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            if hints.is_empty() {
+                return;
+            }
+            match ch.importance(seed, &hints) {
+                Ok(s) => match parse_importance_json(s.trim()) {
+                    Some((mem_id, imp)) => {
+                        let rec = importance_record_json(mem_id, imp);
+                        self.record_replay(
+                            id,
+                            seed,
+                            String::new(),
+                            rec.clone(),
+                            REPLAY_CALL_IMPORTANCE,
+                        );
+                        rec
+                    }
+                    None => {
+                        self.record_replay(
+                            id,
+                            seed,
+                            String::new(),
+                            LLM_SKIP_SENTINEL.into(),
+                            REPLAY_CALL_IMPORTANCE,
+                        );
+                        return;
+                    }
+                },
+                Err(_) => {
+                    self.record_replay(
+                        id,
+                        seed,
+                        String::new(),
+                        LLM_SKIP_SENTINEL.into(),
+                        REPLAY_CALL_IMPORTANCE,
+                    );
+                    return;
+                }
+            }
+        };
+        let Some((mem_id, imp)) = parse_importance_json(&raw) else {
+            return;
+        };
+        if let Some(a) = self.agents.get_mut(&id) {
+            if let Some(e) = a.memory.iter_mut().find(|e| e.id == mem_id) {
+                e.importance = imp;
+            }
+        }
     }
 
     fn step_insight(&mut self, id: AgentId, obs: &observation::Observation) {
@@ -968,6 +1100,7 @@ impl Simulation {
                 .unwrap_or_default()
         };
         timing.retrieve_ns = timing::ns_since(r0);
+        self.step_importance(id, &retrieved_ids);
         let rf0 = Instant::now();
         self.step_insight(id, &obs);
         timing.reflect_ns = timing::ns_since(rf0);
@@ -1296,6 +1429,13 @@ impl Simulation {
         self.board.hash_into(&mut hasher);
         for agent in self.agents.values() {
             agent.hash_bytes(&mut hasher);
+        }
+        if !self.household_home.is_empty() {
+            for (hid, (x, y)) in &self.household_home {
+                hasher.update(hid.to_le_bytes());
+                hasher.update(x.to_le_bytes());
+                hasher.update(y.to_le_bytes());
+            }
         }
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());

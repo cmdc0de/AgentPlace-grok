@@ -88,6 +88,7 @@ fn main() {
             sim.llm_plan_every_n = barrier.plan_every_n_ticks;
             sim.llm_plan_length = barrier.plan_length;
             sim.llm_execute_plan = barrier.execute_plan;
+            sim.llm_reflect_importance = barrier.reflect_importance;
             let conflict = sim_core::ConflictParams::from_config_toml(&text);
             sim.conflict_enabled = conflict.enabled;
             sim.conflict_death_enabled = conflict.death_enabled;
@@ -100,6 +101,12 @@ fn main() {
             }
             if pop.aging {
                 sim.enable_aging(pop.childhood_ticks, pop.founder_age_ticks);
+            }
+            if pop.household_crates {
+                sim.enable_household_crates();
+            }
+            if pop.culture {
+                sim.enable_culture(pop.culture_count);
             }
             SimPlugin::from_simulation(sim)
         }

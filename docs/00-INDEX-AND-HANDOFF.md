@@ -48,7 +48,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M30** | Done (tag `M30`) | [`M30-plan.md`](M30-plan.md), walkthrough [`M30-test-plan.md`](M30-test-plan.md) | Combat particles / meshes |
 | **M31** | Done (tag `M31`) | [`M31-plan.md`](M31-plan.md), walkthrough [`M31-test-plan.md`](M31-test-plan.md) | Kinship, reproduction, D&D-like sheet |
 | **M32** | Done (tag `M32`) | [`M32-plan.md`](M32-plan.md), walkthrough [`M32-test-plan.md`](M32-test-plan.md) | kin_of incentives, household, aging |
-| **M33** | Planned — next | [`M33-plan.md`](M33-plan.md) | Household crates, culture inheritance, reflect importance |
+| **M33** | Done (tag `M33`) | [`M33-plan.md`](M33-plan.md), walkthrough [`M33-test-plan.md`](M33-test-plan.md) | Household crates, culture inheritance, reflect importance |
 | After M33 | Not started | listed at the bottom of `M33-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -122,7 +122,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 36b | `M31-test-plan.md` | M31 walkthrough (kinship, reproduction, D&D-like sheet) |
 | 37 | `M32-plan.md` | Milestone 32 (done, tag `M32`): kin_of incentives, household, aging |
 | 37b | `M32-test-plan.md` | M32 walkthrough (kin_of incentives, household, aging) |
-| 38 | `M33-plan.md` | Milestone 33 (planned): household crates, culture inheritance, reflect importance |
+| 38 | `M33-plan.md` | Milestone 33 (done, tag `M33`): household crates, culture inheritance, reflect importance |
+| 38b | `M33-test-plan.md` | M33 walkthrough (household crates, culture inheritance, reflect importance) |
 
 ---
 
@@ -159,13 +160,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M32 are done. Current slice is [`M33-plan.md`](M33-plan.md) (planned, not yet implemented).
+M1–M33 are done. M33 is implemented (`docs/M33-plan.md`, walkthrough `docs/M33-test-plan.md`). Later work is at the bottom of that file.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M33-plan.md.
-M33 is the current slice (household crates; culture inheritance;
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M33-plan.md and docs/M33-test-plan.md.
+M33 is implemented (household crates; culture inheritance;
 reflect importance; PROTOCOL_VERSION=5). Later work is at the bottom
-of that file. Do not add protobuf, TLS, or a browser client. CI stays
+of M33-plan.md. Do not add protobuf, TLS, or a browser client. CI stays
 provider=mock with no network.
 ```
 

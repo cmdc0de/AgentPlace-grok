@@ -95,6 +95,9 @@ pub struct PopulationParams {
     pub aging: bool,
     pub childhood_ticks: u64,
     pub founder_age_ticks: u64,
+    pub household_crates: bool,
+    pub culture: bool,
+    pub culture_count: u8,
 }
 
 impl Default for PopulationParams {
@@ -104,6 +107,9 @@ impl Default for PopulationParams {
             aging: false,
             childhood_ticks: 80,
             founder_age_ticks: 200,
+            household_crates: false,
+            culture: false,
+            culture_count: 4,
         }
     }
 }
@@ -121,13 +127,24 @@ impl PopulationParams {
             aging: Option<bool>,
             childhood_ticks: Option<u64>,
             founder_age_ticks: Option<u64>,
+            household_crates: Option<bool>,
+            culture: Option<bool>,
+            culture_count: Option<u32>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
+        let culture_count = slice
+            .population
+            .culture_count
+            .unwrap_or(4)
+            .clamp(1, 255) as u8;
         Self {
             reproduction: slice.population.reproduction.unwrap_or(false),
             aging: slice.population.aging.unwrap_or(false),
             childhood_ticks: slice.population.childhood_ticks.unwrap_or(80),
             founder_age_ticks: slice.population.founder_age_ticks.unwrap_or(200),
+            household_crates: slice.population.household_crates.unwrap_or(false),
+            culture: slice.population.culture.unwrap_or(false),
+            culture_count,
         }
     }
 }

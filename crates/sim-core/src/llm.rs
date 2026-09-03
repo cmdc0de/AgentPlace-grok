@@ -26,6 +26,7 @@ pub const REPLAY_CALL_CHOOSE: &str = "choose";
 pub const REPLAY_CALL_REFLECT: &str = "reflect";
 pub const REPLAY_CALL_PLAN: &str = "plan";
 pub const REPLAY_CALL_REFLECT_EVICT: &str = "reflect_evict";
+pub const REPLAY_CALL_IMPORTANCE: &str = "importance";
 
 pub fn is_llm_wait_response(raw: &str) -> bool {
     extract_json_payload(raw).contains("__llm_wait__")
@@ -61,6 +62,24 @@ pub fn parse_insight_json(raw: &str) -> Option<String> {
         .and_then(|x| x.as_str())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+pub fn importance_record_json(id: u64, importance: u8) -> String {
+    serde_json::json!({ "id": id, "importance": importance }).to_string()
+}
+
+pub fn parse_importance_json(raw: &str) -> Option<(u64, u8)> {
+    if is_skip_response(raw) {
+        return None;
+    }
+    let p = extract_json_payload(raw);
+    let v: serde_json::Value = serde_json::from_str(&p).ok()?;
+    let id = v.get("id")?.as_u64()?;
+    let imp = v.get("importance")?.as_u64()?;
+    if imp > 255 {
+        return None;
+    }
+    Some((id, imp as u8))
 }
 
 pub fn parse_plan_json(raw: &str, max_len: usize) -> Option<Vec<String>> {
@@ -155,6 +174,17 @@ pub trait ActionChooser: Send + Sync {
         let _ = (seed, obs, max_len);
         Err(ChooseError::Malformed)
     }
+
+    /// Rewrite one retrieved memory's importance. Default: skip.
+    /// Return JSON `{"id": <memory id>, "importance": 0-255}`.
+    fn importance(
+        &self,
+        seed: u64,
+        retrieved: &[(u64, u8, String)],
+    ) -> Result<String, ChooseError> {
+        let _ = (seed, retrieved);
+        Err(ChooseError::Malformed)
+    }
 }
 
 #[derive(Clone)]
@@ -196,6 +226,8 @@ pub struct LlmBarrierParams {
     pub plan_length: u32,
     /// Overlay `[llm] execute_plan`. Not hashed.
     pub execute_plan: bool,
+    /// Overlay `[llm] reflect_importance`. Not hashed.
+    pub reflect_importance: bool,
 }
 
 impl Default for LlmBarrierParams {
@@ -208,6 +240,7 @@ impl Default for LlmBarrierParams {
             plan_every_n_ticks: 0,
             plan_length: 4,
             execute_plan: false,
+            reflect_importance: false,
         }
     }
 }
@@ -229,6 +262,7 @@ impl LlmBarrierParams {
             plan_every_n_ticks: Option<u64>,
             plan_length: Option<u32>,
             execute_plan: Option<bool>,
+            reflect_importance: Option<bool>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -253,6 +287,9 @@ impl LlmBarrierParams {
         if let Some(e) = slice.llm.execute_plan {
             p.execute_plan = e;
         }
+        if let Some(r) = slice.llm.reflect_importance {
+            p.reflect_importance = r;
+        }
         p
     }
 }
@@ -264,7 +301,7 @@ pub struct ReplayRecord {
     pub call_seed: u64,
     pub prompt_hash: String,
     pub response: String,
-    /// `""` / omitted = choose (old JSONL). Also `choose` | `reflect` | `plan` | `reflect_evict`.
+    /// `""` / omitted = choose (old JSONL). Also `choose` | `reflect` | `plan` | `reflect_evict` | `importance`.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub call: String,
 }

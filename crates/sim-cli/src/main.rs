@@ -55,6 +55,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut sheet = false;
     let mut reproduction = false;
     let mut aging = false;
+    let mut household_crates = false;
+    let mut culture = false;
+    let mut llm_reflect_importance = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -150,6 +153,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 sheet = true;
             }
             "--aging" => aging = true,
+            "--household-crates" => household_crates = true,
+            "--culture" => culture = true,
+            "--llm-reflect-importance" => llm_reflect_importance = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -250,6 +256,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.llm_plan_every_n = llm_plan_every.unwrap_or(barrier.plan_every_n_ticks);
         sim.llm_plan_length = barrier.plan_length;
         sim.llm_execute_plan = llm_execute_plan || barrier.execute_plan;
+        sim.llm_reflect_importance = llm_reflect_importance || barrier.reflect_importance;
         let cp = sim_core::ConflictParams::from_config_toml(&text);
         sim.conflict_enabled = conflict || cp.enabled;
         sim.conflict_death_enabled = conflict_death || cp.death_enabled;
@@ -262,6 +269,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if aging || pop.aging {
             sim.enable_aging(pop.childhood_ticks, pop.founder_age_ticks);
+        }
+        if household_crates || pop.household_crates {
+            sim.enable_household_crates();
+        }
+        if culture || pop.culture {
+            sim.enable_culture(pop.culture_count);
         }
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
@@ -442,8 +455,10 @@ Usage:
           [--token SECRET]
           [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
           [--llm-reflect-every N] [--llm-plan-every N]
-          [--llm-execute-plan] [--conflict] [--conflict-death]
+          [--llm-execute-plan] [--llm-reflect-importance]
+          [--conflict] [--conflict-death]
           [--sheet] [--reproduction] [--aging]
+          [--household-crates] [--culture]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -472,6 +487,9 @@ Options:
       --sheet               Roll founder STR/DEX/CON/INT/WIS/CHA (overlay [agents.sheet] enabled)
       --reproduction        PairBond/Reproduce (implies --sheet; overlay [population] reproduction)
       --aging               Accrue age_ticks; childhood gates PairBond/Reproduce/Attack
+      --household-crates    Members Store/Retrieve at household home (Chebyshev ≤ 1)
+      --culture             Assign founder culture ids; children copy a parent
+      --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)
