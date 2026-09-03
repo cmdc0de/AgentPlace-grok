@@ -180,6 +180,16 @@ mod tests {
     }
 
     #[test]
+    fn hello_none_frame_is_postcard_v5() {
+        let frame = encode_frame(&hello(None)).unwrap();
+        assert!(frame.len() >= 7, "{:?}", frame);
+        let len = u32::from_le_bytes(frame[0..4].try_into().unwrap());
+        assert_eq!(len as usize, frame.len() - 4);
+        assert_eq!(&frame[4..], &[0, 5, 0], "Hello variant 0, protocol 5, token None");
+        assert_eq!(PROTOCOL_VERSION, 5);
+    }
+
+    #[test]
     fn codec_round_trip_hello_welcome_snapshot_tick_error() {
         round_trip_client(hello(Some("secret".into())));
         round_trip_client(ClientMessage::Subscribe {

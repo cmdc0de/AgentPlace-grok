@@ -65,6 +65,7 @@ pub enum PrimaryAction {
     Reproduce {
         with: AgentId,
     },
+    Invent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

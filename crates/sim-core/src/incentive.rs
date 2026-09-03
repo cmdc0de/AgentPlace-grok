@@ -312,6 +312,10 @@ pub fn resource_mult_milli(sim: &Simulation, id: AgentId, resource: &str) -> u32
             }
         }
     }
+    if resource == "food" {
+        let inv = crate::inventions::food_mult_milli(&sim.inventions, id);
+        milli = milli.saturating_mul(inv) / 1000;
+    }
     milli.max(1)
 }
 

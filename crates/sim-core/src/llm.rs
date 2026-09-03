@@ -572,6 +572,7 @@ pub fn parse_choice_json(
                 .unwrap_or(0);
             PrimaryAction::Reproduce { with: AgentId(to) }
         }
+        "invent" => PrimaryAction::Invent,
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {

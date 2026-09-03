@@ -14,6 +14,7 @@ pub mod event_log;
 pub mod execute;
 pub mod haul;
 pub mod incentive;
+pub mod inventions;
 pub mod kinship;
 pub mod llm;
 pub mod markers;
@@ -42,6 +43,7 @@ pub use checkpoint::{
 pub use combat_fx::{CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role};
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
 pub use conflict::ConflictParams;
+pub use inventions::{Invention, InventionKind, InventionsParams};
 pub use kinship::{Kinship, PopulationParams};
 pub use sheet::{AbilitySheet, SheetParams};
 pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};

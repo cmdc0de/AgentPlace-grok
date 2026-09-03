@@ -62,6 +62,10 @@ struct BoardBlob {
     household_home: BTreeMap<u64, (u32, u32)>,
     #[serde(default)]
     cultures: BTreeMap<u64, u8>,
+    #[serde(default)]
+    inventions: BTreeMap<u64, crate::inventions::Invention>,
+    #[serde(default)]
+    next_invention_id: u64,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -150,6 +154,8 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .iter()
             .map(|(id, a)| (id.0, a.culture))
             .collect(),
+        inventions: sim.inventions.clone(),
+        next_invention_id: sim.next_invention_id,
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -162,12 +168,19 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
 fn board_from_wire(
     wire: &PublicBoard,
     agents: &mut BTreeMap<crate::agent::AgentId, Agent>,
-) -> (RichBoard, u64, u64, BTreeMap<u64, (u32, u32)>) {
+) -> (
+    RichBoard,
+    u64,
+    u64,
+    BTreeMap<u64, (u32, u32)>,
+    BTreeMap<u64, crate::inventions::Invention>,
+    u64,
+) {
     let Some(hex_str) = wire.entries.first() else {
-        return (RichBoard::default(), 0, 0, BTreeMap::new());
+        return (RichBoard::default(), 0, 0, BTreeMap::new(), BTreeMap::new(), 0);
     };
     let Ok(bytes) = hex::decode(hex_str) else {
-        return (RichBoard::default(), 0, 0, BTreeMap::new());
+        return (RichBoard::default(), 0, 0, BTreeMap::new(), BTreeMap::new(), 0);
     };
     let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
         Ok(b) => b,
@@ -185,7 +198,16 @@ fn board_from_wire(
                     goals: old.goals,
                     ..BoardBlob::default()
                 },
-                Err(_) => return (RichBoard::default(), 0, 0, BTreeMap::new()),
+                Err(_) => {
+                    return (
+                        RichBoard::default(),
+                        0,
+                        0,
+                        BTreeMap::new(),
+                        BTreeMap::new(),
+                        0,
+                    )
+                }
             }
         }
     };
@@ -261,6 +283,8 @@ fn board_from_wire(
         blob.next_agent_id,
         blob.next_household_id,
         blob.household_home,
+        blob.inventions,
+        blob.next_invention_id,
     )
 }
 
@@ -360,7 +384,7 @@ impl Simulation {
         }
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
-        let (board, blob_next_id, blob_house_id, blob_homes) =
+        let (board, blob_next_id, blob_house_id, blob_homes, blob_inventions, blob_next_inv) =
             board_from_wire(&body.public_board, &mut agents);
         let inf = config.influence_milli();
         for a in agents.values_mut() {
@@ -431,9 +455,23 @@ impl Simulation {
             household_home: blob_homes,
             culture_enabled: false,
             culture_count: 4,
+            inventions_enabled: false,
+            invention_share_delay: 8,
+            inventions: blob_inventions,
+            next_invention_id: blob_next_inv,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;
+        }
+        if sim.next_invention_id == 0 {
+            sim.next_invention_id = sim
+                .inventions
+                .keys()
+                .max()
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(1)
+                .max(1);
         }
         if sim.next_agent_id == 0 {
             sim.next_agent_id = sim
@@ -748,6 +786,12 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
             format!(
                 "{{\"type\":\"born\",\"parent_a\":{},\"parent_b\":{}}}",
                 parent_a.0, parent_b.0
+            )
+        }
+        SimEventKind::Invented { inventor, kind } => {
+            format!(
+                "{{\"type\":\"invented\",\"inventor\":{},\"kind\":{}}}",
+                inventor.0, *kind as u8
             )
         }
     };

@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut household_crates = false;
     let mut culture = false;
     let mut llm_reflect_importance = false;
+    let mut inventions = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -155,6 +156,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--aging" => aging = true,
             "--household-crates" => household_crates = true,
             "--culture" => culture = true,
+            "--inventions" => inventions = true,
             "--llm-reflect-importance" => llm_reflect_importance = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
@@ -275,6 +277,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if culture || pop.culture {
             sim.enable_culture(pop.culture_count);
+        }
+        let inv = sim_core::InventionsParams::from_config_toml(&text);
+        if inventions || inv.enabled {
+            sim.enable_inventions(inv.share_delay_ticks);
         }
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
@@ -458,7 +464,7 @@ Usage:
           [--llm-execute-plan] [--llm-reflect-importance]
           [--conflict] [--conflict-death]
           [--sheet] [--reproduction] [--aging]
-          [--household-crates] [--culture]
+          [--household-crates] [--culture] [--inventions]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -489,6 +495,7 @@ Options:
       --aging               Accrue age_ticks; childhood gates PairBond/Reproduce/Attack
       --household-crates    Members Store/Retrieve at household home (Chebyshev ≤ 1)
       --culture             Assign founder culture ids; children copy a parent
+      --inventions          Invent GatherBonus; inventor then society after share_delay_ticks
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)

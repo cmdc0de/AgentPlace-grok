@@ -120,6 +120,13 @@ pub struct Simulation {
     pub culture_enabled: bool,
     /// Overlay `[population] culture_count`. Default 4. Not hashed.
     pub culture_count: u8,
+    /// Overlay `[inventions] enabled`. Not hashed.
+    pub inventions_enabled: bool,
+    /// Overlay `[inventions] share_delay_ticks`. Default 8. Not hashed.
+    pub invention_share_delay: u64,
+    /// Invention table. Checkpointed. Hashed when non-empty.
+    pub inventions: BTreeMap<u64, crate::inventions::Invention>,
+    pub next_invention_id: u64,
 }
 
 impl Simulation {
@@ -199,6 +206,10 @@ impl Simulation {
             household_home: BTreeMap::new(),
             culture_enabled: false,
             culture_count: 4,
+            inventions_enabled: false,
+            invention_share_delay: 8,
+            inventions: BTreeMap::new(),
+            next_invention_id: 1,
         })
     }
 
@@ -281,6 +292,21 @@ impl Simulation {
             let n: u32 = rng.random();
             if let Some(a) = self.agents.get_mut(&id) {
                 a.culture = (1 + (n % count)) as u8;
+            }
+        }
+    }
+
+    pub fn enable_inventions(&mut self, share_delay_ticks: u64) {
+        self.inventions_enabled = true;
+        self.invention_share_delay = share_delay_ticks;
+    }
+
+    pub fn share_due_inventions(&mut self) {
+        let delay = self.invention_share_delay;
+        let tick = self.tick;
+        for inv in self.inventions.values_mut() {
+            if !inv.shared && tick >= inv.tick.saturating_add(delay) {
+                inv.shared = true;
             }
         }
     }
@@ -871,6 +897,7 @@ impl Simulation {
         }
         let wall0 = Instant::now();
         self.tick += 1;
+        self.share_due_inventions();
         self.last_tick_decisions.clear();
         let aging = self.aging_enabled;
         for a in self.agents.values_mut() {
@@ -1440,6 +1467,7 @@ impl Simulation {
                 hasher.update(y.to_le_bytes());
             }
         }
+        crate::inventions::hash_table(&self.inventions, &mut hasher);
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());
             hasher.update(a.to_le_bytes());

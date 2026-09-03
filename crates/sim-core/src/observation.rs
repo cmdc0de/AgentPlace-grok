@@ -100,6 +100,9 @@ pub struct Observation {
     /// Kinship names (`parent #3`). Empty when unused.
     #[serde(default)]
     pub kin: Vec<String>,
+    /// Invention lines. Empty when unused.
+    #[serde(default)]
+    pub inventions: Vec<String>,
 }
 
 impl Default for Observation {
@@ -129,6 +132,7 @@ impl Default for Observation {
             incentives: Vec::new(),
             plan: Vec::new(),
             kin: Vec::new(),
+            inventions: Vec::new(),
         }
     }
 }
@@ -369,6 +373,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
             }
             kin
         },
+        inventions: crate::inventions::observation_lines(&sim.inventions, id),
     }
 }
 
@@ -841,6 +846,16 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
     }
+    if sim.inventions_enabled
+        && !agent.incapacitated
+        && !sim.is_child(agent)
+        && !sim
+            .inventions
+            .values()
+            .any(|i| matches!(i.kind, crate::inventions::InventionKind::GatherBonus))
+    {
+        legal.push(PrimaryAction::Invent);
+    }
     legal
 }
 
@@ -1011,6 +1026,7 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         PrimaryAction::Flee => "Flee".into(),
         PrimaryAction::PairBond { target } => format!("PairBond #{}", target.0),
         PrimaryAction::Reproduce { with } => format!("Reproduce #{}", with.0),
+        PrimaryAction::Invent => "Invent".into(),
     }
 }
 

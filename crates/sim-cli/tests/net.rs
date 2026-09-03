@@ -1425,3 +1425,12 @@ fn connect_inject_missing_file_is_stderr() {
     );
     let _ = wait_hash(&mut child, out_h, err_h);
 }
+
+#[test]
+fn browser_page_ships_protocol_5() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/index.html");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    assert!(text.contains("PROTOCOL_VERSION = 5"), "{text}");
+    assert!(text.contains("postcard"), "{text}");
+    assert!(text.contains("ws://"), "{text}");
+}

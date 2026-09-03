@@ -114,6 +114,10 @@ pub enum SimEventKind {
         parent_a: AgentId,
         parent_b: AgentId,
     },
+    Invented {
+        inventor: AgentId,
+        kind: crate::inventions::InventionKind,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,6 +287,11 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update(parent_a.0.to_le_bytes());
             hasher.update(parent_b.0.to_le_bytes());
         }
+        SimEventKind::Invented { inventor, kind } => {
+            hasher.update([31u8]);
+            hasher.update(inventor.0.to_le_bytes());
+            hasher.update([*kind as u8]);
+        }
     }
 }
 
@@ -334,6 +343,7 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::CombatDeath { .. } => "CombatDeath",
         SimEventKind::PairBonded { .. } => "PairBonded",
         SimEventKind::Born { .. } => "Born",
+        SimEventKind::Invented { .. } => "Invented",
     }
 }
 
@@ -370,6 +380,7 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::CombatDeath { .. } => "combat_death",
         SimEventKind::PairBonded { .. } => "pair_bonded",
         SimEventKind::Born { .. } => "born",
+        SimEventKind::Invented { .. } => "invented",
     }
 }
 
@@ -426,5 +437,6 @@ pub fn is_primary_kind(kind: &SimEventKind) -> bool {
             | SimEventKind::Incapacitated { .. }
             | SimEventKind::CombatDeath { .. }
             | SimEventKind::Born { .. }
+            | SimEventKind::Invented { .. }
     )
 }

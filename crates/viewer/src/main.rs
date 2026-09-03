@@ -108,6 +108,10 @@ fn main() {
             if pop.culture {
                 sim.enable_culture(pop.culture_count);
             }
+            let inv = sim_core::InventionsParams::from_config_toml(&text);
+            if inv.enabled {
+                sim.enable_inventions(inv.share_delay_ticks);
+            }
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

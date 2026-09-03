@@ -42,6 +42,7 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Flee => flee(sim, id),
         PrimaryAction::PairBond { target } => pair_bond(sim, id, *target),
         PrimaryAction::Reproduce { with } => reproduce(sim, id, *with),
+        PrimaryAction::Invent => invent(sim, id),
     }
 }
 
@@ -533,6 +534,79 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
         SimEventKind::Born {
             parent_a,
             parent_b,
+        },
+    );
+}
+
+fn invent(sim: &mut Simulation, id: AgentId) {
+    if !sim.inventions_enabled {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    if sim
+        .inventions
+        .values()
+        .any(|i| matches!(i.kind, crate::inventions::InventionKind::GatherBonus))
+    {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    if agent.incapacitated || sim.is_child(agent) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let chance = crate::inventions::invent_chance(agent.sheet.intelligence);
+    let seed = crate::seeding::derive_seed(
+        sim.config.master_seed,
+        &format!("tick_{}_agent_{}_invent_0", sim.tick, id.0),
+    );
+    let mut rng = crate::seeding::rng_from_seed(seed);
+    let roll: u32 = rng.random_range(0..1000);
+    if (roll as i32) >= chance {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let iid = sim.next_invention_id;
+    sim.next_invention_id = sim.next_invention_id.saturating_add(1);
+    let inv = crate::inventions::Invention {
+        id: iid,
+        inventor: id,
+        tick: sim.tick,
+        kind: crate::inventions::InventionKind::GatherBonus,
+        shared: false,
+    };
+    sim.inventions.insert(iid, inv);
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.influence_factor = a
+            .influence_factor
+            .saturating_add(crate::inventions::INVENTOR_INFLUENCE)
+            .min(10_000);
+    }
+    remember_agent(
+        sim,
+        id,
+        crate::memory::MemoryEntry {
+            tick: sim.tick,
+            kind: crate::memory::MemoryKind::Reflection,
+            text: "invented gather bonus".into(),
+            importance: 200,
+            last_accessed: sim.tick,
+            species_tag: 0,
+            id: 0,
+            participants: Vec::new(),
+            valence: 0,
+            ..Default::default()
+        },
+    );
+    push(
+        sim,
+        id,
+        SimEventKind::Invented {
+            inventor: id,
+            kind: crate::inventions::InventionKind::GatherBonus,
         },
     );
 }

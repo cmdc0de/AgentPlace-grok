@@ -1,8 +1,8 @@
 # M35 — Inventions, browser attach
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M34 complete (`docs/M34-plan.md`, git tag `M34`)  
-**Walkthrough:** written on implement (`docs/M35-test-plan.md`)  
+**Walkthrough:** [`docs/M35-test-plan.md`](M35-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-5), `docs/M7-plan.md` (WS attach, no browser)
 
 ## Context
@@ -56,7 +56,8 @@ CLI: `--inventions` (does **not** imply `--sheet`). INT_mod is 0 if the sheet is
 
 | Later | What |
 |---|---|
-| After M35 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; extra invention kinds / tech tree / patents |
+| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| After M36 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; extra invention kinds / tech tree / patents |
 | Not M35 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions
@@ -104,7 +105,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M35-test-plan.md`).
+Walkthrough: [`docs/M35-test-plan.md`](M35-test-plan.md).
 
 ```bash
 cargo test -p sim-core
