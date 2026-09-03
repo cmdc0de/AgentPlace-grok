@@ -54,7 +54,8 @@ Spawn/despawn **Bevy meshes** (simple primitives / short-lived particles) from t
 
 | Later | What |
 |---|---|
-| After M30 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; PG-1/2/3 post-GA |
+| **M31** | [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
+| After M31 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client** |
 | Not M30 | PROTOCOL bump; PG sheet; reproduction; kinship |
 
 ## Key decisions

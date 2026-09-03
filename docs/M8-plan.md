@@ -112,8 +112,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
 | **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
-| After M30 | Protobuf/TLS |
+| **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| **M31** | [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
+| After M31 | Protobuf/TLS |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

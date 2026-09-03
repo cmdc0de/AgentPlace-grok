@@ -1,6 +1,6 @@
 # M13 test plan — see each new feature
 
-Walkthrough for [`M13-plan.md`](M13-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (board accept vs open, `--compare`). Next slice: [`M30-plan.md`](M30-plan.md).
+Walkthrough for [`M13-plan.md`](M13-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (board accept vs open, `--compare`). Next slice: [`M31-plan.md`](M31-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

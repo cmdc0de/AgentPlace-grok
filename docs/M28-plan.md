@@ -59,8 +59,9 @@ type = "force_reflect"
 | Later | What |
 |---|---|
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
-| After M30 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; PG-1/2/3 post-GA |
+| **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| **M31** | [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
+| After M31 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client** |
 | Not M28 | Browser; CI Win/mac; PROTOCOL bump |
 
 ## Key decisions

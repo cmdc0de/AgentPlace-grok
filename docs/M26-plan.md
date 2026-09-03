@@ -80,8 +80,9 @@ Live `OpenAiCompatClient`: short JSON `{"reflection":"..."}` / `{"plan":["...", 
 | **M27** | Done — [`M27-plan.md`](M27-plan.md) — auto-execute plan, combat |
 | **M28** | Done — [`M28-plan.md`](M28-plan.md) — health/incapacitation, combat viewer FX, force_reflect |
 | **M29** | Done — [`M29-plan.md`](M29-plan.md) — local embeddings, combat death, CI Win/mac |
-| **M30** | [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
-| After M30 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client**; PG-1/2/3 post-GA |
+| **M30** | Done — [`M30-plan.md`](M30-plan.md) — combat particles / meshes |
+| **M31** | [`M31-plan.md`](M31-plan.md) — kinship, reproduction, D&D-like sheet |
+| After M31 | protobuf/TLS; Unix sockets; reflection importance-adjust; hashed pipeline events; **browser client** |
 | Not M26 | Browser; combat; CI Win/mac; PROTOCOL bump; auto-execute plan |
 
 ## Key decisions
