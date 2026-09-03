@@ -75,6 +75,9 @@ fn main() {
             sim.llm_barrier = barrier.barrier;
             sim.llm_barrier_retries = barrier.retries;
             sim.llm_reflect_on_evict = barrier.reflect_on_evict;
+            sim.llm_reflect_every_n = barrier.reflect_every_n_ticks;
+            sim.llm_plan_every_n = barrier.plan_every_n_ticks;
+            sim.llm_plan_length = barrier.plan_length;
             SimPlugin::from_simulation(sim)
         }
         ViewerSource::Checkpoint(path) => {

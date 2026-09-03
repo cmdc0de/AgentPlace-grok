@@ -40,6 +40,8 @@ fn checkpoint_round_trip_preserves_hash() {
     assert_eq!(restored.state_hash(), hash);
     assert_eq!(restored.world.water, sim.world.water);
     assert_eq!(restored.agents.len(), sim.agents.len());
+    assert!(restored.agents.values().all(|a| a.plan.is_empty()));
+    assert_eq!(CHECKPOINT_FORMAT_VERSION, 2);
 }
 
 #[test]

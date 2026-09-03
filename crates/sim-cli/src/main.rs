@@ -47,6 +47,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut lockstep = false;
     let mut lockstep_timeout_ms: Option<u64> = None;
     let mut llm_reflect_on_evict = false;
+    let mut llm_reflect_every: Option<u64> = None;
+    let mut llm_plan_every: Option<u64> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -114,6 +116,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             "--llm-reflect-on-evict" => llm_reflect_on_evict = true,
+            "--llm-reflect-every" => {
+                i += 1;
+                llm_reflect_every = Some(
+                    args.get(i)
+                        .ok_or("--llm-reflect-every requires a number")?
+                        .parse()?,
+                );
+            }
+            "--llm-plan-every" => {
+                i += 1;
+                llm_plan_every = Some(
+                    args.get(i)
+                        .ok_or("--llm-plan-every requires a number")?
+                        .parse()?,
+                );
+            }
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -210,6 +228,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.llm_barrier = barrier.barrier;
         sim.llm_barrier_retries = barrier.retries;
         sim.llm_reflect_on_evict = llm_reflect_on_evict || barrier.reflect_on_evict;
+        sim.llm_reflect_every_n = llm_reflect_every.unwrap_or(barrier.reflect_every_n_ticks);
+        sim.llm_plan_every_n = llm_plan_every.unwrap_or(barrier.plan_every_n_ticks);
+        sim.llm_plan_length = barrier.plan_length;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -388,6 +409,7 @@ Usage:
           [--allow-control] [--start-paused] [--lockstep] [--lockstep-timeout-ms N]
           [--token SECRET]
           [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
+          [--llm-reflect-every N] [--llm-plan-every N]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -408,6 +430,8 @@ Options:
       --lockstep            After each tick, wait for AckTick from every subscriber (overlay [network] lockstep)
       --lockstep-timeout-ms N  Give up waiting for AckTick after N ms (0 = forever; overlay lockstep_timeout_ms)
       --llm-reflect-on-evict   Summarise dropped memories via LLM (overlay [llm] reflect_on_evict)
+      --llm-reflect-every N Periodic insight every N ticks (0 = off; overlay reflect_every_n_ticks)
+      --llm-plan-every N    Short-term plan every N ticks (0 = off; overlay plan_every_n_ticks)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

@@ -19,8 +19,69 @@ pub enum ChooseError {
 /// Sentinel stored when a live call becomes `LlmWait`. Replay re-emits the event.
 pub const LLM_WAIT_SENTINEL: &str = r#"{"__llm_wait__":true}"#;
 
+/// Sentinel for insight / plan / evict-reflect skip (not action-select `LlmWait`).
+pub const LLM_SKIP_SENTINEL: &str = r#"{"__skip__":true}"#;
+
+pub const REPLAY_CALL_CHOOSE: &str = "choose";
+pub const REPLAY_CALL_REFLECT: &str = "reflect";
+pub const REPLAY_CALL_PLAN: &str = "plan";
+pub const REPLAY_CALL_REFLECT_EVICT: &str = "reflect_evict";
+
 pub fn is_llm_wait_response(raw: &str) -> bool {
     extract_json_payload(raw).contains("__llm_wait__")
+}
+
+pub fn is_skip_response(raw: &str) -> bool {
+    extract_json_payload(raw).contains("__skip__")
+}
+
+pub fn normalize_replay_call(call: &str) -> String {
+    if call.is_empty() {
+        REPLAY_CALL_CHOOSE.into()
+    } else {
+        call.to_string()
+    }
+}
+
+pub fn insight_record_json(text: &str) -> String {
+    serde_json::json!({ "reflection": text }).to_string()
+}
+
+pub fn plan_record_json(steps: &[String]) -> String {
+    serde_json::json!({ "plan": steps }).to_string()
+}
+
+pub fn parse_insight_json(raw: &str) -> Option<String> {
+    if is_skip_response(raw) {
+        return None;
+    }
+    let p = extract_json_payload(raw);
+    let v: serde_json::Value = serde_json::from_str(&p).ok()?;
+    v.get("reflection")
+        .and_then(|x| x.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+pub fn parse_plan_json(raw: &str, max_len: usize) -> Option<Vec<String>> {
+    if is_skip_response(raw) {
+        return None;
+    }
+    let p = extract_json_payload(raw);
+    let v: serde_json::Value = serde_json::from_str(&p).ok()?;
+    let arr = v.get("plan")?.as_array()?;
+    let steps: Vec<String> = arr
+        .iter()
+        .filter_map(|x| x.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .take(max_len)
+        .collect();
+    if steps.is_empty() {
+        None
+    } else {
+        Some(steps)
+    }
 }
 
 /// Pull a JSON object out of fences, `<think>` wrappers, or leading prose.
@@ -66,6 +127,23 @@ pub trait ActionChooser: Send + Sync {
         let _ = (seed, dropped);
         Err(ChooseError::Malformed)
     }
+
+    /// Periodic insight. Default: skip.
+    fn insight(&self, seed: u64, obs: &Observation) -> Result<String, ChooseError> {
+        let _ = (seed, obs);
+        Err(ChooseError::Malformed)
+    }
+
+    /// Short-term plan (not executed). Default: skip.
+    fn plan(
+        &self,
+        seed: u64,
+        obs: &Observation,
+        max_len: usize,
+    ) -> Result<Vec<String>, ChooseError> {
+        let _ = (seed, obs, max_len);
+        Err(ChooseError::Malformed)
+    }
 }
 
 #[derive(Clone)]
@@ -99,6 +177,12 @@ pub struct LlmBarrierParams {
     pub retries: u32,
     /// Overlay `[llm] reflect_on_evict`. Not hashed.
     pub reflect_on_evict: bool,
+    /// Overlay `[llm] reflect_every_n_ticks`. 0 = off.
+    pub reflect_every_n_ticks: u64,
+    /// Overlay `[llm] plan_every_n_ticks`. 0 = off.
+    pub plan_every_n_ticks: u64,
+    /// Overlay `[llm] plan_length`. Default 4.
+    pub plan_length: u32,
 }
 
 impl Default for LlmBarrierParams {
@@ -107,6 +191,9 @@ impl Default for LlmBarrierParams {
             barrier: false,
             retries: 3,
             reflect_on_evict: false,
+            reflect_every_n_ticks: 0,
+            plan_every_n_ticks: 0,
+            plan_length: 4,
         }
     }
 }
@@ -124,6 +211,9 @@ impl LlmBarrierParams {
             barrier: Option<bool>,
             barrier_retries: Option<u32>,
             reflect_on_evict: Option<bool>,
+            reflect_every_n_ticks: Option<u64>,
+            plan_every_n_ticks: Option<u64>,
+            plan_length: Option<u32>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -136,6 +226,15 @@ impl LlmBarrierParams {
         if let Some(r) = slice.llm.reflect_on_evict {
             p.reflect_on_evict = r;
         }
+        if let Some(n) = slice.llm.reflect_every_n_ticks {
+            p.reflect_every_n_ticks = n;
+        }
+        if let Some(n) = slice.llm.plan_every_n_ticks {
+            p.plan_every_n_ticks = n;
+        }
+        if let Some(n) = slice.llm.plan_length {
+            p.plan_length = n;
+        }
         p
     }
 }
@@ -147,12 +246,15 @@ pub struct ReplayRecord {
     pub call_seed: u64,
     pub prompt_hash: String,
     pub response: String,
+    /// `""` / omitted = choose (old JSONL). Also `choose` | `reflect` | `plan` | `reflect_evict`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub call: String,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct ReplayTable {
-    /// (tick, agent) → raw JSON response
-    pub by_tick_agent: BTreeMap<(u64, u64), String>,
+    /// (tick, agent, normalized call) → raw JSON response
+    pub by_tick_agent_call: BTreeMap<(u64, u64, String), String>,
 }
 
 impl ReplayTable {
@@ -164,16 +266,23 @@ impl ReplayTable {
                 continue;
             }
             if let Ok(rec) = serde_json::from_str::<ReplayRecord>(line) {
-                table
-                    .by_tick_agent
-                    .insert((rec.tick, rec.agent), rec.response);
+                table.by_tick_agent_call.insert(
+                    (rec.tick, rec.agent, normalize_replay_call(&rec.call)),
+                    rec.response,
+                );
             }
         }
         table
     }
 
     pub fn get(&self, tick: u64, agent: u64) -> Option<&str> {
-        self.by_tick_agent.get(&(tick, agent)).map(String::as_str)
+        self.get_call(tick, agent, REPLAY_CALL_CHOOSE)
+    }
+
+    pub fn get_call(&self, tick: u64, agent: u64, call: &str) -> Option<&str> {
+        self.by_tick_agent_call
+            .get(&(tick, agent, normalize_replay_call(call)))
+            .map(String::as_str)
     }
 }
 

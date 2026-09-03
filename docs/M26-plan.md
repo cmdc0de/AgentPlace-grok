@@ -1,8 +1,8 @@
 # M26 — Reflect/Plan every-N-ticks, record/replay of reflection text
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M25 complete (`docs/M25-plan.md`, commit `35f1560`)  
-**Walkthrough:** written on implement (`docs/M26-test-plan.md`)  
+**Walkthrough:** [`M26-test-plan.md`](M26-test-plan.md)  
 **Specs:** `decision-observation-llm-economy-metrics-spec.md` §1 (pipeline Reflect / Plan), `M25-plan.md` (evict-reflect skipped on replay; no periodic stages)
 
 ## Context
@@ -135,7 +135,7 @@ cargo run -p viewer -- --connect tcp://127.0.0.1:9000
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M26-test-plan.md`).
+Walkthrough: [`M26-test-plan.md`](M26-test-plan.md).
 
 ```bash
 cargo test -p sim-core

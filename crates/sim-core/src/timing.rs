@@ -13,6 +13,10 @@ pub struct AgentTiming {
     pub agent: u64,
     pub perceive_ns: u64,
     pub retrieve_ns: u64,
+    #[serde(default)]
+    pub reflect_ns: u64,
+    #[serde(default)]
+    pub plan_ns: u64,
     pub select_ns: u64,
     pub execute_ns: u64,
     pub remember_ns: u64,

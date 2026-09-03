@@ -94,6 +94,9 @@ pub struct Observation {
     /// Active incentives that `applies_to` this agent and are not `visibility = "hidden"`.
     #[serde(default)]
     pub incentives: Vec<IncentiveView>,
+    /// Short-term plan from the Plan stage. Empty when unused.
+    #[serde(default)]
+    pub plan: Vec<String>,
 }
 
 impl Default for Observation {
@@ -121,6 +124,7 @@ impl Default for Observation {
             allergies: Vec::new(),
             toxins: Vec::new(),
             incentives: Vec::new(),
+            plan: Vec::new(),
         }
     }
 }
@@ -319,6 +323,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
         allergies: agent.personality.allergy_tags.clone(),
         toxins,
         incentives,
+        plan: agent.plan.clone(),
     }
 }
 

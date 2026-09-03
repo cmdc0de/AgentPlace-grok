@@ -129,6 +129,9 @@ pub struct Agent {
     pub next_memory_id: u64,
     #[serde(default, skip)]
     pub influence_factor: u32,
+    /// Short-term plan (not executed). Packed in the checkpoint board blob.
+    #[serde(default, skip)]
+    pub plan: Vec<String>,
 }
 
 impl Default for Needs {
@@ -162,6 +165,7 @@ impl Agent {
             relationships: BTreeMap::new(),
             next_memory_id: 1,
             influence_factor: 0,
+            plan: Vec::new(),
         }
     }
 
@@ -463,6 +467,10 @@ impl Agent {
         }
         for mem in &self.memory {
             mem.hash_into(hasher);
+        }
+        for step in &self.plan {
+            hasher.update(step.as_bytes());
+            hasher.update([0]);
         }
     }
 }

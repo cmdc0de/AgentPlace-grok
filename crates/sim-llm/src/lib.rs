@@ -180,6 +180,60 @@ impl ActionChooser for OpenAiCompatClient {
             .filter(|s| !s.is_empty())
             .ok_or(ChooseError::Malformed)
     }
+
+    fn insight(&self, seed: u64, obs: &Observation) -> Result<String, ChooseError> {
+        let memos: Vec<String> = obs
+            .goals
+            .iter()
+            .map(|g| g.text.clone())
+            .take(8)
+            .collect();
+        let prompt = format!(
+            "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nGoals: {}\nWrite one short insight about recent experience.\nReply JSON only: {{\"reflection\":\"...\"}}",
+            obs.agent_id.0,
+            obs.x,
+            obs.y,
+            obs.hunger,
+            obs.thirst,
+            obs.energy,
+            memos.join(" | "),
+        );
+        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let payload = extract_json_payload(&text);
+        let v: serde_json::Value =
+            serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
+        v.get("reflection")
+            .and_then(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .ok_or(ChooseError::Malformed)
+    }
+
+    fn plan(
+        &self,
+        seed: u64,
+        obs: &Observation,
+        max_len: usize,
+    ) -> Result<Vec<String>, ChooseError> {
+        let n = max_len.max(1);
+        let current = if obs.plan.is_empty() {
+            "(none)".into()
+        } else {
+            obs.plan.join(" | ")
+        };
+        let prompt = format!(
+            "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nCurrent plan: {current}\nPropose up to {n} short next steps (sub-goals, not executed automatically).\nReply JSON only: {{\"plan\":[\"...\"]}}",
+            obs.agent_id.0,
+            obs.x,
+            obs.y,
+            obs.hunger,
+            obs.thirst,
+            obs.energy,
+        );
+        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let payload = extract_json_payload(&text);
+        sim_core::llm::parse_plan_json(&payload, n).ok_or(ChooseError::Malformed)
+    }
 }
 
 const PROMPT_LINE_CAP: usize = 16;
@@ -262,6 +316,11 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
         "no".into()
     };
     let visible = sim_core::observation::visible_summary(obs, species, 12);
+    let plan = if obs.plan.is_empty() {
+        "(none)".into()
+    } else {
+        obs.plan.join(" | ")
+    };
     format!(
         "Agent {} at ({}, {}). Vision {}.\n\
          Needs (0–100): hunger={} thirst={} energy={} illness={}\n\
@@ -271,6 +330,7 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
          Known toxins: [{}]\n\
          Active incentives: [{}]\n\
          Goals: [{}]\n\
+         Plan: [{}]\n\
          Visible: {}\n\
          Board: [{}]\n\
          Relationships: [{}]\n\
@@ -292,6 +352,7 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
         obs.toxins.join(", "),
         incentives.join(" ; "),
         goals.join(" | "),
+        plan,
         if visible.is_empty() {
             "(none)".into()
         } else {
@@ -388,6 +449,10 @@ count = 2
         assert!(p.contains("coop_food"), "{p}");
         assert!(p.contains("Drink"), "{p}");
         assert!(p.contains("berry_bush"), "{p}");
+        assert!(p.contains("Plan: [(none)]"), "{p}");
+        obs.plan = vec!["drink water".into()];
+        let p2 = build_prompt(&obs, &sim_core::species::SpeciesTables::default());
+        assert!(p2.contains("drink water"), "{p2}");
     }
 
     #[test]

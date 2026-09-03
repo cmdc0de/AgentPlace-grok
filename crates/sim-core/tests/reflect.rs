@@ -1,12 +1,13 @@
 //! M25 reflection-on-evict.
 
 use sim_core::action::ChosenAction;
-use sim_core::llm::{ActionChooser, ChooseError, LlmBarrierParams};
+use sim_core::llm::{ActionChooser, ChooseError, LlmBarrierParams, ReplayTable};
 use sim_core::memory::{MemoryEntry, MemoryKind};
 use sim_core::observation::Observation;
 use sim_core::{AgentId, Chooser, ExperimentConfig, Simulation};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -165,4 +166,56 @@ fn replay_skips_reflect() {
     assert_eq!(chooser.calls.load(Ordering::SeqCst), 0);
     let mem = &sim.agents.get(&id).unwrap().memory;
     assert!(!mem.iter().any(|e| e.kind == MemoryKind::Reflection));
+}
+
+#[test]
+fn record_replay_reflect_on_evict_same_hash() {
+    let rec = std::env::temp_dir().join(format!(
+        "agentplace-m26-evict-{}-{}.jsonl",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_file(&rec);
+    let chooser = Arc::new(ReflectOk {
+        calls: AtomicU32::new(0),
+        summary: "we used to wander".into(),
+    });
+    let mut writer = Simulation::new(tiny(0x26_10)).unwrap();
+    writer.llm_reflect_on_evict = true;
+    writer.chooser = Chooser::Custom(chooser);
+    writer.record_path = Some(rec.clone());
+    let id = AgentId(0);
+    writer.remember_entry(id, noise(1, "alpha"));
+    writer.remember_entry(id, noise(2, "beta"));
+    writer.remember_entry(id, noise(3, "gamma"));
+    let hash = writer.state_hash();
+    let text = std::fs::read_to_string(&rec).unwrap();
+    assert!(text.contains("reflect_evict"), "{text}");
+
+    let replay_ch = Arc::new(ReflectOk {
+        calls: AtomicU32::new(0),
+        summary: "should not appear from live".into(),
+    });
+    let mut replayed = Simulation::new(tiny(0x26_10)).unwrap();
+    replayed.llm_reflect_on_evict = true;
+    replayed.chooser = Chooser::Custom(replay_ch.clone());
+    replayed.replay = Some(ReplayTable::from_jsonl(&text));
+    replayed.remember_entry(id, noise(1, "alpha"));
+    replayed.remember_entry(id, noise(2, "beta"));
+    replayed.remember_entry(id, noise(3, "gamma"));
+    assert_eq!(replay_ch.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(replayed.state_hash(), hash);
+    assert!(
+        replayed
+            .agents
+            .get(&id)
+            .unwrap()
+            .memory
+            .iter()
+            .any(|e| e.kind == MemoryKind::Reflection && e.text.contains("wander"))
+    );
+    let _ = std::fs::remove_file(&rec);
 }

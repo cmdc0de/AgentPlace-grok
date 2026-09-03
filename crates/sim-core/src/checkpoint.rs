@@ -42,6 +42,8 @@ struct BoardBlob {
     next_memory_id: BTreeMap<u64, u64>,
     #[serde(default)]
     influence: BTreeMap<u64, u32>,
+    #[serde(default)]
+    plans: BTreeMap<u64, Vec<String>>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -91,6 +93,11 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .agents
             .iter()
             .map(|(id, a)| (id.0, a.influence_factor))
+            .collect(),
+        plans: sim
+            .agents
+            .iter()
+            .map(|(id, a)| (id.0, a.plan.clone()))
             .collect(),
     };
     match postcard::to_allocvec(&blob) {
@@ -161,6 +168,11 @@ fn board_from_wire(
     for (id, inf) in blob.influence {
         if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
             agent.influence_factor = inf;
+        }
+    }
+    for (id, plan) in blob.plans {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.plan = plan;
         }
     }
     blob.board
@@ -314,6 +326,9 @@ impl Simulation {
             llm_barrier: false,
             llm_barrier_retries: 3,
             llm_reflect_on_evict: false,
+            llm_reflect_every_n: 0,
+            llm_plan_every_n: 0,
+            llm_plan_length: 4,
         };
         if let Some(raw) = body.active_incentives.entries.get(1) {
             if let Ok(map) = serde_json::from_str::<BTreeMap<String, Vec<u64>>>(raw) {

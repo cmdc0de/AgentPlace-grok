@@ -9,8 +9,10 @@ use crate::execute::{apply_heard_memories, execute_primary};
 use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    ActionChooser, ChooseError, Chooser, LLM_WAIT_SENTINEL, ReplayRecord, ReplayTable,
-    chosen_to_json, is_llm_wait_response, parse_choice_json, prompt_hash,
+    ActionChooser, ChooseError, Chooser, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL, REPLAY_CALL_CHOOSE,
+    REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT, REPLAY_CALL_REFLECT_EVICT, ReplayRecord, ReplayTable,
+    chosen_to_json, insight_record_json, is_llm_wait_response, is_skip_response, parse_choice_json,
+    parse_insight_json, parse_plan_json, plan_record_json, prompt_hash,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
@@ -81,6 +83,12 @@ pub struct Simulation {
     pub llm_barrier_retries: u32,
     /// Overlay `[llm] reflect_on_evict`. Not hashed, not checkpointed.
     pub llm_reflect_on_evict: bool,
+    /// Overlay `[llm] reflect_every_n_ticks`. 0 = off. Not hashed.
+    pub llm_reflect_every_n: u64,
+    /// Overlay `[llm] plan_every_n_ticks`. 0 = off. Not hashed.
+    pub llm_plan_every_n: u64,
+    /// Overlay `[llm] plan_length`. Default 4. Not hashed.
+    pub llm_plan_length: u32,
 }
 
 impl Simulation {
@@ -141,6 +149,9 @@ impl Simulation {
             llm_barrier: false,
             llm_barrier_retries: 3,
             llm_reflect_on_evict: false,
+            llm_reflect_every_n: 0,
+            llm_plan_every_n: 0,
+            llm_plan_length: 4,
         })
     }
 
@@ -280,25 +291,108 @@ impl Simulation {
     }
 
     pub(crate) fn reflect_on_evict(&mut self, id: AgentId, dropped: Vec<String>) {
-        if dropped.is_empty() || !self.llm_reflect_on_evict || self.replay.is_some() {
+        if dropped.is_empty() || !self.llm_reflect_on_evict {
             return;
         }
-        let Chooser::Custom(ch) = &self.chooser else {
-            return;
-        };
-        let ch = Arc::clone(ch);
         let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
         let seed = derive_seed(
             llm_base,
             &format!("tick_{}_agent_{}_reflect_0", self.tick, id.0),
         );
-        let Ok(summary) = ch.reflect(seed, &dropped) else {
+        let summary = if self.replay.is_some() {
+            let Some(raw) = self.replay_call(id, REPLAY_CALL_REFLECT_EVICT) else {
+                return;
+            };
+            let Some(summary) = parse_insight_json(&raw) else {
+                return;
+            };
+            summary
+        } else {
+            let Chooser::Custom(ch) = &self.chooser else {
+                return;
+            };
+            let ch = Arc::clone(ch);
+            match ch.reflect(seed, &dropped) {
+                Ok(s) => {
+                    let s = s.trim().to_string();
+                    if s.is_empty() {
+                        self.record_replay(
+                            id,
+                            seed,
+                            String::new(),
+                            LLM_SKIP_SENTINEL.into(),
+                            REPLAY_CALL_REFLECT_EVICT,
+                        );
+                        return;
+                    }
+                    self.record_replay(
+                        id,
+                        seed,
+                        String::new(),
+                        insight_record_json(&s),
+                        REPLAY_CALL_REFLECT_EVICT,
+                    );
+                    s
+                }
+                Err(_) => {
+                    self.record_replay(
+                        id,
+                        seed,
+                        String::new(),
+                        LLM_SKIP_SENTINEL.into(),
+                        REPLAY_CALL_REFLECT_EVICT,
+                    );
+                    return;
+                }
+            }
+        };
+        self.insert_reflection(id, summary);
+    }
+
+    fn replay_call(&self, id: AgentId, call: &str) -> Option<String> {
+        self.replay
+            .as_ref()?
+            .get_call(self.tick, id.0, call)
+            .filter(|raw| !is_skip_response(raw))
+            .map(str::to_string)
+    }
+
+    fn record_replay(
+        &self,
+        id: AgentId,
+        call_seed: u64,
+        prompt_hash: String,
+        response: String,
+        call: &str,
+    ) {
+        let Some(path) = &self.record_path else {
             return;
         };
-        let summary = summary.trim().to_string();
-        if summary.is_empty() {
-            return;
+        let rec = ReplayRecord {
+            tick: self.tick,
+            agent: id.0,
+            call_seed,
+            prompt_hash,
+            response,
+            call: if call == REPLAY_CALL_CHOOSE {
+                String::new()
+            } else {
+                call.to_string()
+            },
+        };
+        if let Ok(line) = serde_json::to_string(&rec) {
+            let _ = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .and_then(|mut f| {
+                    use std::io::Write;
+                    writeln!(f, "{line}")
+                });
         }
+    }
+
+    fn insert_reflection(&mut self, id: AgentId, summary: String) {
         let tick = self.tick;
         let cap = self.config.memory_capacity();
         let policy = self.config.agents.memory.eviction_policy;
@@ -323,6 +417,157 @@ impl Simulation {
                 },
             );
         }
+    }
+
+    fn every_n_fires(n: u64, tick: u64) -> bool {
+        n > 0 && tick > 0 && tick % n == 0
+    }
+
+    fn step_insight(&mut self, id: AgentId, obs: &observation::Observation) {
+        if !Self::every_n_fires(self.llm_reflect_every_n, self.tick) {
+            return;
+        }
+        let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
+        let seed = derive_seed(
+            llm_base,
+            &format!("tick_{}_agent_{}_insight_0", self.tick, id.0),
+        );
+        let hash = prompt_hash(obs);
+        let summary = if self.replay.is_some() {
+            let Some(raw) = self.replay_call(id, REPLAY_CALL_REFLECT) else {
+                return;
+            };
+            let Some(summary) = parse_insight_json(&raw) else {
+                return;
+            };
+            summary
+        } else {
+            let Chooser::Custom(ch) = &self.chooser else {
+                return;
+            };
+            let ch = Arc::clone(ch);
+            match ch.insight(seed, obs) {
+                Ok(s) => {
+                    let s = s.trim().to_string();
+                    if s.is_empty() {
+                        self.record_replay(
+                            id,
+                            seed,
+                            hash,
+                            LLM_SKIP_SENTINEL.into(),
+                            REPLAY_CALL_REFLECT,
+                        );
+                        return;
+                    }
+                    self.record_replay(
+                        id,
+                        seed,
+                        hash,
+                        insight_record_json(&s),
+                        REPLAY_CALL_REFLECT,
+                    );
+                    s
+                }
+                Err(_) => {
+                    self.record_replay(
+                        id,
+                        seed,
+                        hash,
+                        LLM_SKIP_SENTINEL.into(),
+                        REPLAY_CALL_REFLECT,
+                    );
+                    return;
+                }
+            }
+        };
+        crate::execute::remember_agent(
+            self,
+            id,
+            MemoryEntry {
+                tick: self.tick,
+                kind: MemoryKind::Reflection,
+                text: summary,
+                importance: 200,
+                last_accessed: self.tick,
+                species_tag: 0,
+                id: 0,
+                participants: Vec::new(),
+                valence: 0,
+            },
+        );
+    }
+
+    fn step_plan(&mut self, id: AgentId, obs: &mut observation::Observation) {
+        if !Self::every_n_fires(self.llm_plan_every_n, self.tick) {
+            return;
+        }
+        let max_len = self.llm_plan_length as usize;
+        let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
+        let seed = derive_seed(
+            llm_base,
+            &format!("tick_{}_agent_{}_plan_0", self.tick, id.0),
+        );
+        let hash = prompt_hash(obs);
+        let steps = if self.replay.is_some() {
+            let Some(raw) = self.replay_call(id, REPLAY_CALL_PLAN) else {
+                return;
+            };
+            let Some(steps) = parse_plan_json(&raw, max_len) else {
+                return;
+            };
+            steps
+        } else {
+            let Chooser::Custom(ch) = &self.chooser else {
+                return;
+            };
+            let ch = Arc::clone(ch);
+            match ch.plan(seed, obs, max_len) {
+                Ok(s) => {
+                    let steps: Vec<String> = s
+                        .into_iter()
+                        .map(|x| x.trim().to_string())
+                        .filter(|x| !x.is_empty())
+                        .take(max_len)
+                        .collect();
+                    if steps.is_empty() {
+                        self.record_replay(
+                            id,
+                            seed,
+                            hash,
+                            LLM_SKIP_SENTINEL.into(),
+                            REPLAY_CALL_PLAN,
+                        );
+                        return;
+                    }
+                    self.record_replay(
+                        id,
+                        seed,
+                        hash,
+                        plan_record_json(&steps),
+                        REPLAY_CALL_PLAN,
+                    );
+                    steps
+                }
+                Err(_) => {
+                    self.record_replay(
+                        id,
+                        seed,
+                        hash,
+                        LLM_SKIP_SENTINEL.into(),
+                        REPLAY_CALL_PLAN,
+                    );
+                    return;
+                }
+            }
+        };
+        if let Some(a) = self.agents.get_mut(&id) {
+            a.plan = steps;
+        }
+        obs.plan = self
+            .agents
+            .get(&id)
+            .map(|a| a.plan.clone())
+            .unwrap_or_default();
     }
 
     pub fn agent_ids(&self) -> Vec<AgentId> {
@@ -565,7 +810,7 @@ impl Simulation {
     fn step_agent(&mut self, id: AgentId) -> AgentTiming {
         let mut timing = AgentTiming::new(id);
         let p0 = Instant::now();
-        let obs = observation::build(self, id);
+        let mut obs = observation::build(self, id);
         apply_heard_memories(self, id, &obs.heard);
         timing.perceive_ns = timing::ns_since(p0);
         let r0 = Instant::now();
@@ -575,7 +820,6 @@ impl Simulation {
             llm_base,
             &format!("tick_{}_agent_{}_call_0", self.tick, id.0),
         );
-        let hash = prompt_hash(&obs);
         let mut allow_speak = true;
         let mut chooser_name = "mock";
         let mut policy_branch;
@@ -593,6 +837,13 @@ impl Simulation {
                 .unwrap_or_default()
         };
         timing.retrieve_ns = timing::ns_since(r0);
+        let rf0 = Instant::now();
+        self.step_insight(id, &obs);
+        timing.reflect_ns = timing::ns_since(rf0);
+        let pl0 = Instant::now();
+        self.step_plan(id, &mut obs);
+        timing.plan_ns = timing::ns_since(pl0);
+        let hash = prompt_hash(&obs);
         let relation_ids: Vec<u64> = obs.relationships.iter().map(|r| r.id.0).collect();
 
         let s0 = Instant::now();
@@ -719,25 +970,13 @@ impl Simulation {
             None,
         ));
 
-        if let Some(path) = &self.record_path {
-            let rec = ReplayRecord {
-                tick: self.tick,
-                agent: id.0,
-                call_seed,
-                prompt_hash: hash,
-                response: record_raw.unwrap_or_else(|| chosen_to_json(&chosen)),
-            };
-            if let Ok(line) = serde_json::to_string(&rec) {
-                let _ = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path)
-                    .and_then(|mut f| {
-                        use std::io::Write;
-                        writeln!(f, "{line}")
-                    });
-            }
-        }
+        self.record_replay(
+            id,
+            call_seed,
+            hash,
+            record_raw.unwrap_or_else(|| chosen_to_json(&chosen)),
+            REPLAY_CALL_CHOOSE,
+        );
 
         let e0 = Instant::now();
         execute_primary(self, id, &chosen.primary);
