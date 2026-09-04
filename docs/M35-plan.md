@@ -57,8 +57,9 @@ CLI: `--inventions` (does **not** imply `--sheet`). INT_mod is 0 if the sheet is
 | Later | What |
 |---|---|
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
-| After M37 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D models; DEX accuracy; STR haul; tech tree / patents |
+| **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| After M38 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents |
 | Not M35 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

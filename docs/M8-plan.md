@@ -119,8 +119,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
-| After M37 | Protobuf/TLS |
+| **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| After M38 | Protobuf/TLS |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

@@ -53,7 +53,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M35** | Done (tag `M35`) | [`M35-plan.md`](M35-plan.md), walkthrough [`M35-test-plan.md`](M35-test-plan.md) | Inventions, browser attach |
 | **M36** | Done (tag `M36`) | [`M36-plan.md`](M36-plan.md), walkthrough [`M36-test-plan.md`](M36-test-plan.md) | Browser researcher UI (no 3D) |
 | **M37** | Done (tag `M37`) | [`M37-plan.md`](M37-plan.md), walkthrough [`M37-test-plan.md`](M37-test-plan.md) | Extra invention kinds, browser /set /give |
-| After M37 | Not started | listed at the bottom of `M37-plan.md` | protobuf/TLS |
+| **M38** | Planned — next | [`M38-plan.md`](M38-plan.md) | Viewer 3D models, browser /inject /scrub + wasm32 CI |
+| After M38 | Not started | listed at the bottom of `M38-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -136,15 +137,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 41b | `M36-test-plan.md` | M36 walkthrough (InspectorView JSON, postcard WS tables) |
 | 42 | `M37-plan.md` | Milestone 37 (done, tag `M37`): extra invention kinds, browser /set /give |
 | 42b | `M37-test-plan.md` | M37 walkthrough (MoveBonus/SenseBonus, page /set /give) |
+| 43 | `M38-plan.md` | Milestone 38 (planned): viewer 3D models, browser /inject /scrub + wasm32 CI |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M37-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M38-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M37 is the current slice (`M37-plan.md`). Do not expand into items it defers (protobuf/TLS, 3D models).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M38 is the current slice (`M38-plan.md`). Do not expand into items it defers (protobuf/TLS, DEX accuracy).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -172,14 +174,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M37 are done. Current slice is [`M37-plan.md`](M37-plan.md) (implemented). Later work is listed at the bottom of that file.
+M1–M37 are done. Current slice is [`M38-plan.md`](M38-plan.md) (planned, not yet implemented).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M37-plan.md.
-M37 is implemented (extra invention kinds, browser /set /give;
-PROTOCOL_VERSION=5). Later work is at the bottom of that file.
-Do not add protobuf, TLS, or Bevy in the browser. CI stays
-provider=mock with no network.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M38-plan.md.
+M38 is the current slice (viewer 3D models, browser /inject /scrub
++ wasm32 CI; PROTOCOL_VERSION=5). Later work is at the bottom of
+that file. Do not add protobuf, TLS, or Bevy in the browser. CI
+stays provider=mock with no network.
 ```
 
 ---

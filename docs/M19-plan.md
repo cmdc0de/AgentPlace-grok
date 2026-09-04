@@ -108,8 +108,9 @@ Do **not** change shipping `configs/default.toml`.
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
-| After M37 | protobuf/TLS |
+| **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| After M38 | protobuf/TLS |
 | Not M19 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

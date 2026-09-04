@@ -42,8 +42,9 @@ No new overlay. No new `ControlVerb`. `Subscribe` + `RequestSnapshot` already ex
 
 | Later | What |
 |---|---|
-| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
-| After M37 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; PG-6 3D; DEX accuracy; STR haul; time-series charts |
+| **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| After M38 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; time-series charts |
 | Not M36 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions
