@@ -93,11 +93,10 @@ fn inspector_board_and_metrics() {
         view.board.adopted
     );
     let row = view.agents.iter().find(|x| x.id == 0).unwrap();
-    assert!(
-        row.relationships
-            .iter()
-            .any(|r| r.id == 1 && r.trust == 400)
-    );
+    assert!(row
+        .relationships
+        .iter()
+        .any(|r| r.id == 1 && r.trust == 400));
     assert!(row.kinship.iter().any(|s| s.contains("household")));
     assert!(view.metrics.hungry >= 1);
     assert!(view.metrics.illness >= 1);
@@ -108,6 +107,18 @@ fn inspector_board_and_metrics() {
     sim.run_ticks(1);
     let after = InspectorView::from_sim(&sim);
     assert!(after.metrics.timing.is_some());
+}
+
+#[test]
+fn inspector_from_checkpoint_bytes_matches_from_sim() {
+    let mut sim = Simulation::new(tiny(0x37_10)).unwrap();
+    sim.run_ticks(2);
+    let bytes = sim.encode_checkpoint().unwrap();
+    let from_bytes = InspectorView::from_checkpoint_bytes(&bytes).unwrap();
+    let from_sim = InspectorView::from_sim(&sim);
+    assert_eq!(from_bytes.tick, from_sim.tick);
+    assert_eq!(from_bytes.agents.len(), from_sim.agents.len());
+    assert_eq!(from_bytes.inventions.len(), from_sim.inventions.len());
 }
 
 #[test]

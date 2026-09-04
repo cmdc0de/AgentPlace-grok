@@ -52,7 +52,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M34** | Done (tag `M34`) | [`M34-plan.md`](M34-plan.md), walkthrough [`M34-test-plan.md`](M34-test-plan.md) | Sheet effects, close-kin PairBond |
 | **M35** | Done (tag `M35`) | [`M35-plan.md`](M35-plan.md), walkthrough [`M35-test-plan.md`](M35-test-plan.md) | Inventions, browser attach |
 | **M36** | Done (tag `M36`) | [`M36-plan.md`](M36-plan.md), walkthrough [`M36-test-plan.md`](M36-test-plan.md) | Browser researcher UI (no 3D) |
-| **M37** | Planned — next | [`M37-plan.md`](M37-plan.md) | Extra invention kinds, browser /set /give |
+| **M37** | Done (tag `M37`) | [`M37-plan.md`](M37-plan.md), walkthrough [`M37-test-plan.md`](M37-test-plan.md) | Extra invention kinds, browser /set /give |
 | After M37 | Not started | listed at the bottom of `M37-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -134,7 +134,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 40b | `M35-test-plan.md` | M35 walkthrough (inventions, browser attach) |
 | 41 | `M36-plan.md` | Milestone 36 (done, tag `M36`): browser researcher UI (no 3D) |
 | 41b | `M36-test-plan.md` | M36 walkthrough (InspectorView JSON, postcard WS tables) |
-| 42 | `M37-plan.md` | Milestone 37 (planned): extra invention kinds, browser /set /give |
+| 42 | `M37-plan.md` | Milestone 37 (done, tag `M37`): extra invention kinds, browser /set /give |
+| 42b | `M37-test-plan.md` | M37 walkthrough (MoveBonus/SenseBonus, page /set /give) |
 
 ---
 
@@ -171,11 +172,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M36 are done. Current slice is [`M37-plan.md`](M37-plan.md) (planned, not yet implemented).
+M1–M37 are done. Current slice is [`M37-plan.md`](M37-plan.md) (implemented). Later work is listed at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M37-plan.md.
-M37 is the current slice (extra invention kinds, browser /set /give;
+M37 is implemented (extra invention kinds, browser /set /give;
 PROTOCOL_VERSION=5). Later work is at the bottom of that file.
 Do not add protobuf, TLS, or Bevy in the browser. CI stays
 provider=mock with no network.

@@ -174,6 +174,15 @@ pub fn perceive_range(base: f64, perceptiveness: u8, wisdom: u8) -> u32 {
     sheet.adjust_range(effective_range(base, perceptiveness))
 }
 
+/// Perception range after WIS, then SenseBonus (no stack).
+pub fn perceive_range_for(sim: &Simulation, agent: &Agent, base: f64) -> u32 {
+    crate::inventions::apply_sense_range(
+        perceive_range(base, agent.personality.perceptiveness, agent.sheet.wisdom),
+        &sim.inventions,
+        agent.id,
+    )
+}
+
 pub fn neighbors4(world: &World, x: u32, y: u32) -> Vec<(u32, u32)> {
     let mut out = vec![(x, y)];
     for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
@@ -192,31 +201,23 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
     let vis = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        perceive_range(
-            cfg.observation.base_vision_range,
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
-        )
+        perceive_range_for(sim, agent, cfg.observation.base_vision_range)
     };
     let hear = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        perceive_range(
+        perceive_range_for(
+            sim,
+            agent,
             cfg.communication
                 .base_speech_range
                 .max(cfg.observation.base_hearing_range),
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
         )
     };
     let ident = if cfg.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        perceive_range(
-            cfg.observation.base_agent_identity_range,
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
-        )
+        perceive_range_for(sim, agent, cfg.observation.base_agent_identity_range)
     };
 
     let mut tiles = Vec::new();
@@ -463,11 +464,11 @@ fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) ->
             continue;
         };
         let range = if *shout {
-            perceive_range(
+            perceive_range_for(
+                sim,
+                listener,
                 sim.config.observation.base_hearing_range
                     * sim.config.communication.shout_range_multiplier,
-                listener.personality.perceptiveness,
-                listener.sheet.wisdom,
             )
         } else {
             hear
@@ -508,7 +509,11 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let mut legal = vec![PrimaryAction::Wait, PrimaryAction::Rest];
     let params = sim.storage;
     let energy = agent.needs.energy;
-    let move_cost = agent.move_cost_milli(&params);
+    let move_cost = crate::inventions::apply_move_cost(
+        agent.move_cost_milli(&params),
+        &sim.inventions,
+        agent.id,
+    );
     for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
         let nx = agent.x as i32 + dx;
         let ny = agent.y as i32 + dy;
@@ -631,11 +636,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let ident = if sim.config.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        perceive_range(
-            sim.config.observation.base_agent_identity_range,
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
-        )
+        perceive_range_for(sim, agent, sim.config.observation.base_agent_identity_range)
     };
     for p in sim.board.open() {
         if !open_proposal_visible(sim, agent, ident, p) {
@@ -728,11 +729,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     let ident = if sim.config.observation.full_information {
         sim.world.width.max(sim.world.height)
     } else {
-        perceive_range(
-            sim.config.observation.base_agent_identity_range,
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
-        )
+        perceive_range_for(sim, agent, sim.config.observation.base_agent_identity_range)
     };
     for other in sim.agents.values() {
         if other.id == agent.id {
@@ -791,11 +788,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         let vis = if sim.config.observation.full_information {
             sim.world.width.max(sim.world.height)
         } else {
-            perceive_range(
-                sim.config.observation.base_vision_range,
-                agent.personality.perceptiveness,
-                agent.sheet.wisdom,
-            )
+            perceive_range_for(sim, agent, sim.config.observation.base_vision_range)
         };
         let mut any_visible = false;
         for other in sim.agents.values() {
@@ -849,10 +842,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     if sim.inventions_enabled
         && !agent.incapacitated
         && !sim.is_child(agent)
-        && !sim
-            .inventions
-            .values()
-            .any(|i| matches!(i.kind, crate::inventions::InventionKind::GatherBonus))
+        && crate::inventions::next_kind(&sim.inventions).is_some()
     {
         legal.push(PrimaryAction::Invent);
     }

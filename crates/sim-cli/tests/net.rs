@@ -1,9 +1,9 @@
 //! M7 attach tests. Spawn `sim-cli --listen` so we do not put sockets in sim-core.
 
-use shared::PROTOCOL_VERSION;
-use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage, hello};
+use shared::protocol::{hello, ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::Connection;
-use sim_core::{Simulation, parse_item};
+use shared::PROTOCOL_VERSION;
+use sim_core::{parse_item, Simulation};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -1439,6 +1439,10 @@ fn browser_page_ships_protocol_5() {
     assert!(text.contains("encodeSubscribe"), "{text}");
     assert!(text.contains("encodeRequestSnapshot"), "{text}");
     assert!(text.contains("inspector"), "{text}");
+    assert!(text.contains("id=\"inventions\""), "inventions section");
+    assert!(text.contains("encodeGive"), "{text}");
+    assert!(text.contains("encodeSet"), "{text}");
+    assert!(text.contains("sim_wasm"), "{text}");
 }
 
 #[test]

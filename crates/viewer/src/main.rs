@@ -4,13 +4,13 @@ mod render;
 mod ui;
 
 use bevy::prelude::*;
-use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
+use commands::{crate_fill_scale, pack_fill_scale, CkptScrubber};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
-use sim_bevy::{SimPlugin, SimState, step_once};
+use sim_bevy::{step_once, SimPlugin, SimState};
+use sim_core::combat_fx::CombatFxJob;
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev};
-use sim_core::combat_fx::CombatFxJob;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -949,10 +949,10 @@ fn update_vision_overlay(
     let vis = if state.sim.config.observation.full_information {
         state.sim.world.width.max(state.sim.world.height)
     } else {
-        sim_core::observation::perceive_range(
+        sim_core::observation::perceive_range_for(
+            &state.sim,
+            agent,
             state.sim.config.observation.base_vision_range,
-            agent.personality.perceptiveness,
-            agent.sheet.wisdom,
         )
     };
     let mesh = meshes.add(Cuboid::new(0.92, 0.04, 0.92));
@@ -992,7 +992,11 @@ fn update_fog_visibility(
     >,
     mut fx: Query<
         (&CombatFxVisual, &mut Visibility),
-        (Without<WorldMarker>, Without<AgentVisual>, Without<SatchelVisual>),
+        (
+            Without<WorldMarker>,
+            Without<AgentVisual>,
+            Without<SatchelVisual>,
+        ),
     >,
 ) {
     let fog_obs = if ui.fog {

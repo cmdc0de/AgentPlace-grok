@@ -1,7 +1,7 @@
 //! Length-prefixed postcard frames (`u32` LE length + payload).
 
 use crate::{MAX_FRAME_BYTES, PROTOCOL_VERSION};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -207,6 +207,32 @@ mod tests {
     fn request_snapshot_postcard_bytes() {
         let frame = encode_frame(&ClientMessage::RequestSnapshot).unwrap();
         assert_eq!(&frame[4..], &[2]);
+    }
+
+    #[test]
+    fn give_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::Control(ControlVerb::Give {
+            id: 0,
+            item: "x".into(),
+            qty: 1,
+        }))
+        .unwrap();
+        assert_eq!(&frame[4..], &[3, 7, 0, 1, b'x', 1]);
+    }
+
+    #[test]
+    fn set_hunger_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::Control(ControlVerb::Set {
+            id: 0,
+            field: "hunger".into(),
+            toward: None,
+            value: 50,
+        }))
+        .unwrap();
+        let mut expect = vec![3, 11, 0, 6];
+        expect.extend(b"hunger");
+        expect.extend([0, 50]);
+        assert_eq!(&frame[4..], expect.as_slice());
     }
 
     #[test]

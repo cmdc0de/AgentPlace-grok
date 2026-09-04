@@ -4,9 +4,9 @@ mod overlay;
 mod server;
 
 use sim_core::{
-    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
-    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint,
+    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, compare_csv,
+    compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint, ExperimentConfig, Simulation,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -495,7 +495,7 @@ Options:
       --aging               Accrue age_ticks; childhood gates PairBond/Reproduce/Attack
       --household-crates    Members Store/Retrieve at household home (Chebyshev ≤ 1)
       --culture             Assign founder culture ids; children copy a parent
-      --inventions          Invent GatherBonus; inventor then society after share_delay_ticks
+      --inventions          Invent GatherBonus/MoveBonus/SenseBonus; inventor then society after share_delay_ticks
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)

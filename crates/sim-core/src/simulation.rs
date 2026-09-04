@@ -4,26 +4,27 @@ use crate::board::{Goal, PublicBoard};
 use crate::config::{ExperimentConfig, SpawnMode};
 use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
-use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
+use crate::event_log::{hash_kind, EventLog, SimEvent, SimEventKind};
 use crate::execute::{apply_heard_memories, execute_primary};
 use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
 use crate::llm::{
-    ActionChooser, ChooseError, Chooser, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL, REPLAY_CALL_CHOOSE,
-    REPLAY_CALL_IMPORTANCE, REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT, REPLAY_CALL_REFLECT_EVICT,
-    ReplayRecord, ReplayTable, chosen_to_json, importance_record_json, insight_record_json,
-    is_llm_wait_response, is_skip_response, parse_choice_json, parse_importance_json,
-    parse_insight_json, parse_plan_json, plan_record_json, prompt_hash, try_parse_plan_step,
+    chosen_to_json, importance_record_json, insight_record_json, is_llm_wait_response,
+    is_skip_response, parse_choice_json, parse_importance_json, parse_insight_json,
+    parse_plan_json, plan_record_json, prompt_hash, try_parse_plan_step, ActionChooser,
+    ChooseError, Chooser, ReplayRecord, ReplayTable, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL,
+    REPLAY_CALL_CHOOSE, REPLAY_CALL_IMPORTANCE, REPLAY_CALL_PLAN, REPLAY_CALL_REFLECT,
+    REPLAY_CALL_REFLECT_EVICT,
 };
 use crate::memory::{MemoryEntry, MemoryKind};
 use crate::observation;
 use crate::policy::{avoid_toxic, mock_choose};
-use crate::seeding::{RngBank, derive_seed, resolve_seed};
+use crate::seeding::{derive_seed, resolve_seed, RngBank};
 use crate::timing::{self, AgentTiming, TickTiming};
 use crate::voting::{CouncilTally, VoteAccept, VoteWeight, VotingParams};
 use crate::world::World;
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -151,7 +152,12 @@ impl Simulation {
         for agent in agents.values() {
             let _ = rngs.agent_stream(agent.id);
         }
-        let next_agent_id = agents.keys().map(|id| id.0).max().unwrap_or(0).saturating_add(1);
+        let next_agent_id = agents
+            .keys()
+            .map(|id| id.0)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1);
 
         let chooser = if config.llm.provider == "wait" {
             Chooser::Wait
@@ -224,10 +230,7 @@ impl Simulation {
             .unwrap_or(self.config.master_seed);
         let ids: Vec<AgentId> = self.agents.keys().copied().collect();
         for id in ids {
-            let unused = self
-                .agents
-                .get(&id)
-                .is_some_and(|a| a.sheet.is_unused());
+            let unused = self.agents.get(&id).is_some_and(|a| a.sheet.is_unused());
             if !unused {
                 continue;
             }
@@ -781,23 +784,11 @@ impl Simulation {
                         );
                         return;
                     }
-                    self.record_replay(
-                        id,
-                        seed,
-                        hash,
-                        plan_record_json(&steps),
-                        REPLAY_CALL_PLAN,
-                    );
+                    self.record_replay(id, seed, hash, plan_record_json(&steps), REPLAY_CALL_PLAN);
                     steps
                 }
                 Err(_) => {
-                    self.record_replay(
-                        id,
-                        seed,
-                        hash,
-                        LLM_SKIP_SENTINEL.into(),
-                        REPLAY_CALL_PLAN,
-                    );
+                    self.record_replay(id, seed, hash, LLM_SKIP_SENTINEL.into(), REPLAY_CALL_PLAN);
                     return;
                 }
             }
@@ -1077,11 +1068,7 @@ impl Simulation {
         if self.agents.get(&id).is_none() {
             return timing;
         }
-        if self
-            .agents
-            .get(&id)
-            .is_some_and(|a| a.incapacitated)
-        {
+        if self.agents.get(&id).is_some_and(|a| a.incapacitated) {
             execute_primary(self, id, &crate::action::PrimaryAction::Wait);
             return timing;
         }
@@ -1356,10 +1343,10 @@ impl Simulation {
         let (broadcast, targets) = match speak.to {
             SpeakTarget::Broadcast => (true, Vec::new()),
             SpeakTarget::Directed(ids) => {
-                let ident = crate::observation::perceive_range(
+                let ident = crate::observation::perceive_range_for(
+                    self,
+                    &speaker,
                     self.config.observation.base_agent_identity_range,
-                    speaker.personality.perceptiveness,
-                    speaker.sheet.wisdom,
                 );
                 let valid: Vec<AgentId> = ids
                     .into_iter()
@@ -1374,23 +1361,27 @@ impl Simulation {
         };
         if self.config.agents.social.track_relationships {
             let partners: Vec<AgentId> = if broadcast {
-                let hear = crate::observation::perceive_range(
+                let hear = crate::observation::perceive_range_for(
+                    self,
+                    &speaker,
                     self.config
                         .communication
                         .base_speech_range
                         .max(self.config.observation.base_hearing_range),
-                    speaker.personality.perceptiveness,
-                    speaker.sheet.wisdom,
                 );
                 self.agents
                     .values()
                     .filter(|t| t.id != id)
                     .filter(|t| {
                         let dist = crate::observation::chebyshev(speaker.x, speaker.y, t.x, t.y);
-                        let ident = crate::observation::perceive_range(
-                            self.config.observation.base_agent_identity_range,
-                            t.personality.perceptiveness,
-                            t.sheet.wisdom,
+                        let ident = crate::inventions::apply_sense_range(
+                            crate::observation::perceive_range(
+                                self.config.observation.base_agent_identity_range,
+                                t.personality.perceptiveness,
+                                t.sheet.wisdom,
+                            ),
+                            &self.inventions,
+                            t.id,
                         );
                         dist <= hear && dist <= ident
                     })

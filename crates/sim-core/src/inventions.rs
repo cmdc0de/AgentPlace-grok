@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const GATHER_BONUS_MILLI: u32 = 1200;
+pub const MOVE_BONUS_MILLI: u32 = 800;
+pub const SENSE_BONUS_CELLS: u32 = 1;
 pub const INVENTOR_INFLUENCE: u32 = 200;
 pub const INVENT_BASE_CHANCE: i32 = 400;
 pub const INVENT_INT_CHANCE: i32 = 50;
@@ -14,6 +16,28 @@ pub const INVENT_INT_CHANCE: i32 = 50;
 pub enum InventionKind {
     #[default]
     GatherBonus = 0,
+    MoveBonus = 1,
+    SenseBonus = 2,
+}
+
+impl InventionKind {
+    pub const ALL: [InventionKind; 3] = [
+        InventionKind::GatherBonus,
+        InventionKind::MoveBonus,
+        InventionKind::SenseBonus,
+    ];
+
+    pub fn slug(self) -> &'static str {
+        match self {
+            InventionKind::GatherBonus => "gather_bonus",
+            InventionKind::MoveBonus => "move_bonus",
+            InventionKind::SenseBonus => "sense_bonus",
+        }
+    }
+
+    pub fn memory_text(self) -> String {
+        format!("invented {}", self.slug().replace('_', " "))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,31 +89,53 @@ pub fn invent_chance(intelligence: u8) -> i32 {
         .clamp(1, 1000)
 }
 
-pub fn food_mult_milli(table: &BTreeMap<u64, Invention>, id: AgentId) -> u32 {
-    let Some(inv) = table
+pub fn next_kind(table: &BTreeMap<u64, Invention>) -> Option<InventionKind> {
+    InventionKind::ALL
+        .into_iter()
+        .find(|k| !table.values().any(|i| i.kind == *k))
+}
+
+pub fn entitled(table: &BTreeMap<u64, Invention>, id: AgentId, kind: InventionKind) -> bool {
+    table
         .values()
-        .find(|i| matches!(i.kind, InventionKind::GatherBonus))
-    else {
-        return 1000;
-    };
-    if inv.shared || inv.inventor == id {
+        .any(|i| i.kind == kind && (i.shared || i.inventor == id))
+}
+
+pub fn food_mult_milli(table: &BTreeMap<u64, Invention>, id: AgentId) -> u32 {
+    if entitled(table, id, InventionKind::GatherBonus) {
         GATHER_BONUS_MILLI
     } else {
         1000
     }
 }
 
+/// Move energy after MoveBonus. Zero cost stays 0. No stack.
+pub fn apply_move_cost(cost: u32, table: &BTreeMap<u64, Invention>, id: AgentId) -> u32 {
+    if cost == 0 {
+        return 0;
+    }
+    if !entitled(table, id, InventionKind::MoveBonus) {
+        return cost;
+    }
+    (cost * MOVE_BONUS_MILLI / 1000).max(1)
+}
+
+/// Vision/hear/ident cells after SenseBonus. No stack.
+pub fn apply_sense_range(range: u32, table: &BTreeMap<u64, Invention>, id: AgentId) -> u32 {
+    if entitled(table, id, InventionKind::SenseBonus) {
+        range.saturating_add(SENSE_BONUS_CELLS)
+    } else {
+        range
+    }
+}
+
 pub fn observation_lines(table: &BTreeMap<u64, Invention>, id: AgentId) -> Vec<String> {
     let mut out = Vec::new();
     for inv in table.values() {
-        match inv.kind {
-            InventionKind::GatherBonus => {
-                if inv.inventor == id {
-                    out.push("invention gather_bonus (yours)".into());
-                } else if inv.shared {
-                    out.push("invention gather_bonus".into());
-                }
-            }
+        if inv.inventor == id {
+            out.push(format!("invention {} (yours)", inv.kind.slug()));
+        } else if inv.shared {
+            out.push(format!("invention {}", inv.kind.slug()));
         }
     }
     out

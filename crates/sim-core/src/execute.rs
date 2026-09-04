@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
+use crate::memory::{knows_toxin, MemoryEntry, MemoryKind};
 use crate::observation::{crate_cell, neighbors4};
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -276,24 +276,12 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
             }
         }
     }
-    push(
-        sim,
-        id,
-        SimEventKind::Attack { target, damage },
-    );
+    push(sim, id, SimEventKind::Attack { target, damage });
     if down {
-        push(
-            sim,
-            target,
-            SimEventKind::Incapacitated { by: id },
-        );
+        push(sim, target, SimEventKind::Incapacitated { by: id });
     }
     if lethal {
-        push(
-            sim,
-            target,
-            SimEventKind::CombatDeath { by: id },
-        );
+        push(sim, target, SimEventKind::CombatDeath { by: id });
         sim.agents.remove(&target);
     }
 }
@@ -445,7 +433,11 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
         craft: crate::sheet::mix_stat(pa.abilities.craft, pb.abilities.craft, &mut rng),
     };
     child.personality = crate::agent::Personality {
-        openness: crate::sheet::mix_stat(pa.personality.openness, pb.personality.openness, &mut rng),
+        openness: crate::sheet::mix_stat(
+            pa.personality.openness,
+            pb.personality.openness,
+            &mut rng,
+        ),
         conscientiousness: crate::sheet::mix_stat(
             pa.personality.conscientiousness,
             pb.personality.conscientiousness,
@@ -494,14 +486,12 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     child.age_ticks = 0;
     child.influence_factor = sim.config.influence_milli();
     if sim.config.agents.start_with_basic_needs {
-        child.goals = vec![
-            crate::board::Goal {
-                id: 0,
-                text: "stay fed".into(),
-                priority: 80,
-                source: "birth".into(),
-            },
-        ];
+        child.goals = vec![crate::board::Goal {
+            id: 0,
+            text: "stay fed".into(),
+            priority: 80,
+            source: "birth".into(),
+        }];
     }
     let sibs: Vec<AgentId> = {
         let mut s = Vec::new();
@@ -528,14 +518,7 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     }
     sim.agents.insert(child_id, child);
     let _ = sim.rngs.agent_stream(child_id);
-    push(
-        sim,
-        child_id,
-        SimEventKind::Born {
-            parent_a,
-            parent_b,
-        },
-    );
+    push(sim, child_id, SimEventKind::Born { parent_a, parent_b });
 }
 
 fn invent(sim: &mut Simulation, id: AgentId) {
@@ -543,14 +526,10 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if sim
-        .inventions
-        .values()
-        .any(|i| matches!(i.kind, crate::inventions::InventionKind::GatherBonus))
-    {
+    let Some(kind) = crate::inventions::next_kind(&sim.inventions) else {
         push(sim, id, SimEventKind::Wait);
         return;
-    }
+    };
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
@@ -575,7 +554,7 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         id: iid,
         inventor: id,
         tick: sim.tick,
-        kind: crate::inventions::InventionKind::GatherBonus,
+        kind,
         shared: false,
     };
     sim.inventions.insert(iid, inv);
@@ -591,7 +570,7 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         crate::memory::MemoryEntry {
             tick: sim.tick,
             kind: crate::memory::MemoryKind::Reflection,
-            text: "invented gather bonus".into(),
+            text: kind.memory_text(),
             importance: 200,
             last_accessed: sim.tick,
             species_tag: 0,
@@ -601,14 +580,7 @@ fn invent(sim: &mut Simulation, id: AgentId) {
             ..Default::default()
         },
     );
-    push(
-        sim,
-        id,
-        SimEventKind::Invented {
-            inventor: id,
-            kind: crate::inventions::InventionKind::GatherBonus,
-        },
-    );
+    push(sim, id, SimEventKind::Invented { inventor: id, kind });
 }
 
 fn flee(sim: &mut Simulation, id: AgentId) {
@@ -634,7 +606,11 @@ fn flee(sim: &mut Simulation, id: AgentId) {
         return;
     };
     let here = crate::observation::chebyshev(ax, ay, ox, oy);
-    let cost = agent.move_cost_milli(&sim.storage);
+    let cost = crate::inventions::apply_move_cost(
+        agent.move_cost_milli(&sim.storage),
+        &sim.inventions,
+        id,
+    );
     let mut best: Option<(i32, i32, u32)> = None;
     for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
         let nx = ax as i32 + dx;
@@ -880,7 +856,11 @@ fn move_rel(sim: &mut Simulation, id: AgentId, dx: i32, dy: i32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let cost = agent.move_cost_milli(&sim.storage);
+    let cost = crate::inventions::apply_move_cost(
+        agent.move_cost_milli(&sim.storage),
+        &sim.inventions,
+        id,
+    );
     if agent.needs.energy < cost {
         push(sim, id, SimEventKind::Wait);
         return;

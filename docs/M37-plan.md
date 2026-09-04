@@ -1,8 +1,8 @@
 # M37 — Extra invention kinds, browser /set /give
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M36 complete (`docs/M36-plan.md`, git tag `M36`, commit `77367e3`)  
-**Walkthrough:** written on implement (`docs/M37-test-plan.md`)  
+**Walkthrough:** [`docs/M37-test-plan.md`](M37-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-5, PG-7 later), `docs/M35-plan.md` (GatherBonus), `docs/M24-plan.md` (wire `/set`), `docs/M22-plan.md` (wire Give)
 
 ## Context
@@ -111,7 +111,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M37-test-plan.md`).
+Walkthrough: [`docs/M37-test-plan.md`](M37-test-plan.md).
 
 ```bash
 cargo test -p sim-core

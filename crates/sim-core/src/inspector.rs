@@ -13,6 +13,8 @@ pub struct InspectorView {
     pub agents: Vec<InspectorAgent>,
     pub board: InspectorBoard,
     pub metrics: InspectorMetrics,
+    #[serde(default)]
+    pub inventions: Vec<InspectorInvention>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,6 +65,15 @@ pub struct InspectorProposal {
 pub struct InspectorAdopted {
     pub proposal_id: u64,
     pub text: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct InspectorInvention {
+    pub id: u64,
+    pub inventor: u64,
+    pub kind: String,
+    pub shared: bool,
+    pub tick: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -170,6 +181,17 @@ impl InspectorView {
                 })
                 .collect(),
         };
+        let inventions = sim
+            .inventions
+            .values()
+            .map(|i| InspectorInvention {
+                id: i.id,
+                inventor: i.inventor.0,
+                kind: i.kind.slug().to_string(),
+                shared: i.shared,
+                tick: i.tick,
+            })
+            .collect();
         Self {
             tick: sim.tick,
             agents,
@@ -182,7 +204,13 @@ impl InspectorView {
                 mean_trust,
                 illness,
             },
+            inventions,
         }
+    }
+
+    pub fn from_checkpoint_bytes(bytes: &[u8]) -> Result<Self, crate::error::SimError> {
+        let sim = Simulation::decode_checkpoint(bytes)?;
+        Ok(Self::from_sim(&sim))
     }
 
     pub fn to_json(&self) -> String {

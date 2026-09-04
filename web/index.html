@@ -16,18 +16,31 @@
 </head>
 <body>
   <h1>AgentPlace browser attach</h1>
-  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Tables come from <code>Tick.metrics.inspector</code> JSON (no wasm). Play/Pause still optional with <code>--allow-control</code>.</p>
+  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Tables come from <code>Tick.metrics.inspector</code> JSON; Snapshot wasm is optional. <code>/set</code> <code>/give</code> need <code>--allow-control</code>.</p>
   <label>WebSocket URL <input id="url" size="40" value="ws://127.0.0.1:9001" /></label>
   <label>Token (optional) <input id="token" size="20" /></label>
   <button id="connect">Connect</button>
   <button id="play" disabled>Play</button>
   <button id="pause" disabled>Pause</button>
+  <div>
+    <label>/give <input id="give-id" size="4" placeholder="id" /></label>
+    <input id="give-item" size="12" placeholder="item" />
+    <input id="give-qty" size="4" placeholder="qty" value="1" />
+    <button id="give" disabled>Give</button>
+    <label>/set <input id="set-id" size="4" placeholder="id" /></label>
+    <input id="set-field" size="10" placeholder="hunger" />
+    <input id="set-toward" size="6" placeholder="toward" />
+    <input id="set-value" size="6" placeholder="0–100" />
+    <button id="set" disabled>Set</button>
+  </div>
   <div id="log"></div>
   <h2>Agents</h2>
   <p id="agents-empty" class="muted">Waiting for Tick (hit Play if the server started paused).</p>
   <div id="agents"></div>
   <h2>Board</h2>
   <div id="board"></div>
+  <h2>Inventions</h2>
+  <div id="inventions"></div>
   <h2>Metrics</h2>
   <div id="metrics"></div>
   <script>
@@ -82,6 +95,23 @@
     function encodeControl(play) {
       return frame([3, play ? 1 : 0]);
     }
+    function encodeStr(s) {
+      const enc = new TextEncoder().encode(s);
+      return [...varint(enc.length), ...enc];
+    }
+    function encodeGive(id, item, qty) {
+      return frame([3, 7, ...varint(id), ...encodeStr(item), ...varint(qty)]);
+    }
+    function encodeSet(id, field, toward, value) {
+      const body = [3, 11, ...varint(id), ...encodeStr(field)];
+      if (toward === null || toward === undefined || toward === "") {
+        body.push(0);
+      } else {
+        body.push(1, ...varint(toward));
+      }
+      body.push(...varint(value));
+      return frame(body);
+    }
     function readVarint(u8, i) {
       let n = 0, shift = 0;
       while (i < u8.length) {
@@ -118,7 +148,14 @@
           .join("");
         return { type: "Welcome", tick, hash: hash.slice(0, 16) + "…" };
       }
-      if (tag === 1) return { type: "Snapshot" };
+      if (tag === 1) {
+        try {
+          const [bytes] = readVec(p, i);
+          return { type: "Snapshot", checkpoint: bytes };
+        } catch (e) {
+          return { type: "Snapshot" };
+        }
+      }
       if (tag === 2) {
         const [tick, i2] = readVarint(p, i);
         i = i2;
@@ -206,6 +243,26 @@
         "<tr><th>agents_ns</th><td>" + esc(t.agents_ns != null ? t.agents_ns : "") + "</td></tr>" +
         "</tbody></table>";
       document.getElementById("metrics").innerHTML = mhtml;
+
+      const invs = ins.inventions || [];
+      let ihtml = "<table><thead><tr><th>id</th><th>inventor</th><th>kind</th><th>shared</th><th>tick</th></tr></thead><tbody>";
+      for (const inv of invs) {
+        ihtml += "<tr><td>" + esc(inv.id) + "</td><td>" + esc(inv.inventor) + "</td><td>" + esc(inv.kind) +
+          "</td><td>" + esc(inv.shared) + "</td><td>" + esc(inv.tick) + "</td></tr>";
+      }
+      if (!invs.length) ihtml += "<tr><td colspan=\"5\" class=\"muted\">none</td></tr>";
+      ihtml += "</tbody></table>";
+      document.getElementById("inventions").innerHTML = ihtml;
+    }
+    async function inspectCheckpoint(bytes) {
+      try {
+        const m = await import("./pkg/sim_wasm.js");
+        if (m && m.inspect_checkpoint) {
+          const json = m.inspect_checkpoint(bytes);
+          return typeof json === "string" ? JSON.parse(json) : json;
+        }
+      } catch (e) { /* wasm optional; Tick.metrics.inspector still works */ }
+      return null;
     }
     let ws = null;
     document.getElementById("connect").onclick = () => {
@@ -220,6 +277,8 @@
         ws.send(encodeRequestSnapshot());
         document.getElementById("play").disabled = false;
         document.getElementById("pause").disabled = false;
+        document.getElementById("give").disabled = false;
+        document.getElementById("set").disabled = false;
       };
       ws.onmessage = (ev) => {
         const u8 = new Uint8Array(ev.data);
@@ -230,6 +289,11 @@
           log(JSON.stringify({ type: msg.type, tag: msg.tag }));
         }
         if (msg.inspector) renderInspector(msg.inspector);
+        if (msg.type === "Snapshot" && msg.checkpoint) {
+          inspectCheckpoint(msg.checkpoint).then((ins) => {
+            if (ins) renderInspector(ins);
+          });
+        }
       };
       ws.onerror = () => log("error");
       ws.onclose = () => log("close");
@@ -239,6 +303,24 @@
     };
     document.getElementById("pause").onclick = () => {
       if (ws) ws.send(encodeControl(false));
+    };
+    document.getElementById("give").onclick = () => {
+      if (!ws) return;
+      const id = Number(document.getElementById("give-id").value);
+      const item = document.getElementById("give-item").value.trim();
+      const qty = Number(document.getElementById("give-qty").value) || 1;
+      if (!item) return;
+      ws.send(encodeGive(id, item, qty));
+    };
+    document.getElementById("set").onclick = () => {
+      if (!ws) return;
+      const id = Number(document.getElementById("set-id").value);
+      const field = document.getElementById("set-field").value.trim();
+      const towardRaw = document.getElementById("set-toward").value.trim();
+      const value = Number(document.getElementById("set-value").value);
+      if (!field) return;
+      const toward = towardRaw === "" ? null : Number(towardRaw);
+      ws.send(encodeSet(id, field, toward, value));
     };
   </script>
 </body>
