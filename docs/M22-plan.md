@@ -88,8 +88,9 @@ Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Vi
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
-| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| After M36 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
+| **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| After M37 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
 | Not M22 | Browser; combat; CI Win/mac; **wire `/set`** |
 
 ## Key decisions

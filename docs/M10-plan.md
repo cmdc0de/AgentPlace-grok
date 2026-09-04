@@ -111,8 +111,9 @@ cost = qty * unit_weight_milli * haul_milli / 1000
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
-| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| After M36 | Protobuf / JSON envelope; TLS/`wss` |
+| **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| After M37 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M10 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

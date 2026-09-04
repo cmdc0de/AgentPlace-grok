@@ -77,8 +77,9 @@ Do **not** implement embeddings, Unix sockets, protobuf/TLS, HP/incapacitation, 
 | **M33** | Done — [`M33-plan.md`](M33-plan.md) — household crates, culture inheritance, reflect importance |
 | **M34** | Done — [`M34-plan.md`](M34-plan.md) — sheet effects, close-kin PairBond |
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
-| **M36** | [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
-| After M36 | protobuf/TLS; Unix sockets; hashed pipeline events; **browser client** |
+| **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
+| **M37** | [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
+| After M37 | protobuf/TLS; Unix sockets; hashed pipeline events |
 | Not M27 | Browser; CI Win/mac; PROTOCOL bump |
 
 ## Key decisions

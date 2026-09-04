@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M35 are done. **Current next slice:** [`M36-plan.md`](M36-plan.md) (browser researcher UI, no 3D). Later work is listed at the bottom of that file.
+M3–M36 are done. **Current next slice:** [`M37-plan.md`](M37-plan.md) (extra invention kinds, browser /set /give). Later work is listed at the bottom of that file.
 
 ## PR Plan
 
