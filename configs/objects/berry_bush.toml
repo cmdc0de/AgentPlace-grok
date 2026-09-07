@@ -1,0 +1,9 @@
+id = "berry_bush"
+kind = "vegetation"
+
+[visual]
+glb = "assets/models/optimized/big_low_poly_berry_bush.glb"
+[visual.lod]
+near = "assets/models/optimized/big_low_poly_berry_bush.glb"
+mid  = "assets/models/optimized/big_low_poly_berry_bush.glb"
+far  = "assets/models/optimized/plants_ready.glb"

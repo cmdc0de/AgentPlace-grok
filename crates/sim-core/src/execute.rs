@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{knows_toxin, MemoryEntry, MemoryKind};
+use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
 use crate::observation::{crate_cell, neighbors4};
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -471,11 +471,7 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     child.culture = {
         let ca = sim.agents.get(&parent_a).map(|p| p.culture).unwrap_or(0);
         let cb = sim.agents.get(&parent_b).map(|p| p.culture).unwrap_or(0);
-        if ca != 0 {
-            ca
-        } else {
-            cb
-        }
+        if ca != 0 { ca } else { cb }
     };
     child.kinship.parents = vec![parent_a, parent_b];
     child.kinship.household = sim
@@ -1309,19 +1305,21 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     let Some(agent) = sim.agents.get(&id).cloned() else {
         return;
     };
-    let (need, out) = match recipe {
-        Recipe::Basket => (vec![(ItemId::Fiber, 2)], ItemId::Basket),
-        Recipe::Backpack => (vec![(ItemId::Fiber, 4)], ItemId::Backpack),
-        Recipe::Spear => (vec![(ItemId::Wood, 1), (ItemId::Stone, 1)], ItemId::Spear),
-        Recipe::FishingRod => (
-            vec![(ItemId::Wood, 1), (ItemId::Fiber, 1)],
-            ItemId::FishingRod,
-        ),
+    let Some((need, out, qty)) = crate::objects::recipe_spec(recipe, &sim.catalog) else {
+        push(
+            sim,
+            id,
+            SimEventKind::Craft {
+                recipe,
+                success: false,
+            },
+        );
+        return;
     };
     let has_all = need
         .iter()
         .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n);
-    let room = agent.inventory_cap.saturating_sub(agent.inventory_count()) >= 1
+    let room = agent.inventory_cap.saturating_sub(agent.inventory_count()) >= qty
         || agent.inventory.contains_key(&out);
     if !has_all || !room {
         push(
@@ -1363,7 +1361,7 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     for (item, n) in need {
         let _ = a.take_item(item, n);
     }
-    let success = a.try_add_item(out, 1) > 0;
+    let success = a.try_add_item(out, qty) > 0;
     push(sim, id, SimEventKind::Craft { recipe, success });
 }
 

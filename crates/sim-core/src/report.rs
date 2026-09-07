@@ -327,6 +327,7 @@ fn item_name(item: ItemId, species: &SpeciesTables) -> String {
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
         ItemId::Backpack => "backpack".into(),
+        ItemId::Catalog(n) => format!("catalog:{n}"),
     }
 }
 

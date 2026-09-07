@@ -4,9 +4,9 @@ mod overlay;
 mod server;
 
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, compare_csv,
-    compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint, ExperimentConfig, Simulation,
+    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
+    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -59,6 +59,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut culture = false;
     let mut llm_reflect_importance = false;
     let mut inventions = false;
+    let mut catalog = false;
+    let mut objects_path: Option<PathBuf> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -157,6 +159,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--household-crates" => household_crates = true,
             "--culture" => culture = true,
             "--inventions" => inventions = true,
+            "--catalog" => catalog = true,
+            "--objects" => {
+                i += 1;
+                objects_path = Some(PathBuf::from(
+                    args.get(i).ok_or("--objects requires a directory")?,
+                ));
+            }
             "--llm-reflect-importance" => llm_reflect_importance = true,
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
@@ -281,6 +290,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let inv = sim_core::InventionsParams::from_config_toml(&text);
         if inventions || inv.enabled {
             sim.enable_inventions(inv.share_delay_ticks);
+        }
+        let cat = sim_core::CatalogParams::from_config_toml(&text);
+        let dir = objects_path
+            .clone()
+            .or_else(sim_core::objects::default_objects_dir);
+        if let Some(dir) = dir {
+            let defs = sim_core::load_object_defs(&dir)?;
+            if catalog || cat.enabled {
+                sim.enable_catalog(sim_core::catalog_entries(&defs));
+            }
         }
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
@@ -465,6 +484,7 @@ Usage:
           [--conflict] [--conflict-death]
           [--sheet] [--reproduction] [--aging]
           [--household-crates] [--culture] [--inventions]
+          [--catalog] [--objects DIR]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -496,6 +516,8 @@ Options:
       --household-crates    Members Store/Retrieve at household home (Chebyshev ≤ 1)
       --culture             Assign founder culture ids; children copy a parent
       --inventions          Invent GatherBonus/MoveBonus/SenseBonus; inventor then society after share_delay_ticks
+      --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
+      --objects DIR         Object definition TOML directory (default: configs/objects if present)
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)

@@ -6,10 +6,10 @@ mod ui;
 
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
-use commands::{crate_fill_scale, pack_fill_scale, CkptScrubber};
+use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
-use sim_bevy::{step_once, SimPlugin, SimState};
+use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::combat_fx::CombatFxJob;
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev};
@@ -61,11 +61,38 @@ struct CombatFxVisual {
 const SATCHEL_OFFSET: Vec3 = Vec3::new(0.22, 0.16, -0.10);
 const BACKPACK_OFFSET: Vec3 = Vec3::new(-0.18, 0.22, -0.12);
 
+#[derive(Resource, Default, Clone)]
+struct ObjectVisuals {
+    defs: Vec<sim_core::ObjectDef>,
+}
+
+fn apply_viewer_objects(
+    sim: &mut Simulation,
+    objects: Option<&Path>,
+    catalog_flag: bool,
+    config_text: Option<&str>,
+) -> Vec<sim_core::ObjectDef> {
+    let cat = config_text
+        .map(sim_core::CatalogParams::from_config_toml)
+        .unwrap_or_default();
+    let dir = objects
+        .map(Path::to_path_buf)
+        .or_else(sim_core::objects::default_objects_dir);
+    let defs = dir
+        .as_ref()
+        .and_then(|d| sim_core::load_object_defs(d).ok())
+        .unwrap_or_default();
+    if catalog_flag || cat.enabled {
+        sim.enable_catalog(sim_core::catalog_entries(&defs));
+    }
+    defs
+}
+
 fn main() {
     let parsed = parse_args();
     let mut net_link = None;
     let mut scrub = CkptScrubber::default();
-    let plugin = match parsed {
+    let (plugin, object_defs) = match parsed.source {
         ViewerSource::Config(path) => {
             let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
                 panic!("failed to read {}: {e}", path.display());
@@ -114,24 +141,34 @@ fn main() {
             if inv.enabled {
                 sim.enable_inventions(inv.share_delay_ticks);
             }
-            SimPlugin::from_simulation(sim)
+            let defs = apply_viewer_objects(
+                &mut sim,
+                parsed.objects.as_deref(),
+                parsed.catalog,
+                Some(&text),
+            );
+            (SimPlugin::from_simulation(sim), defs)
         }
         ViewerSource::Checkpoint(path) => {
             let load_path = CkptScrubber::initial_path(&path).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
             });
-            let sim = Simulation::load_checkpoint(&load_path).unwrap_or_else(|e| {
+            let mut sim = Simulation::load_checkpoint(&load_path).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", load_path.display());
             });
+            let defs =
+                apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
             scrub = CkptScrubber::discover(&path);
-            SimPlugin::from_simulation(sim)
+            (SimPlugin::from_simulation(sim), defs)
         }
         ViewerSource::Connect { url, token } => {
-            let (sim, link) = net::connect(&url, token).unwrap_or_else(|e| {
+            let (mut sim, link) = net::connect(&url, token).unwrap_or_else(|e| {
                 panic!("failed to connect to {url}: {e}");
             });
+            let defs =
+                apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
             net_link = Some(link);
-            SimPlugin::from_remote(sim)
+            (SimPlugin::from_remote(sim), defs)
         }
     };
 
@@ -151,6 +188,7 @@ fn main() {
         ..Default::default()
     })
     .init_resource::<UiState>()
+    .insert_resource(ObjectVisuals { defs: object_defs })
     .insert_resource(scrub);
     if let Some(link) = net_link {
         app.insert_resource(link);
@@ -183,13 +221,21 @@ enum ViewerSource {
     Connect { url: String, token: Option<String> },
 }
 
-fn parse_args() -> ViewerSource {
+struct ViewerArgs {
+    source: ViewerSource,
+    objects: Option<PathBuf>,
+    catalog: bool,
+}
+
+fn parse_args() -> ViewerArgs {
     let args: Vec<String> = env::args().skip(1).collect();
     let mut i = 0;
     let mut config = None;
     let mut load = None;
     let mut connect = None;
     let mut token = None;
+    let mut objects = None;
+    let mut catalog = false;
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
@@ -220,16 +266,33 @@ fn parse_args() -> ViewerSource {
                     continue;
                 }
             }
+            "--objects" => {
+                if let Some(path) = args.get(i + 1) {
+                    objects = Some(PathBuf::from(path));
+                    i += 2;
+                    continue;
+                }
+            }
+            "--catalog" => {
+                catalog = true;
+                i += 1;
+                continue;
+            }
             _ => {}
         }
         i += 1;
     }
-    if let Some(url) = connect {
+    let source = if let Some(url) = connect {
         ViewerSource::Connect { url, token }
     } else if let Some(path) = load {
         ViewerSource::Checkpoint(path)
     } else {
         ViewerSource::Config(config.unwrap_or_else(default_config_path))
+    };
+    ViewerArgs {
+        source,
+        objects,
+        catalog,
     }
 }
 
@@ -253,6 +316,7 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Res<AssetServer>,
     state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
 ) {
     let world = &state.sim.world;
     let terrain = meshes.add(heightmap_mesh(world));
@@ -274,6 +338,7 @@ fn setup_scene(
                 spawn_marker(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -282,12 +347,14 @@ fn setup_scene(
                     resource_world_pos(world, x, y, 0.25),
                     x,
                     y,
+                    models::camera_dist_cells(world.width, world.height, x, y),
                 );
             }
             if world.crops.contains_key(&(x, y)) {
                 spawn_marker(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -296,12 +363,14 @@ fn setup_scene(
                     resource_world_pos(world, x, y, 0.22),
                     x,
                     y,
+                    models::camera_dist_cells(world.width, world.height, x, y),
                 );
             }
             if world.animal_count_at(x, y) > 0 {
                 spawn_marker(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -310,12 +379,14 @@ fn setup_scene(
                     resource_world_pos(world, x, y, 0.35),
                     x,
                     y,
+                    models::camera_dist_cells(world.width, world.height, x, y),
                 );
             }
             if world.fish_count_at(x, y) > 0 {
                 spawn_marker(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -324,12 +395,14 @@ fn setup_scene(
                     resource_world_pos(world, x, y, 0.15),
                     x,
                     y,
+                    models::camera_dist_cells(world.width, world.height, x, y),
                 );
             }
             if world.has_stockpile(x, y) {
                 spawn_stockpile(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -343,6 +416,7 @@ fn setup_scene(
                 spawn_marker(
                     &mut commands,
                     &assets,
+                    &visuals,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -351,6 +425,7 @@ fn setup_scene(
                     resource_world_pos(world, x, y, 0.18),
                     x,
                     y,
+                    models::camera_dist_cells(world.width, world.height, x, y),
                 );
             }
         }
@@ -364,7 +439,9 @@ fn setup_scene(
         if !try_spawn_model(
             &mut commands,
             &assets,
+            &visuals,
             "agent",
+            models::camera_dist_cells(world.width, world.height, agent.x, agent.y),
             tf,
             AgentVisual { id: agent.id },
         ) {
@@ -385,6 +462,7 @@ fn setup_scene(
             spawn_satchel(
                 &mut commands,
                 &assets,
+                &visuals,
                 &mut meshes,
                 &mut materials,
                 world,
@@ -399,6 +477,7 @@ fn setup_scene(
             spawn_satchel(
                 &mut commands,
                 &assets,
+                &visuals,
                 &mut meshes,
                 &mut materials,
                 world,
@@ -432,6 +511,7 @@ fn setup_scene(
 fn spawn_stockpile(
     commands: &mut Commands,
     assets: &AssetServer,
+    visuals: &ObjectVisuals,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
@@ -446,7 +526,9 @@ fn spawn_stockpile(
     if try_spawn_model(
         commands,
         assets,
+        visuals,
         "crate",
+        models::camera_dist_cells(world.width, world.height, x, y),
         tf,
         (WorldMarker { x, y }, StockpileVisual { x, y }),
     ) {
@@ -489,6 +571,7 @@ fn sync_stockpile_markers(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Res<AssetServer>,
     state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
     mut existing: Query<(Entity, &StockpileVisual, &mut Transform)>,
 ) {
     let live: std::collections::BTreeSet<(u32, u32)> = state
@@ -517,6 +600,7 @@ fn sync_stockpile_markers(
         spawn_stockpile(
             &mut commands,
             &assets,
+            &visuals,
             &mut meshes,
             &mut materials,
             &mut cache,
@@ -536,6 +620,7 @@ fn satchel_scale(agent: &sim_core::Agent, params: &sim_core::StorageParams) -> f
 fn spawn_satchel(
     commands: &mut Commands,
     assets: &AssetServer,
+    visuals: &ObjectVisuals,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     world: &sim_core::World,
@@ -571,7 +656,9 @@ fn spawn_satchel(
     if try_spawn_model(
         commands,
         assets,
+        visuals,
         stem,
+        models::camera_dist_cells(world.width, world.height, x, y),
         Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
         SatchelVisual { id, backpack },
     ) {
@@ -592,6 +679,7 @@ fn sync_satchel_markers(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Res<AssetServer>,
     state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
     existing: Query<(Entity, &SatchelVisual)>,
 ) {
     let params = state.sim.storage;
@@ -621,6 +709,7 @@ fn sync_satchel_markers(
         spawn_satchel(
             &mut commands,
             &assets,
+            &visuals,
             &mut meshes,
             &mut materials,
             &state.sim.world,
@@ -636,11 +725,13 @@ fn sync_satchel_markers(
 fn try_spawn_model(
     commands: &mut Commands,
     assets: &AssetServer,
+    visuals: &ObjectVisuals,
     stem: &str,
+    dist_cells: u32,
     transform: Transform,
     extra: impl Bundle,
 ) -> bool {
-    let Some(path) = models::resolve_model(stem) else {
+    let Some(path) = models::resolve_visual(&visuals.defs, stem, dist_cells) else {
         return false;
     };
     commands.spawn((
@@ -655,6 +746,7 @@ fn try_spawn_model(
 fn spawn_marker(
     commands: &mut Commands,
     assets: &AssetServer,
+    visuals: &ObjectVisuals,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
@@ -663,11 +755,14 @@ fn spawn_marker(
     pos: Vec3,
     x: u32,
     y: u32,
+    dist_cells: u32,
 ) {
     if try_spawn_model(
         commands,
         assets,
+        visuals,
         stem,
+        dist_cells,
         Transform::from_translation(pos),
         WorldMarker { x, y },
     ) {

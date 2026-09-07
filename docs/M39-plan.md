@@ -1,8 +1,8 @@
 # M39 — Object definition files (visual + LOD + hashed catalog)
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M38 complete (`docs/M38-plan.md`, git tag `M38`, commit `76f4917`)  
-**Walkthrough:** written on implement (`docs/M39-test-plan.md`)  
+**Walkthrough:** [`docs/M39-test-plan.md`](M39-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-8, PG-6 LOD)
 
 ## Context
@@ -113,7 +113,7 @@ cargo run -p sim-cli -- --config configs/default.toml --catalog --objects config
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M39-test-plan.md`).
+Walkthrough: [`docs/M39-test-plan.md`](M39-test-plan.md).
 
 ```bash
 cargo test -p sim-core

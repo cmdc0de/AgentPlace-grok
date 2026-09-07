@@ -20,6 +20,7 @@ pub mod kinship;
 pub mod llm;
 pub mod markers;
 pub mod memory;
+pub mod objects;
 pub mod observation;
 pub mod policy;
 pub mod report;
@@ -62,6 +63,10 @@ pub use llm::{
     ActionChooser, ChooseError, Chooser, LLM_SKIP_SENTINEL, LLM_WAIT_SENTINEL, LlmBarrierParams,
     ReplayTable, extract_json_payload, is_llm_wait_response, is_skip_response, parse_choice_json,
     parse_item,
+};
+pub use objects::{
+    CatalogEntry, CatalogParams, ObjectDef, VisualDef, catalog_entries, load_object_defs,
+    pick_visual_path, visual_for_id,
 };
 pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};

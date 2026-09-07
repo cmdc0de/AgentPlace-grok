@@ -459,6 +459,8 @@ impl Simulation {
             invention_share_delay: 8,
             inventions: blob_inventions,
             next_invention_id: blob_next_inv,
+            catalog_enabled: false,
+            catalog: Vec::new(),
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;

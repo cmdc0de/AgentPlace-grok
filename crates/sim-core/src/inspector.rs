@@ -250,6 +250,7 @@ fn item_key(item: ItemId) -> String {
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
         ItemId::Backpack => "backpack".into(),
+        ItemId::Catalog(n) => format!("catalog:{n}"),
     }
 }
 

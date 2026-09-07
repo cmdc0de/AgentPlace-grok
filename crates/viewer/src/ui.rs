@@ -880,5 +880,6 @@ fn item_label(item: ItemId, species: &sim_core::species::SpeciesTables) -> Strin
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
         ItemId::Backpack => "backpack".into(),
+        ItemId::Catalog(n) => format!("catalog:{n}"),
     }
 }

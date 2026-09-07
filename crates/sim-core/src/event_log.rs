@@ -184,8 +184,11 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
         }
         SimEventKind::Craft { recipe, success } => {
             hasher.update([9u8]);
-            hasher.update([*recipe as u8]);
+            hasher.update([recipe_disc(*recipe)]);
             hasher.update([u8::from(*success)]);
+            if let Recipe::Catalog(n) = recipe {
+                hasher.update(n.to_le_bytes());
+            }
         }
         SimEventKind::Speak {
             shout,
@@ -295,7 +298,7 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
     }
 }
 
-fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
+pub(crate) fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
     match item {
         ItemId::Food(tag) => {
             hasher.update([0u8, tag]);
@@ -307,6 +310,20 @@ fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
         ItemId::Spear => hasher.update([5u8]),
         ItemId::FishingRod => hasher.update([6u8]),
         ItemId::Backpack => hasher.update([7u8]),
+        ItemId::Catalog(n) => {
+            hasher.update([8u8]);
+            hasher.update(n.to_le_bytes());
+        }
+    }
+}
+
+fn recipe_disc(recipe: Recipe) -> u8 {
+    match recipe {
+        Recipe::Basket => 0,
+        Recipe::Spear => 1,
+        Recipe::FishingRod => 2,
+        Recipe::Backpack => 3,
+        Recipe::Catalog(_) => 4,
     }
 }
 

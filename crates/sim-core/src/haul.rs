@@ -121,6 +121,7 @@ pub fn item_weight_milli(item: ItemId) -> u32 {
         ItemId::Wood => 150,
         ItemId::Stone => 300,
         ItemId::Basket | ItemId::Spear | ItemId::FishingRod | ItemId::Backpack => 200,
+        ItemId::Catalog(_) => 400,
     }
 }
 

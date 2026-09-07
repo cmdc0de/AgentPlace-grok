@@ -107,11 +107,7 @@ pub fn parse_plan_json(raw: &str, max_len: usize) -> Option<Vec<String>> {
         })
         .take(max_len)
         .collect();
-    if steps.is_empty() {
-        None
-    } else {
-        Some(steps)
-    }
+    if steps.is_empty() { None } else { Some(steps) }
 }
 
 /// Pull a JSON object out of fences, `<think>` wrappers, or leading prose.
@@ -450,11 +446,17 @@ pub fn parse_choice_json(
                 .as_deref()
                 .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
                 .unwrap_or("spear");
-            let recipe = match recipe {
-                "basket" => Recipe::Basket,
-                "backpack" => Recipe::Backpack,
-                "fishing_rod" | "rod" => Recipe::FishingRod,
-                _ => Recipe::Spear,
+            let recipe = if let Some(rest) = recipe.strip_prefix("catalog:") {
+                rest.parse::<u16>()
+                    .map(Recipe::Catalog)
+                    .unwrap_or(Recipe::Spear)
+            } else {
+                match recipe {
+                    "basket" => Recipe::Basket,
+                    "backpack" => Recipe::Backpack,
+                    "fishing_rod" | "rod" => Recipe::FishingRod,
+                    _ => Recipe::Spear,
+                }
             };
             PrimaryAction::Craft { recipe }
         }
@@ -551,7 +553,9 @@ pub fn parse_choice_json(
                 .and_then(|v| v.as_u64())
                 .or(parsed.proposal_id)
                 .unwrap_or(0);
-            PrimaryAction::Attack { target: AgentId(to) }
+            PrimaryAction::Attack {
+                target: AgentId(to),
+            }
         }
         "flee" => PrimaryAction::Flee,
         "pair_bond" | "pairbond" => {
@@ -561,7 +565,9 @@ pub fn parse_choice_json(
                 .and_then(|v| v.as_u64())
                 .or(parsed.proposal_id)
                 .unwrap_or(0);
-            PrimaryAction::PairBond { target: AgentId(to) }
+            PrimaryAction::PairBond {
+                target: AgentId(to),
+            }
         }
         "reproduce" => {
             let to = parsed
@@ -702,6 +708,10 @@ pub fn parse_item(s: &str, species: &SpeciesTables) -> Option<ItemId> {
     if let Some(rest) = s.strip_prefix("food:") {
         let tag: u8 = rest.parse().ok()?;
         return Some(ItemId::Food(tag));
+    }
+    if let Some(rest) = s.strip_prefix("catalog:") {
+        let n: u16 = rest.parse().ok()?;
+        return Some(ItemId::Catalog(n));
     }
     match s {
         "wood" => Some(ItemId::Wood),

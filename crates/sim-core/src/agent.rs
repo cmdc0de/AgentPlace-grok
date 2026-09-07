@@ -15,6 +15,7 @@ pub enum ItemId {
     Spear,
     FishingRod,
     Backpack,
+    Catalog(u16),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -473,11 +474,11 @@ impl Agent {
         hasher.update(self.illness_ticks.to_le_bytes());
         hasher.update(self.inventory_cap.to_le_bytes());
         for (item, qty) in &self.inventory {
-            hasher.update(item_tag(*item));
+            hash_item_id(hasher, *item);
             hasher.update(qty.to_le_bytes());
         }
         for (item, qty) in &self.pack {
-            hasher.update(item_tag(*item));
+            hash_item_id(hasher, *item);
             hasher.update(qty.to_le_bytes());
         }
         hasher.update(self.consumption.vegetation.to_le_bytes());
@@ -519,6 +520,13 @@ impl Agent {
     }
 }
 
+fn hash_item_id(hasher: &mut impl sha2::Digest, item: ItemId) {
+    hasher.update(item_tag(item));
+    if let ItemId::Catalog(n) = item {
+        hasher.update(n.to_le_bytes());
+    }
+}
+
 fn item_tag(item: ItemId) -> [u8; 2] {
     match item {
         ItemId::Food(s) => [1, s],
@@ -529,6 +537,7 @@ fn item_tag(item: ItemId) -> [u8; 2] {
         ItemId::Spear => [6, 0],
         ItemId::FishingRod => [7, 0],
         ItemId::Backpack => [8, 0],
+        ItemId::Catalog(_) => [9, 0],
     }
 }
 

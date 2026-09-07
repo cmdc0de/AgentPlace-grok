@@ -605,25 +605,33 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
     }
-    if can_craft(agent, Recipe::Basket) {
+    if can_craft(agent, Recipe::Basket, &sim.catalog) {
         legal.push(PrimaryAction::Craft {
             recipe: Recipe::Basket,
         });
     }
-    if can_craft(agent, Recipe::Spear) {
+    if can_craft(agent, Recipe::Spear, &sim.catalog) {
         legal.push(PrimaryAction::Craft {
             recipe: Recipe::Spear,
         });
     }
-    if can_craft(agent, Recipe::FishingRod) {
+    if can_craft(agent, Recipe::FishingRod, &sim.catalog) {
         legal.push(PrimaryAction::Craft {
             recipe: Recipe::FishingRod,
         });
     }
-    if can_craft(agent, Recipe::Backpack) {
+    if can_craft(agent, Recipe::Backpack, &sim.catalog) {
         legal.push(PrimaryAction::Craft {
             recipe: Recipe::Backpack,
         });
+    }
+    if sim.catalog_enabled {
+        for i in 0..sim.catalog.len() {
+            let recipe = Recipe::Catalog(i as u16);
+            if can_craft(agent, recipe, &sim.catalog) {
+                legal.push(PrimaryAction::Craft { recipe });
+            }
+        }
     }
     if sim.board.author_open_count(agent.id)
         < sim.config.proposals.max_open_proposals_per_agent as usize
@@ -886,19 +894,12 @@ pub(crate) fn can_drop_worn_carrier(
             .crate_can_take(cx, cy, crate_reserved, &leftover, &sim.storage)
 }
 
-pub fn can_craft(agent: &Agent, recipe: Recipe) -> bool {
-    match recipe {
-        Recipe::Basket => agent.inventory.get(&ItemId::Fiber).copied().unwrap_or(0) >= 2,
-        Recipe::Spear => {
-            agent.inventory.get(&ItemId::Wood).copied().unwrap_or(0) >= 1
-                && agent.inventory.get(&ItemId::Stone).copied().unwrap_or(0) >= 1
-        }
-        Recipe::FishingRod => {
-            agent.inventory.get(&ItemId::Wood).copied().unwrap_or(0) >= 1
-                && agent.inventory.get(&ItemId::Fiber).copied().unwrap_or(0) >= 1
-        }
-        Recipe::Backpack => agent.inventory.get(&ItemId::Fiber).copied().unwrap_or(0) >= 4,
-    }
+pub fn can_craft(agent: &Agent, recipe: Recipe, catalog: &[crate::objects::CatalogEntry]) -> bool {
+    let Some((need, _, _)) = crate::objects::recipe_spec(recipe, catalog) else {
+        return false;
+    };
+    need.iter()
+        .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n)
 }
 
 pub fn encode_for_hash(obs: &Observation) -> Vec<u8> {
@@ -954,6 +955,7 @@ pub fn item_display_name(item: ItemId, species: &SpeciesTables) -> String {
         ItemId::Spear => "spear".into(),
         ItemId::FishingRod => "fishing_rod".into(),
         ItemId::Backpack => "backpack".into(),
+        ItemId::Catalog(n) => format!("catalog:{n}"),
     }
 }
 
@@ -976,10 +978,11 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         PrimaryAction::Eat { item } => format!("Eat {}", item_display_name(*item, species)),
         PrimaryAction::Craft { recipe } => {
             let name = match recipe {
-                Recipe::Basket => "basket",
-                Recipe::Spear => "spear",
-                Recipe::FishingRod => "fishing_rod",
-                Recipe::Backpack => "backpack",
+                Recipe::Basket => "basket".into(),
+                Recipe::Spear => "spear".into(),
+                Recipe::FishingRod => "fishing_rod".into(),
+                Recipe::Backpack => "backpack".into(),
+                Recipe::Catalog(n) => format!("catalog:{n}"),
             };
             format!("Craft {name}")
         }

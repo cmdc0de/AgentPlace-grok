@@ -1,0 +1,8 @@
+id = "cord"
+kind = "item"
+
+[sim]
+weight_milli = 400
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
