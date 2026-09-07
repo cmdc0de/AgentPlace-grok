@@ -58,8 +58,9 @@ Existing `ControlVerb::Give` / `ControlVerb::Set`. **No PROTOCOL bump.** Postcar
 
 | Later | What |
 |---|---|
-| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
-| After M38 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents; time-series charts |
+| **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| **M39** | [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
+| After M39 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents; time-series charts |
 | Not M37 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

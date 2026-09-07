@@ -54,7 +54,8 @@ Existing wire. **No PROTOCOL bump.**
 
 | Later | What |
 |---|---|
-| After M38 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents; time-series charts; `/ckpt` `/events` in the page; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac |
+| **M39** | [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
+| After M39 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents; time-series charts; `/ckpt` `/events` in the page; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac |
 | Not M38 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

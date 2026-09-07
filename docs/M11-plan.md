@@ -93,8 +93,9 @@ Eat-all in the 50–75% band is **off** when a storage goal is active.
 | **M35** | Done — [`M35-plan.md`](M35-plan.md) — inventions, browser attach |
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
-| **M38** | [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
-| After M38 | Protobuf/TLS |
+| **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
+| **M39** | [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
+| After M39 | Protobuf/TLS |
 | Not M11 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
