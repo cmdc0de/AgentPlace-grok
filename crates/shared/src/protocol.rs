@@ -210,6 +210,21 @@ mod tests {
     }
 
     #[test]
+    fn inject_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::InjectIncentive {
+            schedule_toml: "x".into(),
+        })
+        .unwrap();
+        assert_eq!(&frame[4..], &[4, 1, b'x']);
+    }
+
+    #[test]
+    fn scrub_postcard_bytes() {
+        let frame = encode_frame(&ClientMessage::Control(ControlVerb::Scrub(3))).unwrap();
+        assert_eq!(&frame[4..], &[3, 6, 3]);
+    }
+
+    #[test]
     fn give_postcard_bytes() {
         let frame = encode_frame(&ClientMessage::Control(ControlVerb::Give {
             id: 0,

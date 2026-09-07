@@ -1442,6 +1442,8 @@ fn browser_page_ships_protocol_5() {
     assert!(text.contains("id=\"inventions\""), "inventions section");
     assert!(text.contains("encodeGive"), "{text}");
     assert!(text.contains("encodeSet"), "{text}");
+    assert!(text.contains("encodeInject"), "{text}");
+    assert!(text.contains("encodeScrub"), "{text}");
     assert!(text.contains("sim_wasm"), "{text}");
 }
 

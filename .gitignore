@@ -19,3 +19,7 @@ target
 
 # Local experiment output and viewer layout
 checkpoints/
+
+# Local authored glTF/glb (drop files here; CI uses primitives if missing)
+assets/models/**
+!assets/models/README.md

@@ -33,6 +33,13 @@
     <input id="set-value" size="6" placeholder="0–100" />
     <button id="set" disabled>Set</button>
   </div>
+  <div>
+    <label>/scrub <input id="scrub-tick" size="8" placeholder="tick" /></label>
+    <button id="scrub" disabled>Scrub</button>
+    <label>/inject</label>
+    <textarea id="inject-toml" rows="4" cols="48" placeholder="[[incentives]]"></textarea>
+    <button id="inject" disabled>Inject</button>
+  </div>
   <div id="log"></div>
   <h2>Agents</h2>
   <p id="agents-empty" class="muted">Waiting for Tick (hit Play if the server started paused).</p>
@@ -111,6 +118,12 @@
       }
       body.push(...varint(value));
       return frame(body);
+    }
+    function encodeScrub(tick) {
+      return frame([3, 6, ...varint(tick)]);
+    }
+    function encodeInject(toml) {
+      return frame([4, ...encodeStr(toml)]);
     }
     function readVarint(u8, i) {
       let n = 0, shift = 0;
@@ -279,6 +292,8 @@
         document.getElementById("pause").disabled = false;
         document.getElementById("give").disabled = false;
         document.getElementById("set").disabled = false;
+        document.getElementById("scrub").disabled = false;
+        document.getElementById("inject").disabled = false;
       };
       ws.onmessage = (ev) => {
         const u8 = new Uint8Array(ev.data);
@@ -321,6 +336,18 @@
       if (!field) return;
       const toward = towardRaw === "" ? null : Number(towardRaw);
       ws.send(encodeSet(id, field, toward, value));
+    };
+    document.getElementById("scrub").onclick = () => {
+      if (!ws) return;
+      const tick = Number(document.getElementById("scrub-tick").value);
+      if (!Number.isFinite(tick)) return;
+      ws.send(encodeScrub(tick));
+    };
+    document.getElementById("inject").onclick = () => {
+      if (!ws) return;
+      const toml = document.getElementById("inject-toml").value;
+      if (!toml.trim()) return;
+      ws.send(encodeInject(toml));
     };
   </script>
 </body>

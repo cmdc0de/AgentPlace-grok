@@ -15,4 +15,6 @@ fn github_actions_workflow_exists() {
     assert!(text.contains("cargo test -p viewer"), "{text}");
     assert!(text.contains("cargo test -p sim-cli --test net"), "{text}");
     assert!(text.contains("cargo test -p shared"), "{text}");
+    assert!(text.contains("wasm32-unknown-unknown"), "{text}");
+    assert!(text.contains("sim-wasm"), "{text}");
 }

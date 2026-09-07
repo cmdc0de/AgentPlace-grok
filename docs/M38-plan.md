@@ -1,8 +1,8 @@
 # M38 — Viewer 3D models, browser /inject /scrub + wasm32 CI
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M37 complete (`docs/M37-plan.md`, git tag `M37`, commit `d565d66`)  
-**Walkthrough:** written on implement (`docs/M38-test-plan.md`)  
+**Walkthrough:** [`docs/M38-test-plan.md`](M38-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-6, PG-7 later), `docs/M8-plan.md` (`InjectIncentive`), `docs/M21-plan.md` (`Scrub`), `docs/M37-plan.md` (optional wasm)
 
 ## Context
@@ -104,7 +104,7 @@ cargo run -p viewer -- --config configs/default.toml
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M38-test-plan.md`).
+Walkthrough: [`docs/M38-test-plan.md`](M38-test-plan.md).
 
 ```bash
 cargo test -p sim-core

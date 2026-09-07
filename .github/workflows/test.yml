@@ -30,3 +30,10 @@ jobs:
           cargo test -p shared
           cargo test -p sim-cli --test net
           cargo test -p viewer
+          cargo test -p sim-wasm
+      - name: Wasm32 sim-wasm (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build -p sim-wasm --target wasm32-unknown-unknown

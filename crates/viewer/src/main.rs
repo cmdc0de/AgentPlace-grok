@@ -1,8 +1,10 @@
 mod commands;
+mod models;
 mod net;
 mod render;
 mod ui;
 
+use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use commands::{crate_fill_scale, pack_fill_scale, CkptScrubber};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
@@ -249,6 +251,7 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
     state: Res<SimState>,
 ) {
     let world = &state.sim.world;
@@ -270,10 +273,12 @@ fn setup_scene(
                 let spec = markers::marker_for_veg(world.vegetation_species(x, y));
                 spawn_marker(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
                     spec,
+                    spec.name,
                     resource_world_pos(world, x, y, 0.25),
                     x,
                     y,
@@ -282,10 +287,12 @@ fn setup_scene(
             if world.crops.contains_key(&(x, y)) {
                 spawn_marker(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
                     markers::marker_crop(),
+                    "crop",
                     resource_world_pos(world, x, y, 0.22),
                     x,
                     y,
@@ -294,10 +301,12 @@ fn setup_scene(
             if world.animal_count_at(x, y) > 0 {
                 spawn_marker(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
                     markers::marker_hare(),
+                    "hare",
                     resource_world_pos(world, x, y, 0.35),
                     x,
                     y,
@@ -306,10 +315,12 @@ fn setup_scene(
             if world.fish_count_at(x, y) > 0 {
                 spawn_marker(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
                     markers::marker_perch(),
+                    "perch",
                     resource_world_pos(world, x, y, 0.15),
                     x,
                     y,
@@ -318,6 +329,7 @@ fn setup_scene(
             if world.has_stockpile(x, y) {
                 spawn_stockpile(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
@@ -330,10 +342,12 @@ fn setup_scene(
             if world.has_mineral(x, y) {
                 spawn_marker(
                     &mut commands,
+                    &assets,
                     &mut meshes,
                     &mut materials,
                     &mut mesh_cache,
                     markers::marker_mineral(),
+                    "stone",
                     resource_world_pos(world, x, y, 0.18),
                     x,
                     y,
@@ -346,21 +360,31 @@ fn setup_scene(
     for agent in state.sim.agents.values() {
         let hue = (agent.id.0 as f32 * 47.0) % 360.0;
         let color = Color::hsl(hue, 0.7, 0.55);
-        commands.spawn((
-            Mesh3d(capsule.clone()),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color,
-                perceptual_roughness: 0.5,
-                ..default()
-            })),
-            Transform::from_translation(agent_world_pos(world, agent.x, agent.y)),
+        let tf = Transform::from_translation(agent_world_pos(world, agent.x, agent.y));
+        if !try_spawn_model(
+            &mut commands,
+            &assets,
+            "agent",
+            tf,
             AgentVisual { id: agent.id },
-            Visibility::default(),
-        ));
+        ) {
+            commands.spawn((
+                Mesh3d(capsule.clone()),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: color,
+                    perceptual_roughness: 0.5,
+                    ..default()
+                })),
+                tf,
+                AgentVisual { id: agent.id },
+                Visibility::default(),
+            ));
+        }
         let params = state.sim.storage;
         if agent.worn_baskets(&params) > 0 {
             spawn_satchel(
                 &mut commands,
+                &assets,
                 &mut meshes,
                 &mut materials,
                 world,
@@ -374,6 +398,7 @@ fn setup_scene(
         if agent.worn_backpacks(&params) > 0 {
             spawn_satchel(
                 &mut commands,
+                &assets,
                 &mut meshes,
                 &mut materials,
                 world,
@@ -406,6 +431,7 @@ fn setup_scene(
 
 fn spawn_stockpile(
     commands: &mut Commands,
+    assets: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
@@ -416,6 +442,16 @@ fn spawn_stockpile(
 ) {
     let spec = markers::marker_stockpile();
     let pos = resource_world_pos(world, x, y, 0.28);
+    let tf = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+    if try_spawn_model(
+        commands,
+        assets,
+        "crate",
+        tf,
+        (WorldMarker { x, y }, StockpileVisual { x, y }),
+    ) {
+        return;
+    }
     let color = {
         let [r, g, b] = markers::rgb_f32(spec.rgb);
         Color::srgb(r, g, b)
@@ -451,6 +487,7 @@ fn sync_stockpile_markers(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
     state: Res<SimState>,
     mut existing: Query<(Entity, &StockpileVisual, &mut Transform)>,
 ) {
@@ -479,6 +516,7 @@ fn sync_stockpile_markers(
         }
         spawn_stockpile(
             &mut commands,
+            &assets,
             &mut meshes,
             &mut materials,
             &mut cache,
@@ -497,6 +535,7 @@ fn satchel_scale(agent: &sim_core::Agent, params: &sim_core::StorageParams) -> f
 
 fn spawn_satchel(
     commands: &mut Commands,
+    assets: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     world: &sim_core::World,
@@ -528,6 +567,16 @@ fn spawn_satchel(
     } else {
         Cuboid::new(0.16, 0.18, 0.12)
     };
+    let stem = if backpack { "backpack" } else { "basket" };
+    if try_spawn_model(
+        commands,
+        assets,
+        stem,
+        Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
+        SatchelVisual { id, backpack },
+    ) {
+        return;
+    }
     commands.spawn((
         Mesh3d(meshes.add(size)),
         MeshMaterial3d(mat),
@@ -541,6 +590,7 @@ fn sync_satchel_markers(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
     state: Res<SimState>,
     existing: Query<(Entity, &SatchelVisual)>,
 ) {
@@ -570,6 +620,7 @@ fn sync_satchel_markers(
         };
         spawn_satchel(
             &mut commands,
+            &assets,
             &mut meshes,
             &mut materials,
             &state.sim.world,
@@ -582,16 +633,46 @@ fn sync_satchel_markers(
     }
 }
 
+fn try_spawn_model(
+    commands: &mut Commands,
+    assets: &AssetServer,
+    stem: &str,
+    transform: Transform,
+    extra: impl Bundle,
+) -> bool {
+    let Some(path) = models::resolve_model(stem) else {
+        return false;
+    };
+    commands.spawn((
+        WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(path))),
+        transform,
+        extra,
+        Visibility::default(),
+    ));
+    true
+}
+
 fn spawn_marker(
     commands: &mut Commands,
+    assets: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     cache: &mut std::collections::HashMap<u8, Handle<Mesh>>,
     spec: MarkerSpec,
+    stem: &str,
     pos: Vec3,
     x: u32,
     y: u32,
 ) {
+    if try_spawn_model(
+        commands,
+        assets,
+        stem,
+        Transform::from_translation(pos),
+        WorldMarker { x, y },
+    ) {
+        return;
+    }
     let color = {
         let [r, g, b] = markers::rgb_f32(spec.rgb);
         Color::srgb(r, g, b)
