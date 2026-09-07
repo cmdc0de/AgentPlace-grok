@@ -1,0 +1,9 @@
+id = "mushroom"
+kind = "vegetation"
+
+[visual]
+glb = "assets/models/optimized/bunch_of_mushrooms.glb"
+[visual.lod]
+near = "assets/models/optimized/bunch_of_mushrooms.glb"
+mid  = "assets/models/optimized/lowpoly_mushrooms.glb"
+far  = "assets/models/optimized/lowpoly_mushrooms.glb"

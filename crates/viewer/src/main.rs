@@ -4,12 +4,13 @@ mod net;
 mod render;
 mod ui;
 
+use bevy::asset::AssetPlugin;
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
-use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
+use commands::{crate_fill_scale, pack_fill_scale, CkptScrubber};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
-use sim_bevy::{SimPlugin, SimState, step_once};
+use sim_bevy::{step_once, SimPlugin, SimState};
 use sim_core::combat_fx::CombatFxJob;
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev};
@@ -69,12 +70,9 @@ struct ObjectVisuals {
 fn apply_viewer_objects(
     sim: &mut Simulation,
     objects: Option<&Path>,
-    catalog_flag: bool,
-    config_text: Option<&str>,
+    _catalog_flag: bool,
+    _config_text: Option<&str>,
 ) -> Vec<sim_core::ObjectDef> {
-    let cat = config_text
-        .map(sim_core::CatalogParams::from_config_toml)
-        .unwrap_or_default();
     let dir = objects
         .map(Path::to_path_buf)
         .or_else(sim_core::objects::default_objects_dir);
@@ -82,9 +80,7 @@ fn apply_viewer_objects(
         .as_ref()
         .and_then(|d| sim_core::load_object_defs(d).ok())
         .unwrap_or_default();
-    if catalog_flag || cat.enabled {
-        sim.enable_catalog(sim_core::catalog_entries(&defs));
-    }
+    sim.enable_catalog(sim_core::catalog_entries(&defs));
     defs
 }
 
@@ -175,13 +171,21 @@ fn main() {
     let _ = std::fs::create_dir_all(ui::ui_layout_dir());
 
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "AgentTown viewer".into(),
-            ..default()
-        }),
-        ..default()
-    }))
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "AgentTown viewer".into(),
+                    ..default()
+                }),
+                ..default()
+            })
+            .set(AssetPlugin {
+                // Object TOML points at repo `assets/models/…` (outside crates/viewer/assets).
+                unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
+                ..default()
+            }),
+    )
     .add_plugins(plugin)
     .add_plugins(bevy_mod_imgui::ImguiPlugin {
         ini_filename: Some(ui::imgui_ini_path()),
@@ -734,8 +738,12 @@ fn try_spawn_model(
     let Some(path) = models::resolve_visual(&visuals.defs, stem, dist_cells) else {
         return false;
     };
+    let handle = assets
+        .load_builder()
+        .override_unapproved()
+        .load(GltfAssetLabel::Scene(0).from_asset(path));
     commands.spawn((
-        WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset(path))),
+        WorldAssetRoot(handle),
         transform,
         extra,
         Visibility::default(),

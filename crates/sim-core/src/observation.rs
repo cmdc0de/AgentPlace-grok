@@ -625,9 +625,9 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             recipe: Recipe::Backpack,
         });
     }
-    if sim.catalog_enabled {
-        for i in 0..sim.catalog.len() {
-            let recipe = Recipe::Catalog(i as u16);
+    for entry in &sim.catalog {
+        if let Some(Recipe::Catalog(n)) = entry.recipe {
+            let recipe = Recipe::Catalog(n);
             if can_craft(agent, recipe, &sim.catalog) {
                 legal.push(PrimaryAction::Craft { recipe });
             }

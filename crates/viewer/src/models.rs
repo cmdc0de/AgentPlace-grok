@@ -1,27 +1,9 @@
 //! Hash-neutral authored glTF/glb paths. Missing file ⇒ primitive mesh.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-/// Locked stems from `docs/M38-plan.md`.
-pub const STEMS: &[&str] = &[
-    "agent",
-    "berry_bush",
-    "herb",
-    "mushroom",
-    "nightshade",
-    "tree",
-    "hare",
-    "perch",
-    "crop",
-    "wood",
-    "fiber",
-    "stone",
-    "basket",
-    "spear",
-    "fishing_rod",
-    "backpack",
-    "crate",
-];
+/// Stem fallback is **only** `agent` (M40). Other ids come from object TOML.
+pub const STEMS: &[&str] = &["agent"];
 
 pub fn model_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
@@ -52,14 +34,35 @@ pub fn resolve_model(stem: &str) -> Option<PathBuf> {
     None
 }
 
-/// Definition `id` visual/LOD if the file exists, else M38 stem.
-pub fn resolve_visual(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u32) -> Option<PathBuf> {
-    if let Some(visual) = sim_core::visual_for_id(defs, id) {
-        if let Some(p) = sim_core::pick_visual_path(visual, dist_cells) {
-            return Some(p);
+/// Resolve a TOML path against cwd and the workspace root; return a canonical file.
+pub fn existing_file(path: &Path) -> Option<PathBuf> {
+    let mut candidates = vec![path.to_path_buf()];
+    if path.is_relative() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        candidates.push(manifest.join("../..").join(path));
+        candidates.push(manifest.join(path));
+    }
+    for c in candidates {
+        if c.is_file() {
+            return c.canonicalize().ok().or(Some(c));
         }
     }
-    resolve_model(id)
+    None
+}
+
+/// Definition `id` visual/LOD if the file exists, else agent stem, else primitive.
+pub fn resolve_visual(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u32) -> Option<PathBuf> {
+    if let Some(visual) = sim_core::visual_for_id(defs, id) {
+        for raw in sim_core::objects::visual_path_candidates(visual, dist_cells) {
+            if let Some(p) = existing_file(Path::new(raw)) {
+                return Some(p);
+            }
+        }
+    }
+    if id == "agent" {
+        return resolve_model(id).and_then(|p| existing_file(&p).or(Some(p)));
+    }
+    None
 }
 
 /// Chebyshev cell distance from the default setup camera xz to `(x, y)`.
@@ -81,21 +84,10 @@ mod tests {
 
     #[test]
     fn path_map_covers_locked_stems() {
-        assert!(STEMS.contains(&"agent"));
-        assert!(STEMS.contains(&"berry_bush"));
-        assert!(STEMS.contains(&"herb"));
-        assert!(STEMS.contains(&"hare"));
-        assert!(STEMS.contains(&"perch"));
-        assert!(STEMS.contains(&"crop"));
-        assert!(STEMS.contains(&"wood"));
-        assert!(STEMS.contains(&"fiber"));
-        assert!(STEMS.contains(&"stone"));
-        assert!(STEMS.contains(&"basket"));
-        assert!(STEMS.contains(&"spear"));
-        assert!(STEMS.contains(&"fishing_rod"));
-        assert!(STEMS.contains(&"backpack"));
-        assert!(STEMS.contains(&"crate"));
-        assert_eq!(STEMS.len(), 17);
+        assert_eq!(STEMS, &["agent"]);
+        assert!(resolve_visual(&[], "berry_bush", 0).is_none());
+        assert!(resolve_visual(&[], "basket", 0).is_none());
+        assert!(resolve_model("berry_bush").is_none());
     }
 
     #[test]
@@ -190,7 +182,48 @@ count = 2
             resolve_visual(&[], "not_a_kind", 0).is_none(),
             "unknown id without toml ⇒ primitive"
         );
-        let _ = resolve_visual(&[], "berry_bush", 0);
+        assert!(
+            resolve_visual(&[], "berry_bush", 0).is_none(),
+            "no stem fallback except agent"
+        );
+    }
+
+    #[test]
+    fn visual_optimized_path_when_present() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let basket = root.join("assets/models/optimized/basket.glb");
+        let bush = root.join("assets/models/optimized/big_low_poly_berry_bush.glb");
+        if !basket.is_file() || !bush.is_file() {
+            return;
+        }
+        let basket = basket.canonicalize().unwrap_or(basket);
+        let bush = bush.canonicalize().unwrap_or(bush);
+        let basket_def = sim_core::ObjectDef {
+            id: "basket".into(),
+            kind: "item".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some(basket.to_string_lossy().into_owned()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        let bush_def = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some(bush.to_string_lossy().into_owned()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual(&[basket_def], "basket", 0).as_deref(),
+            Some(basket.as_path())
+        );
+        assert_eq!(
+            resolve_visual(&[bush_def], "berry_bush", 0).as_deref(),
+            Some(bush.as_path())
+        );
     }
 
     #[test]

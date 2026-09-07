@@ -1,16 +1,25 @@
-//! M39 object definitions: visual/LOD hash-neutral; hashed catalog Craft.
+//! M40 object definitions: config-owned recipes; visual/LOD hash-neutral.
 
 use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
-    CatalogParams, ObjectDef, catalog_entries, load_object_defs, lod_band, pick_visual_path,
+    catalog_entries, load_object_defs, lod_band, pick_visual_path, CatalogParams, ObjectDef,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const IDLE_2: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
+/// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects.
+const IDLE_2: &str = "cd1e085363099fdda8a3abeb848cf7a4182131da12690d3e8d0b0075cabeb130";
+
+fn shipped_objects() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
+}
+
+fn apply_shipped(sim: &mut Simulation) {
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+}
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -78,6 +87,7 @@ fn default_mock_two_ticks_idle_hash() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/default.toml");
     let cfg = ExperimentConfig::load_path(&path).unwrap();
     let mut sim = Simulation::new(cfg).unwrap();
+    apply_shipped(&mut sim);
     sim.run_ticks(2);
     assert_eq!(sim.state_hash().to_string(), IDLE_2);
 }
@@ -207,6 +217,12 @@ output_qty = 1
         x,
         PrimaryAction::Craft {
             recipe: Recipe::Catalog(_)
+        }
+    )));
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: Recipe::Basket
         }
     )));
 
@@ -433,4 +449,154 @@ output_qty = 1
     let entries = catalog_entries(&[def]);
     assert_eq!(entries[0].inputs, vec![(ItemId::Fiber, 2)]);
     assert_eq!(entries[0].output_qty, 1);
+    assert_eq!(entries[0].item, ItemId::Catalog(0));
+}
+
+#[test]
+fn no_hardcoded_recipes_without_files() {
+    let mut sim = Simulation::new(tiny(0x40_01)).unwrap();
+    if let Some(a) = sim.agents.get_mut(&AgentId(0)) {
+        a.try_add_item(ItemId::Fiber, 8);
+        a.try_add_item(ItemId::Wood, 2);
+        a.try_add_item(ItemId::Stone, 2);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&AgentId(0)).unwrap());
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: Recipe::Basket
+                | Recipe::Spear
+                | Recipe::FishingRod
+                | Recipe::Backpack
+                | Recipe::Catalog(_)
+        }
+    )));
+}
+
+#[test]
+fn shipped_basket_craft_fiber_two() {
+    let mut sim = Simulation::new(tiny(0x40_02)).unwrap();
+    apply_shipped(&mut sim);
+    let a = AgentId(0);
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.try_add_item(ItemId::Fiber, 8);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(
+        legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Basket
+            }
+        )),
+        "{legal:?}"
+    );
+    for _ in 0..256 {
+        let have = sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&ItemId::Basket).copied())
+            .unwrap_or(0);
+        sim_core::execute::execute_primary(
+            &mut sim,
+            a,
+            &PrimaryAction::Craft {
+                recipe: Recipe::Basket,
+            },
+        );
+        let after = sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&ItemId::Basket).copied())
+            .unwrap_or(0);
+        if after > have {
+            assert_eq!(after, 1);
+            return;
+        }
+    }
+    panic!("basket craft never succeeded");
+}
+
+#[test]
+fn override_recipe_changes_hash_and_inputs() {
+    let shipped = catalog_entries(&load_object_defs(&shipped_objects()).unwrap());
+    let mut changed = shipped.clone();
+    let basket = changed.iter_mut().find(|e| e.slug == "basket").unwrap();
+    basket.inputs = vec![(ItemId::Wood, 3)];
+    let mut a = Simulation::new(tiny(0x40_03)).unwrap();
+    let mut b = Simulation::new(tiny(0x40_03)).unwrap();
+    a.enable_catalog(shipped);
+    b.enable_catalog(changed.clone());
+    a.run_ticks(2);
+    b.run_ticks(2);
+    assert_ne!(a.state_hash(), b.state_hash());
+    let spec = sim_core::objects::recipe_spec(Recipe::Basket, &changed).unwrap();
+    assert_eq!(spec.0, vec![(ItemId::Wood, 3)]);
+    assert_eq!(spec.1, ItemId::Basket);
+}
+
+#[test]
+fn load_basket_restores_no_double_grant() {
+    let mut sim = Simulation::new(tiny(0x40_04)).unwrap();
+    apply_shipped(&mut sim);
+    let a = AgentId(0);
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.try_add_item(ItemId::Fiber, 8);
+    }
+    for _ in 0..256 {
+        sim_core::execute::execute_primary(
+            &mut sim,
+            a,
+            &PrimaryAction::Craft {
+                recipe: Recipe::Basket,
+            },
+        );
+        if sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&ItemId::Basket).copied())
+            .unwrap_or(0)
+            >= 1
+        {
+            break;
+        }
+    }
+    assert_eq!(
+        sim.agents
+            .get(&a)
+            .unwrap()
+            .inventory
+            .get(&ItemId::Basket)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_shipped(&mut loaded);
+    assert_eq!(
+        loaded
+            .agents
+            .get(&a)
+            .unwrap()
+            .inventory
+            .get(&ItemId::Basket)
+            .copied()
+            .unwrap_or(0),
+        1,
+        "load must not re-grant"
+    );
+}
+
+#[test]
+fn builtin_slugs_are_not_catalog_u16() {
+    let entries = catalog_entries(&load_object_defs(&shipped_objects()).unwrap());
+    let basket = entries.iter().find(|e| e.slug == "basket").unwrap();
+    assert_eq!(basket.item, ItemId::Basket);
+    assert_eq!(basket.recipe, Some(Recipe::Basket));
+    let cord = entries.iter().find(|e| e.slug == "cord").unwrap();
+    assert_eq!(cord.item, ItemId::Catalog(0));
+    assert_eq!(cord.recipe, Some(Recipe::Catalog(0)));
 }

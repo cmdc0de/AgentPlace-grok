@@ -1,7 +1,7 @@
 use sim_core::event_log::SimEventKind;
 use sim_core::observation::{self, chebyshev, effective_range};
 use sim_core::species::Toxicity;
-use sim_core::{AgentId, CHECKPOINT_FORMAT_VERSION, ExperimentConfig, ItemId, Simulation};
+use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation, CHECKPOINT_FORMAT_VERSION};
 
 fn tiny_config(master_seed: u64) -> ExperimentConfig {
     let toml = format!(
@@ -39,11 +39,11 @@ fn drink_raises_thirst() {
         "thirst should recover after drink, got {}",
         a.needs.thirst
     );
-    assert!(
-        sim.events.events.iter().any(|e| {
-            e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait)
-        })
-    );
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .any(|e| { e.agent == id && matches!(e.kind, SimEventKind::Drink | SimEventKind::Wait) }));
 }
 
 #[test]
@@ -217,23 +217,33 @@ fn wait_chooser_does_not_speak() {
     let mut sim = Simulation::new(tiny_config(15)).unwrap();
     sim.chooser = sim_core::Chooser::Wait;
     sim.run_ticks(8);
-    assert!(
-        sim.events
-            .events
-            .iter()
-            .all(|e| !matches!(e.kind, SimEventKind::Speak { .. }))
-    );
-    assert!(
-        sim.events
-            .events
-            .iter()
-            .any(|e| matches!(e.kind, SimEventKind::LlmWait))
-    );
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .all(|e| !matches!(e.kind, SimEventKind::Speak { .. })));
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::LlmWait)));
 }
 
 #[test]
 fn craft_failure_keeps_ingredients() {
     let mut sim = Simulation::new(tiny_config(17)).unwrap();
+    sim.enable_catalog(sim_core::catalog_entries(&[sim_core::ObjectDef {
+        id: "spear".into(),
+        kind: "item".into(),
+        visual: None,
+        sim: Some(sim_core::objects::SimDef {
+            weight_milli: Some(200),
+            craft: Some(sim_core::objects::CraftDef {
+                inputs: vec![("wood".into(), 1), ("stone".into(), 1)],
+                output_qty: Some(1),
+            }),
+        }),
+    }]));
     let id = AgentId(0);
     if let Some(a) = sim.agents.get_mut(&id) {
         a.inventory.clear();
@@ -370,12 +380,11 @@ fn death_disabled_keeps_zero_thirst_agent() {
     sim.tick();
     assert_eq!(sim.agents.len(), n);
     assert!(sim.agents.values().any(|a| a.needs.thirst == 0));
-    assert!(
-        sim.events
-            .events
-            .iter()
-            .all(|e| !matches!(e.kind, SimEventKind::Died { .. }))
-    );
+    assert!(sim
+        .events
+        .events
+        .iter()
+        .all(|e| !matches!(e.kind, SimEventKind::Died { .. })));
 }
 
 #[test]

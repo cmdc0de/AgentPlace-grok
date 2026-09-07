@@ -1,0 +1,15 @@
+id = "basket"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/basket.glb"
+[visual.lod]
+near = "assets/models/optimized/basket.glb"
+mid  = "assets/models/optimized/wicker_basket_01.glb"
+far  = "assets/models/optimized/wicker_basket_01.glb"
+
+[sim]
+weight_milli = 200
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1

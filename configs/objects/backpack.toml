@@ -1,0 +1,15 @@
+id = "backpack"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/backpack.glb"
+[visual.lod]
+near = "assets/models/optimized/backpack.glb"
+mid  = "assets/models/optimized/hiking_backpack.glb"
+far  = "assets/models/optimized/hiking_backpack.glb"
+
+[sim]
+weight_milli = 200
+[sim.craft]
+inputs = [["fiber", 4]]
+output_qty = 1

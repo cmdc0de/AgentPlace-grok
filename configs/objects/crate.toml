@@ -1,0 +1,9 @@
+id = "crate"
+kind = "crate"
+
+[visual]
+glb = "assets/models/optimized/simple_crate.glb"
+[visual.lod]
+near = "assets/models/optimized/simple_crate.glb"
+mid  = "assets/models/optimized/simple_short_crate.glb"
+far  = "assets/models/optimized/simple_short_crate.glb"

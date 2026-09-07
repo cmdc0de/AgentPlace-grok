@@ -1,0 +1,9 @@
+id = "tree"
+kind = "vegetation"
+
+[visual]
+glb = "assets/models/optimized/maple_tree.glb"
+[visual.lod]
+near = "assets/models/optimized/maple_tree.glb"
+mid  = "assets/models/optimized/tree.glb"
+far  = "assets/models/optimized/tree.glb"

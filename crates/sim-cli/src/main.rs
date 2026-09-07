@@ -4,9 +4,9 @@ mod overlay;
 mod server;
 
 use sim_core::{
-    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
-    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint,
+    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, compare_csv,
+    compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint, ExperimentConfig, Simulation,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -296,10 +296,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .clone()
             .or_else(sim_core::objects::default_objects_dir);
         if let Some(dir) = dir {
-            let defs = sim_core::load_object_defs(&dir)?;
-            if catalog || cat.enabled {
-                sim.enable_catalog(sim_core::catalog_entries(&defs));
-            }
+            let _ = sim.apply_objects_dir(&dir)?;
+        } else if catalog || cat.enabled {
+            sim.enable_catalog(Vec::new());
         }
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {

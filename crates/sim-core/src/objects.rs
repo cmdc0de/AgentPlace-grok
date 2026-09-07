@@ -1,5 +1,5 @@
 //! Object definition files (`configs/objects/*.toml`). Visuals are not hashed.
-//! `[sim]` catalog items are hashed only when overlay `[catalog]` is on.
+//! Item `[sim]` (including built-in recipes) is hashed when the catalog is loaded.
 
 use crate::action::Recipe;
 use crate::agent::ItemId;
@@ -82,9 +82,34 @@ pub struct CraftDef {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CatalogEntry {
     pub slug: String,
+    pub item: ItemId,
+    pub recipe: Option<Recipe>,
     pub weight_milli: u32,
     pub inputs: Vec<(ItemId, u32)>,
     pub output_qty: u32,
+}
+
+pub fn builtin_item(slug: &str) -> Option<ItemId> {
+    match slug {
+        "wood" => Some(ItemId::Wood),
+        "fiber" => Some(ItemId::Fiber),
+        "stone" => Some(ItemId::Stone),
+        "basket" => Some(ItemId::Basket),
+        "spear" => Some(ItemId::Spear),
+        "fishing_rod" => Some(ItemId::FishingRod),
+        "backpack" => Some(ItemId::Backpack),
+        _ => None,
+    }
+}
+
+pub fn builtin_recipe(slug: &str) -> Option<Recipe> {
+    match slug {
+        "basket" => Some(Recipe::Basket),
+        "spear" => Some(Recipe::Spear),
+        "fishing_rod" => Some(Recipe::FishingRod),
+        "backpack" => Some(Recipe::Backpack),
+        _ => None,
+    }
 }
 
 pub fn default_objects_dir() -> Option<PathBuf> {
@@ -127,25 +152,43 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
         .filter(|d| d.kind == "item" && d.sim.is_some())
         .collect();
     items.sort_by(|a, b| a.id.cmp(&b.id));
-    let slugs: Vec<String> = items.iter().map(|d| d.id.clone()).collect();
+    let extra: Vec<String> = items
+        .iter()
+        .map(|d| d.id.clone())
+        .filter(|id| builtin_item(id).is_none())
+        .collect();
     items
         .iter()
         .map(|d| {
             let sim = d.sim.as_ref().unwrap();
-            let (inputs, output_qty) = if let Some(c) = &sim.craft {
+            let item = builtin_item(&d.id).unwrap_or_else(|| {
+                let i = extra.iter().position(|s| s == &d.id).unwrap_or(0);
+                ItemId::Catalog(i as u16)
+            });
+            let (inputs, output_qty, has_craft) = if let Some(c) = &sim.craft {
                 let ins = c
                     .inputs
                     .iter()
                     .filter_map(|(s, n)| {
-                        parse_catalog_item(s, &slugs).map(|item| (item, (*n).max(1)))
+                        parse_catalog_item(s, &extra).map(|item| (item, (*n).max(1)))
                     })
                     .collect();
-                (ins, c.output_qty.unwrap_or(1).max(1))
+                (ins, c.output_qty.unwrap_or(1).max(1), true)
             } else {
-                (Vec::new(), 1)
+                (Vec::new(), 1, false)
+            };
+            let recipe = if has_craft && !inputs.is_empty() {
+                builtin_recipe(&d.id).or_else(|| match item {
+                    ItemId::Catalog(n) => Some(Recipe::Catalog(n)),
+                    _ => None,
+                })
+            } else {
+                None
             };
             CatalogEntry {
                 slug: d.id.clone(),
+                item,
+                recipe,
                 weight_milli: sim.weight_milli.unwrap_or(400),
                 inputs,
                 output_qty,
@@ -154,20 +197,14 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
         .collect()
 }
 
-pub fn parse_catalog_item(slug: &str, catalog_slugs: &[String]) -> Option<ItemId> {
-    match slug {
-        "wood" => Some(ItemId::Wood),
-        "fiber" => Some(ItemId::Fiber),
-        "stone" => Some(ItemId::Stone),
-        "basket" => Some(ItemId::Basket),
-        "spear" => Some(ItemId::Spear),
-        "fishing_rod" => Some(ItemId::FishingRod),
-        "backpack" => Some(ItemId::Backpack),
-        other => catalog_slugs
-            .iter()
-            .position(|s| s == other)
-            .map(|i| ItemId::Catalog(i as u16)),
+pub fn parse_catalog_item(slug: &str, extra_slugs: &[String]) -> Option<ItemId> {
+    if let Some(item) = builtin_item(slug) {
+        return Some(item);
     }
+    extra_slugs
+        .iter()
+        .position(|s| s == slug)
+        .map(|i| ItemId::Catalog(i as u16))
 }
 
 pub fn lod_band(dist_cells: u32) -> &'static str {
@@ -180,8 +217,8 @@ pub fn lod_band(dist_cells: u32) -> &'static str {
     }
 }
 
-/// Existing path string, else next coarser, else `glb`.
-pub fn pick_visual_path(visual: &VisualDef, dist_cells: u32) -> Option<PathBuf> {
+/// LOD / glb path strings in fallback order (near → coarser → `glb`).
+pub fn visual_path_candidates(visual: &VisualDef, dist_cells: u32) -> Vec<&str> {
     let band = lod_band(dist_cells);
     let ordered: Vec<Option<&String>> = match band {
         "near" => vec![
@@ -197,7 +234,12 @@ pub fn pick_visual_path(visual: &VisualDef, dist_cells: u32) -> Option<PathBuf> 
         ],
         _ => vec![visual.lod.far.as_ref(), visual.glb.as_ref()],
     };
-    for p in ordered.into_iter().flatten() {
+    ordered.into_iter().flatten().map(String::as_str).collect()
+}
+
+/// Existing path string, else next coarser, else `glb`.
+pub fn pick_visual_path(visual: &VisualDef, dist_cells: u32) -> Option<PathBuf> {
+    for p in visual_path_candidates(visual, dist_cells) {
         let path = PathBuf::from(p);
         if path.is_file() {
             return Some(path);
@@ -229,30 +271,17 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
     }
 }
 
-/// Built-in recipes plus catalog Craft. `None` if Catalog id is missing or has no inputs.
+/// Recipes come from object TOML. `None` if the file is missing or has no inputs.
 pub fn recipe_spec(
     recipe: Recipe,
     catalog: &[CatalogEntry],
 ) -> Option<(Vec<(ItemId, u32)>, ItemId, u32)> {
-    match recipe {
-        Recipe::Basket => Some((vec![(ItemId::Fiber, 2)], ItemId::Basket, 1)),
-        Recipe::Backpack => Some((vec![(ItemId::Fiber, 4)], ItemId::Backpack, 1)),
-        Recipe::Spear => Some((
-            vec![(ItemId::Wood, 1), (ItemId::Stone, 1)],
-            ItemId::Spear,
-            1,
-        )),
-        Recipe::FishingRod => Some((
-            vec![(ItemId::Wood, 1), (ItemId::Fiber, 1)],
-            ItemId::FishingRod,
-            1,
-        )),
-        Recipe::Catalog(n) => catalog.get(n as usize).and_then(|e| {
-            if e.inputs.is_empty() {
-                None
-            } else {
-                Some((e.inputs.clone(), ItemId::Catalog(n), e.output_qty.max(1)))
-            }
-        }),
+    let entry = match recipe {
+        Recipe::Catalog(n) => catalog.iter().find(|e| e.item == ItemId::Catalog(n)),
+        other => catalog.iter().find(|e| e.recipe == Some(other)),
+    }?;
+    if entry.inputs.is_empty() {
+        return None;
     }
+    Some((entry.inputs.clone(), entry.item, entry.output_qty.max(1)))
 }

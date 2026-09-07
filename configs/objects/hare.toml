@@ -1,0 +1,9 @@
+id = "hare"
+kind = "animal"
+
+[visual]
+glb = "assets/models/optimized/rabbit.glb"
+[visual.lod]
+near = "assets/models/optimized/rabbit.glb"
+mid  = "assets/models/optimized/rabbit.glb"
+far  = "assets/models/optimized/rabbit.glb"

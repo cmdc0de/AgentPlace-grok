@@ -1,0 +1,9 @@
+id = "perch"
+kind = "fish"
+
+[visual]
+glb = "assets/models/optimized/lowpoly_fish.glb"
+[visual.lod]
+near = "assets/models/optimized/lowpoly_fish.glb"
+mid  = "assets/models/optimized/fish_animated.glb"
+far  = "assets/models/optimized/fish_animated.glb"

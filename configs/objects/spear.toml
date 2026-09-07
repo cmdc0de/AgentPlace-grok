@@ -1,0 +1,15 @@
+id = "spear"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/spear.glb"
+[visual.lod]
+near = "assets/models/optimized/spear.glb"
+mid  = "assets/models/optimized/herrscher_of_truths_spear.glb"
+far  = "assets/models/optimized/herrscher_of_truths_spear.glb"
+
+[sim]
+weight_milli = 200
+[sim.craft]
+inputs = [["wood", 1], ["stone", 1]]
+output_qty = 1

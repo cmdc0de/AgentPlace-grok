@@ -1,8 +1,8 @@
 # M40 — Config-owned objects + recipes (except agent)
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M39 complete (`docs/M39-plan.md`, git tag `M39`, commit `93d385a`)  
-**Walkthrough:** written on implement (`docs/M40-test-plan.md`)  
+**Walkthrough:** [`docs/M40-test-plan.md`](M40-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-8, PG-6 LOD)
 
 ## Context
@@ -124,7 +124,7 @@ cargo run -p sim-cli -- --config configs/default.toml --objects configs/objects 
 
 ## Verification
 
-Walkthrough: written on implement (`docs/M40-test-plan.md`).
+Walkthrough: [`docs/M40-test-plan.md`](M40-test-plan.md).
 
 ```bash
 cargo test -p sim-core

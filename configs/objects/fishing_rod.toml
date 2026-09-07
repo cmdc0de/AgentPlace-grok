@@ -1,0 +1,15 @@
+id = "fishing_rod"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/fishing_rod.glb"
+[visual.lod]
+near = "assets/models/optimized/fishing_rod.glb"
+mid  = "assets/models/optimized/stylized_old_fishing_rod_low_poly.glb"
+far  = "assets/models/optimized/stylized_old_fishing_rod_low_poly.glb"
+
+[sim]
+weight_milli = 200
+[sim.craft]
+inputs = [["wood", 1], ["fiber", 1]]
+output_qty = 1
