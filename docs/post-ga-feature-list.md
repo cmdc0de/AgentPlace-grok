@@ -17,8 +17,9 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-3 | Physical sheet (D&D-like) | Done (M31) | STR/DEX/CON/INT/WIS/CHA rolled for founders; children mixed. |
 | PG-4 | Sheet effects on the agent | Open | Remaining score → sim uses (accuracy, invent, haul cap, illness, …). M34 shipped a first set. |
 | PG-5 | Inventions | Open | Invented artifacts: private payoff for the inventor vs public payoff for the society. |
-| PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models for agents, food/veg, and every item. |
+| PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models. M38: stem-named `.glb`. Later: per-object config (path + LOD). |
 | PG-7 | Browser researcher UI | Done (M36) | Attach page lists every agent, board posts, and metrics — no 3D required. |
+| PG-8 | Object / item definition files | Open | One config file per sim object: visuals (glb + LOD) and sim fields so new items/crafts are a file, not a Rust enum. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -164,25 +165,24 @@ Out of this theme until picked: full tech trees, stealing recipes, patents as go
 
 ## PG-6 — Viewer 3D models
 
-**Shipped today:** the 3D view is **primitives + colour**. Agents are capsules; vegetation/animals/fish use distinct `Mesh` kinds (M5 legend); crates/packs/combat FX are cubes, flashes, and scaled fill. That is enough to tell berry from hare, not a world that looks like the items.
+**Shipped today (M38):** if `assets/models/{stem}.glb` (or `.gltf`) exists, the viewer loads it; otherwise today’s primitive. Stem = kind name (`berry_bush`, `agent`, `crate`, …). No per-object config. No LOD. Models are **not hashed**.
 
-**Wanted:** authored **3D models** (glTF / Bevy scenes, or equivalent) so a researcher can read the scene without the legend:
+**Wanted:** each object’s **visuals** come from a config (PG-8), not from guessing the stem:
 
-| Kind | Model |
+| Field | Meaning |
 |---|---|
-| Agent | Humanoid (or species body); optional sheet/CON scale stays hash-neutral. |
-| Food / vegetation | One mesh per veg species (berry bush ≠ herb), plus hare, perch, crops. |
-| Each `ItemId` | Wood, fiber, stone, basket, spear, fishing rod, backpack — in world, crate, and worn pack. |
-| Later | Household home marker, invention artifacts (PG-5), incapacitated/dead poses. |
+| `mesh` / `glb` | Path to the authored glTF/glb (absolute under `assets/` or relative to the definition file). |
+| `lod` | Optional extra meshes by distance (e.g. `near`, `mid`, `far`) so a far berry bush is a cheaper mesh. Missing LOD step ⇒ next coarser, then primitive. |
+| Fallback | File missing or path empty ⇒ today’s primitive. |
 
 Constraints for a later `/spec`:
 
-- **Hash-neutral.** Models never enter `state_hash` or checkpoints. Same sim, new art.
-- One asset per kind; palette/LOD optional. Fog still hides what Observation cannot see.
-- Fallback to today’s primitive if a file is missing (CI / headless must not require GPU art).
-- Do not block `cargo test -p viewer` on loading `.glb` from the network.
+- **Hash-neutral** unless the same file also carries hashed sim fields (then split: visuals overlay vs catalog — see PG-8).
+- Fog still hides what Observation cannot see.
+- `cargo test -p viewer` must not download `.glb` and must not require a GPU window.
+- Do not block CI on GPU art.
 
-Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture.
+Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture, household-home / invention / downed poses.
 
 ---
 
@@ -212,6 +212,48 @@ Out of this theme until picked: PG-6 3D in the browser, charts time-series (M8 p
 
 ---
 
+## PG-8 — Object / item definition files
+
+**Shipped today:** kinds are **code**. `ItemId` is a Rust enum (Food/Wood/Fiber/Stone/Basket/Spear/FishingRod/Backpack). Veg species live in world config + `markers.rs` names. Craft recipes are a `match` in `execute`. Viewer art is a **stem** (`berry_bush.glb`) with no per-object file. Adding a new craftable item means a postcard enum append, recipe arm, marker, and a matching filename.
+
+**Wanted:** one **definition file per object** (TOML or equivalent) that a researcher can drop in without a new `ItemId` variant for every experiment. The file describes both **what it is in the sim** and **how it looks**:
+
+```toml
+# sketch — lock fields in a later /spec
+id = "berry_bush"
+kind = "vegetation"          # vegetation | animal | fish | item | agent | crate | …
+
+[sim]
+# hashed when this object exists in the run (mass, slots, craft recipe, nutrition, …)
+# omit / overlay off ⇒ today’s hardcoded table, same hashes
+
+[visual]
+# not hashed
+glb = "assets/models/berry_bush.glb"
+[visual.lod]
+near = "assets/models/berry_bush.glb"
+mid  = "assets/models/berry_bush_lod1.glb"
+far  = "assets/models/berry_bush_lod2.glb"
+```
+
+| Job | What the file enables |
+|---|---|
+| **New item / craft** | Add a definition + recipe table; agents can Gather/Craft/Store it. No new Rust `ItemId` arm for that experiment (postcard strategy locked in `/spec`: string id vs append-only enum alias). |
+| **Change the look** | Point `glb` / `lod` at different files. Same sim, new art (hash-neutral if `[sim]` unchanged). |
+| **LOD** | Viewer picks near/mid/far from camera (or agent) distance. Missing file ⇒ coarser LOD, then primitive. |
+
+Constraints for a later `/spec`:
+
+- Split **hashed sim fields** from **hash-neutral visuals**. Changing only `glb` / `lod` must not change `state_hash`. Adding a new item that agents can hold **does** change the hash (inventory keys, recipes).
+- Overlay / directory of definitions, not `ExperimentConfig`, unless that slice **is** a hashed catalog bump. Shipping `default.toml` / `coop.toml` stay as today until a plan says otherwise.
+- Old ckpts: unknown item ids skip or map; do not fail magic/`format_version = 2` unless the slice bumps ckpt.
+- Mock + catalog-off ⇒ idle hash `70e5204d…`. `cargo test` never needs the network. Missing glb never fails CI.
+- Postcard enums stay **append only** if ids stay numeric; a string-id catalog is a `/spec` lock (and may be a PROTOCOL/ckpt bump — do not sneak it).
+
+Out of this theme until picked: full tech tree (PG-5), procedural mesh generation, runtime hot-reload of glb from disk while the window is open.
+
+---
+
 ## How these interact
 
 ```
@@ -224,7 +266,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art. PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not.
 
 ---
 
@@ -240,4 +282,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, and the browser inspector are **PG-4 / PG-5 / PG-6 / PG-7**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, and object definition files are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8**, not parking-lot one-liners.
