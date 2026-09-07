@@ -114,8 +114,9 @@ cost = qty * unit_weight_milli * haul_milli / 1000
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
-| **M39** | [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| After M39 | Protobuf / JSON envelope; TLS/`wss` |
+| **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
+| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| After M40 | Protobuf / JSON envelope; TLS/`wss`; world species from TOML |
 | Not M10 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

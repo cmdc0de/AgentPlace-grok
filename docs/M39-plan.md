@@ -64,7 +64,8 @@ Do not invent extra overlays. Create named `configs/objects/` examples **on impl
 
 | Later | What |
 |---|---|
-| After M39 | protobuf/TLS; DEX accuracy; STR haul; tech tree; catalog vegetation/animals; override built-in recipes; string ItemId / ckpt bump; `/ckpt` in the page; skeletal animation; hot-reload glb |
+| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| After M40 | protobuf/TLS; DEX accuracy; STR haul; tech tree; world species from TOML; string ItemId / ckpt bump; agent meshes; `/ckpt` in the page; skeletal animation; hot-reload glb |
 | Not M39 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

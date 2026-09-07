@@ -113,8 +113,9 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | **M36** | Done — [`M36-plan.md`](M36-plan.md) — browser researcher UI (no 3D) |
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
-| **M39** | [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| After M39 | protobuf/TLS |
+| **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
+| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| After M40 | protobuf/TLS; world species from TOML |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

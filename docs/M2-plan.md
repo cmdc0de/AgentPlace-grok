@@ -188,7 +188,7 @@ Extend `crates/sim-core/tests/determinism.rs` and add focused unit tests:
 
 ## Out of scope (later milestones)
 
-M3–M38 are done. **Current next slice:** [`M39-plan.md`](M39-plan.md) (object definition files: visual + LOD + hashed catalog). Later work is listed at the bottom of that file.
+M3–M39 are done. **Current next slice:** [`M40-plan.md`](M40-plan.md) (config-owned objects + recipes except agent). Later work is listed at the bottom of that file.
 
 ## PR Plan
 
