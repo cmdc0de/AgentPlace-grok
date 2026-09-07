@@ -76,6 +76,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
 | 6b | `missing-features.md` | Open researcher gaps found in use (not After-M later-table) |
 | 6c | `post-ga-feature-list.md` | Post-GA backlog (kinship, reproduction, D&D-like sheet). Not a milestone plan. |
+| 6d | `art-scale.md` | Viewer world units for authored glb (agent capsule = reference) |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
 | 9 | `M4-plan.md` | Milestone 4 (done): public board, adopted rules, food-economy report |

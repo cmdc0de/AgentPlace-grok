@@ -1,3 +1,4 @@
+size-rabbit.glb filter=lfs diff=lfs merge=lfs -text
 backpack.glb filter=lfs diff=lfs merge=lfs -text
 stones_and_grass.glb filter=lfs diff=lfs merge=lfs -text
 mushrooms_-_blue_oyster.glb filter=lfs diff=lfs merge=lfs -text
