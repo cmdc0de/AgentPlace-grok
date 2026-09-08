@@ -673,6 +673,12 @@ fn handle_client(
             Ok(ClientMessage::Control(verb)) => {
                 let reply = {
                     let mut hub = hub.lock().unwrap();
+                    if matches!(
+                        verb,
+                        ControlVerb::Play | ControlVerb::Pause | ControlVerb::Step(_)
+                    ) {
+                        eprintln!("net: control {verb:?} from client {id}");
+                    }
                     hub.apply_control(verb)
                 };
                 conn.send_msg(&reply)?;

@@ -2,7 +2,7 @@
 
 use crate::ui::UiState;
 use bevy::prelude::*;
-use shared::protocol::{ClientMessage, ServerMessage, hello};
+use shared::protocol::{hello, ClientMessage, ServerMessage};
 use shared::transport::Connection;
 use sim_bevy::SimState;
 use sim_core::{Simulation, TickTiming};

@@ -5,5 +5,5 @@ kind = "fish"
 glb = "assets/models/optimized/lowpoly_fish.glb"
 [visual.lod]
 near = "assets/models/optimized/lowpoly_fish.glb"
-mid  = "assets/models/optimized/fish_animated.glb"
-far  = "assets/models/optimized/fish_animated.glb"
+mid  = "assets/models/optimized/lowpoly_fish.glb"
+far  = "assets/models/optimized/lowpoly_fish.glb"

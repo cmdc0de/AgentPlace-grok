@@ -2,11 +2,11 @@
 
 use bevy::prelude::Resource;
 use shared::protocol::ControlVerb;
-use sim_bevy::{SimState, step_once};
+use sim_bevy::{step_once, SimState};
 use sim_core::{
-    AgentId, ExperimentConfig, Simulation, ckpt_at_or_before, find_events_jsonl,
-    jsonl_tick_at_or_before, list_checkpoints, list_jsonl_ticks, summary_markdown, write_report,
-    write_run_checkpoint,
+    ckpt_at_or_before, find_events_jsonl, jsonl_tick_at_or_before, list_checkpoints,
+    list_jsonl_ticks, summary_markdown, write_report, write_run_checkpoint, AgentId,
+    ExperimentConfig, Simulation,
 };
 use std::path::{Path, PathBuf};
 
@@ -691,11 +691,9 @@ mod tests {
         );
         assert!(parse_command("/scrub").unwrap_err().contains("tick"));
         assert!(parse_command("/ckpt").unwrap_err().contains("next|prev"));
-        assert!(
-            parse_command("/ckpt jump")
-                .unwrap_err()
-                .contains("next|prev")
-        );
+        assert!(parse_command("/ckpt jump")
+            .unwrap_err()
+            .contains("next|prev"));
     }
 
     #[test]

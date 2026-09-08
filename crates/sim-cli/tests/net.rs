@@ -960,6 +960,45 @@ fn start_paused_holds_tick_until_play() {
 }
 
 #[test]
+fn viewer_handshake_does_not_unpause_start_paused() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
+    let (mut conn, welcome, _) = dummy_read_hello(&url, None).unwrap();
+    match welcome {
+        ServerMessage::Welcome { tick, .. } => assert_eq!(tick, 0),
+        other => panic!("{other:?}"),
+    }
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: true,
+        want_decisions: true,
+    })
+    .unwrap();
+    let report: ServerMessage = conn.recv_msg().unwrap();
+    match report {
+        ServerMessage::ReportReady { markdown_or_path } => {
+            assert_eq!(markdown_or_path, "paused");
+        }
+        other => panic!("expected paused, got {other:?}"),
+    }
+    conn.send_msg(&ClientMessage::AckTick(0)).unwrap();
+    thread::sleep(Duration::from_millis(300));
+    conn.send_msg(&ClientMessage::RequestSnapshot).unwrap();
+    let snap: ServerMessage = conn.recv_msg().unwrap();
+    let ServerMessage::Snapshot { checkpoint_bytes } = snap else {
+        panic!("expected Snapshot, got {snap:?}");
+    };
+    let sim = Simulation::decode_checkpoint(&checkpoint_bytes).unwrap();
+    assert_eq!(
+        sim.tick, 0,
+        "Subscribe+AckTick must not start a --start-paused server"
+    );
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
 fn subscribe_reports_paused_when_start_paused() {
     let (mut child, url, out_h, err_h) = spawn_listen(&["--allow-control", "--start-paused"]);
     let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();

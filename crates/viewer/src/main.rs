@@ -67,6 +67,15 @@ struct ObjectVisuals {
     defs: Vec<sim_core::ObjectDef>,
 }
 
+#[derive(Component, Clone)]
+struct ModelLabel {
+    id: String,
+    path: PathBuf,
+}
+
+#[derive(Resource, Default)]
+struct ReportedModels(std::collections::HashSet<PathBuf>);
+
 fn apply_viewer_objects(
     sim: &mut Simulation,
     objects: Option<&Path>,
@@ -192,6 +201,8 @@ fn main() {
         ..Default::default()
     })
     .init_resource::<UiState>()
+    .init_resource::<ui::ClickThroughGuard>()
+    .init_resource::<ReportedModels>()
     .insert_resource(ObjectVisuals { defs: object_defs })
     .insert_resource(scrub);
     if let Some(link) = net_link {
@@ -208,6 +219,7 @@ fn main() {
                 sync_combat_fx,
                 sync_stockpile_markers,
                 sync_satchel_markers,
+                report_model_sizes,
                 update_camera,
                 update_vision_overlay,
                 update_fog_visibility,
@@ -741,14 +753,88 @@ fn try_spawn_model(
     let handle = assets
         .load_builder()
         .override_unapproved()
-        .load(GltfAssetLabel::Scene(0).from_asset(path));
+        .load(GltfAssetLabel::Scene(0).from_asset(path.clone()));
     commands.spawn((
         WorldAssetRoot(handle),
         transform,
         extra,
+        ModelLabel {
+            id: stem.to_string(),
+            path,
+        },
         Visibility::default(),
     ));
     true
+}
+
+fn report_model_sizes(
+    roots: Query<(Entity, &ModelLabel, &GlobalTransform)>,
+    children: Query<&Children>,
+    meshes: Query<(&GlobalTransform, &Mesh3d)>,
+    assets: Res<Assets<Mesh>>,
+    mut reported: ResMut<ReportedModels>,
+) {
+    for (entity, label, root_tf) in &roots {
+        if reported.0.contains(&label.path) {
+            continue;
+        }
+        let Some((w, h, d)) = model_size_meters(entity, root_tf, &children, &meshes, &assets)
+        else {
+            continue;
+        };
+        reported.0.insert(label.path.clone());
+        println!(
+            "model {} {} size={:.3}×{:.3}×{:.3} m (x×y×z)",
+            label.id,
+            label.path.display(),
+            w,
+            h,
+            d
+        );
+    }
+}
+
+fn model_size_meters(
+    root: Entity,
+    root_tf: &GlobalTransform,
+    children: &Query<&Children>,
+    meshes: &Query<(&GlobalTransform, &Mesh3d)>,
+    assets: &Assets<Mesh>,
+) -> Option<(f32, f32, f32)> {
+    let inv = root_tf.affine().inverse();
+    let mut min = Vec3::splat(f32::MAX);
+    let mut max = Vec3::splat(f32::MIN);
+    let mut found = false;
+    let mut stack = vec![root];
+    while let Some(e) = stack.pop() {
+        if let Ok(kids) = children.get(e) {
+            stack.extend(kids.iter());
+        }
+        let Ok((gt, mesh3d)) = meshes.get(e) else {
+            continue;
+        };
+        let Some(mesh) = assets.get(&mesh3d.0) else {
+            continue;
+        };
+        let Some(attr) = mesh.attribute(Mesh::ATTRIBUTE_POSITION) else {
+            continue;
+        };
+        let Some(iter) = attr.as_float3() else {
+            continue;
+        };
+        let local = inv * gt.affine();
+        for p in iter {
+            let v = local.transform_point3(Vec3::from(*p));
+            min = min.min(v);
+            max = max.max(v);
+            found = true;
+        }
+    }
+    if !found {
+        return None;
+    }
+    let s = max - min;
+    Some((s.x.abs(), s.y.abs(), s.z.abs()))
 }
 
 fn spawn_marker(
@@ -826,12 +912,16 @@ fn mesh_for_shape(shape: MarkerShape) -> Mesh {
 
 fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    mut guard: ResMut<ui::ClickThroughGuard>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
     mut scrub: ResMut<CkptScrubber>,
     net: Option<Res<net::NetLink>>,
     mut exit: MessageWriter<AppExit>,
 ) {
+    guard.tick(mouse.pressed(MouseButton::Left));
+    let remote_ready = !state.remote || guard.armed();
     if keys.just_pressed(KeyCode::Escape) {
         ui.save_layout();
         exit.write(AppExit::Success);
@@ -846,26 +936,31 @@ fn handle_input(
         return;
     }
     if keys.just_pressed(KeyCode::Space) {
-        state.paused = !state.paused;
         if state.remote {
-            let verb = if state.paused {
-                shared::protocol::ControlVerb::Pause
-            } else {
-                shared::protocol::ControlVerb::Play
-            };
-            if let Some(net) = net.as_ref() {
-                let _ = net.tx.send(ClientMessage::Control(verb));
+            // Space only pauses an attach. Toggle-to-Play on window-open /
+            // leftover key-up used to start a --start-paused server.
+            if !state.paused {
+                state.paused = true;
+                if let Some(net) = net.as_ref() {
+                    let _ = net
+                        .tx
+                        .send(ClientMessage::Control(shared::protocol::ControlVerb::Pause));
+                }
             }
+        } else {
+            state.paused = !state.paused;
         }
     }
     if keys.just_pressed(KeyCode::Period) {
         if state.remote {
-            if let Some(net) = net.as_ref() {
-                let _ = net
-                    .tx
-                    .send(ClientMessage::Control(shared::protocol::ControlVerb::Step(
-                        1,
-                    )));
+            if remote_ready {
+                if let Some(net) = net.as_ref() {
+                    let _ = net
+                        .tx
+                        .send(ClientMessage::Control(shared::protocol::ControlVerb::Step(
+                            1,
+                        )));
+                }
             }
         } else {
             step_once(&mut state);
