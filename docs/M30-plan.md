@@ -63,8 +63,9 @@ Spawn/despawn **Bevy meshes** (simple primitives / short-lived particles) from t
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
-| After M40 | protobuf/TLS; Unix sockets; hashed pipeline events; world species from TOML |
+| **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| After M41 | protobuf/TLS; Unix sockets; hashed pipeline events |
 | Not M30 | PROTOCOL bump; PG sheet; reproduction; kinship |
 
 ## Key decisions

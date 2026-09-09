@@ -112,8 +112,9 @@ Hello **v4 vs v5** is Protocol. Old v4 clients cannot talk to a lockstep v5 serv
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
-| After M40 | protobuf/TLS; Unix sockets; world species from TOML |
+| **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| After M41 | protobuf/TLS; Unix sockets |
 | Not M24 | Browser; combat; CI Win/mac; hashed pipeline events |
 
 ## Key decisions

@@ -55,8 +55,9 @@ Existing wire. **No PROTOCOL bump.**
 | Later | What |
 |---|---|
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
-| After M40 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; DEX accuracy; STR haul; tech tree / patents; world species from TOML; time-series charts; `/ckpt` `/events` in the page; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac |
+| **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| After M41 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; tech tree / patents; time-series charts; `/ckpt` `/events` in the page; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac |
 | Not M38 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

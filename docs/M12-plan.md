@@ -104,8 +104,9 @@ Inspector lists **all** active incentives and marks hidden ones. Agent-POV / pro
 | **M37** | Done — [`M37-plan.md`](M37-plan.md) — extra invention kinds, browser /set /give |
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
-| **M40** | [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
-| After M40 | Protobuf/TLS; world species from TOML |
+| **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
+| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| After M41 | Protobuf/TLS |
 | Not M12 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions
