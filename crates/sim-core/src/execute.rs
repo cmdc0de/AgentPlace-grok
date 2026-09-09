@@ -211,7 +211,7 @@ fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if agent.inventory_count().saturating_add(qty) > agent.inventory_cap {
+    if agent.inventory_count().saturating_add(qty) > agent.pocket_slot_cap() {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -257,22 +257,33 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         return;
     }
     let cost = crate::conflict::ATTACK_ENERGY_COST;
-    let damage = atk.sheet.attack_damage();
+    let str_score = atk.sheet.strength;
+    let def_dex = def.sheet.dexterity;
+    let hit = crate::sheet::AbilitySheet::attack_hits(
+        sim.config.master_seed,
+        sim.tick,
+        id.0,
+        str_score,
+        def_dex,
+    );
+    let damage = if hit { atk.sheet.attack_damage() } else { 0 };
     if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
     let mut down = false;
     let mut lethal = false;
-    if let Some(d) = sim.agents.get_mut(&target) {
-        d.needs.energy = d.needs.energy.saturating_sub(damage);
-        d.health = d.health.saturating_sub(damage);
-        if d.health == 0 {
-            if sim.conflict_death_enabled {
-                lethal = true;
-            } else if !d.incapacitated {
-                d.incapacitated = true;
-                down = true;
+    if damage > 0 {
+        if let Some(d) = sim.agents.get_mut(&target) {
+            d.needs.energy = d.needs.energy.saturating_sub(damage);
+            d.health = d.health.saturating_sub(damage);
+            if d.health == 0 {
+                if sim.conflict_death_enabled {
+                    lethal = true;
+                } else if !d.incapacitated {
+                    d.incapacitated = true;
+                    down = true;
+                }
             }
         }
     }
@@ -649,7 +660,9 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let room = recv.inventory_cap.saturating_sub(recv.inventory_count());
+    let room = recv
+        .pocket_slot_cap()
+        .saturating_sub(recv.inventory_count());
     let moved = qty.min(room);
     let have_pockets = sender.inventory.get(&item).copied().unwrap_or(0);
     let have_pack = sender.pack.get(&item).copied().unwrap_or(0);
@@ -1319,7 +1332,10 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     let has_all = need
         .iter()
         .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n);
-    let room = agent.inventory_cap.saturating_sub(agent.inventory_count()) >= qty
+    let room = agent
+        .pocket_slot_cap()
+        .saturating_sub(agent.inventory_count())
+        >= qty
         || agent.inventory.contains_key(&out);
     if !has_all || !room {
         push(

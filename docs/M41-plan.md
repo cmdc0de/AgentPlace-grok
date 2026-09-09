@@ -1,7 +1,8 @@
 # M41 — World species from TOML, DEX accuracy, STR haul
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M40 complete (`docs/M40-plan.md`, git tag `M40`, commit `5f57ab4`)  
+**Walkthrough:** [`docs/M41-test-plan.md`](M41-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-8 species, PG-4 DEX/STR)
 
 ## Context
@@ -142,7 +143,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: write `docs/M41-test-plan.md` on implement.
+Walkthrough: [`docs/M41-test-plan.md`](M41-test-plan.md).
 
 ```bash
 cargo test -p sim-core

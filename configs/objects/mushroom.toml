@@ -7,3 +7,12 @@ glb = "assets/models/optimized/bunch_of_mushrooms.glb"
 near = "assets/models/optimized/bunch_of_mushrooms.glb"
 mid  = "assets/models/optimized/lowpoly_mushrooms.glb"
 far  = "assets/models/optimized/lowpoly_mushrooms.glb"
+
+[sim]
+yield = "food"
+nutrition = 12.0
+toxicity = "toxic"
+allergen_tag = ""
+wood_yield = 0
+fiber_yield = 0
+grow_ticks = 20

@@ -7,3 +7,8 @@ glb = "assets/models/optimized/size-rabbit.glb"
 near = "assets/models/optimized/size-rabbit.glb"
 mid  = "assets/models/optimized/size-rabbit.glb"
 far  = "assets/models/optimized/size-rabbit.glb"
+
+[sim]
+nutrition = 30.0
+toxicity = "safe"
+allergen_tag = ""

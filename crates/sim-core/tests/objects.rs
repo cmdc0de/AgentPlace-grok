@@ -3,7 +3,7 @@
 use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
-    catalog_entries, load_object_defs, lod_band, pick_visual_path, CatalogParams, ObjectDef,
+    CatalogParams, ObjectDef, catalog_entries, load_object_defs, lod_band, pick_visual_path,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
@@ -599,4 +599,158 @@ fn builtin_slugs_are_not_catalog_u16() {
     let cord = entries.iter().find(|e| e.slug == "cord").unwrap();
     assert_eq!(cord.item, ItemId::Catalog(0));
     assert_eq!(cord.recipe, Some(Recipe::Catalog(0)));
+}
+
+#[test]
+fn shipped_species_sim_matches_defaults() {
+    let defs = load_object_defs(&shipped_objects()).unwrap();
+    let mut tables = sim_core::species::default_species_tables();
+    let before = tables.clone();
+    sim_core::apply_species_defs(&mut tables, &defs);
+    assert_eq!(tables.vegetation.len(), before.vegetation.len());
+    for (a, b) in tables.vegetation.iter().zip(before.vegetation.iter()) {
+        assert_eq!(a.id, b.id);
+        assert_eq!(a.nutrition, b.nutrition);
+        assert_eq!(a.toxicity, b.toxicity);
+        assert_eq!(a.fiber_yield, b.fiber_yield);
+        assert_eq!(a.wood_yield, b.wood_yield);
+        assert_eq!(a.grow_ticks, b.grow_ticks);
+    }
+    assert_eq!(tables.animals[0].id, "hare");
+    assert_eq!(tables.animals[0].nutrition, 30.0);
+    assert_eq!(tables.fish[0].id, "perch");
+    assert_eq!(tables.fish[0].nutrition, 25.0);
+}
+
+#[test]
+fn missing_species_sim_keeps_rust_nutrition() {
+    let dir = std::env::temp_dir().join("agentplace-m41-visual-only-veg");
+    let _ = fs::remove_dir_all(&dir);
+    write_toml(
+        &dir,
+        "berry_bush.toml",
+        r#"
+id = "berry_bush"
+kind = "vegetation"
+[visual]
+glb = "assets/models/missing.glb"
+"#,
+    );
+    let defs = load_object_defs(&dir).unwrap();
+    let mut tables = sim_core::species::default_species_tables();
+    sim_core::apply_species_defs(&mut tables, &defs);
+    assert_eq!(tables.veg(1).unwrap().nutrition, 20.0);
+    assert_eq!(tables.veg(1).unwrap().id, "berry_bush");
+}
+
+#[test]
+fn extra_vegetation_appends_tag_and_changes_hash() {
+    let dir = std::env::temp_dir().join("agentplace-m41-extra-veg");
+    let _ = fs::remove_dir_all(&dir);
+    write_toml(
+        &dir,
+        "apple.toml",
+        r#"
+id = "apple"
+kind = "vegetation"
+[sim]
+yield = "food"
+nutrition = 18.0
+toxicity = "safe"
+fiber_yield = 0
+grow_ticks = 25
+"#,
+    );
+    let defs = load_object_defs(&dir).unwrap();
+    let mut cfg = tiny(0x41_02);
+    sim_core::apply_species_defs(&mut cfg.world.species, &defs);
+    assert_eq!(cfg.world.species.vegetation.len(), 6);
+    assert_eq!(cfg.world.species.veg(1).unwrap().id, "berry_bush");
+    assert_eq!(cfg.world.species.veg(5).unwrap().id, "tree");
+    assert_eq!(cfg.world.species.veg(6).unwrap().id, "apple");
+    let extra = Simulation::new(cfg).unwrap();
+    let base = Simulation::new(tiny(0x41_02)).unwrap();
+    assert_eq!(extra.config.world.species.vegetation.len(), 6);
+    assert_ne!(extra.state_hash(), base.state_hash());
+}
+
+#[test]
+fn override_nutrition_changes_hash_after_eat() {
+    let dir = std::env::temp_dir().join("agentplace-m41-override-nut");
+    let _ = fs::remove_dir_all(&dir);
+    write_toml(
+        &dir,
+        "berry_bush.toml",
+        r#"
+id = "berry_bush"
+kind = "vegetation"
+[sim]
+yield = "food"
+nutrition = 80.0
+toxicity = "safe"
+fiber_yield = 1
+grow_ticks = 40
+"#,
+    );
+    let mut shipped = Simulation::new(tiny(0x41_03)).unwrap();
+    apply_shipped(&mut shipped);
+    let mut over = Simulation::new(tiny(0x41_03)).unwrap();
+    over.apply_objects_dir(&dir).unwrap();
+    force_gather_eat(&mut shipped, 1);
+    force_gather_eat(&mut over, 1);
+    assert_ne!(shipped.state_hash(), over.state_hash());
+}
+
+fn force_gather_eat(sim: &mut Simulation, tag: u8) {
+    let a = AgentId(0);
+    let (x, y) = {
+        let ag = sim.agents.get(&a).unwrap();
+        (ag.x, ag.y)
+    };
+    let mut placed = false;
+    for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+        let nx = x as i32 + dx;
+        let ny = y as i32 + dy;
+        if sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32) {
+            sim.world.set_vegetation(nx as u32, ny as u32, tag);
+            placed = true;
+            break;
+        }
+    }
+    assert!(placed, "no land neighbor for gather");
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.needs = sim_core::Needs::maxed(
+            sim.config.hunger_max_milli(),
+            sim.config.thirst_max_milli(),
+            sim.config.energy_max_milli(),
+        );
+        ag.abilities.gather = 100;
+    }
+    for _ in 0..64 {
+        sim_core::execute::execute_primary(sim, a, &PrimaryAction::Gather { species: tag });
+        if sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&ItemId::Food(tag)).copied())
+            .unwrap_or(0)
+            > 0
+        {
+            break;
+        }
+    }
+    assert!(
+        sim.agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&ItemId::Food(tag)).copied())
+            .unwrap_or(0)
+            > 0,
+        "gather never succeeded"
+    );
+    sim_core::execute::execute_primary(
+        sim,
+        a,
+        &PrimaryAction::Eat {
+            item: ItemId::Food(tag),
+        },
+    );
 }

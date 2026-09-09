@@ -121,21 +121,13 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .iter()
             .map(|(id, a)| (id.0, a.plan.clone()))
             .collect(),
-        health: sim
-            .agents
-            .iter()
-            .map(|(id, a)| (id.0, a.health))
-            .collect(),
+        health: sim.agents.iter().map(|(id, a)| (id.0, a.health)).collect(),
         incapacitated: sim
             .agents
             .iter()
             .map(|(id, a)| (id.0, a.incapacitated))
             .collect(),
-        sheets: sim
-            .agents
-            .iter()
-            .map(|(id, a)| (id.0, a.sheet))
-            .collect(),
+        sheets: sim.agents.iter().map(|(id, a)| (id.0, a.sheet)).collect(),
         kinship: sim
             .agents
             .iter()
@@ -149,11 +141,7 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
             .map(|(id, a)| (id.0, a.age_ticks))
             .collect(),
         household_home: sim.household_home.clone(),
-        cultures: sim
-            .agents
-            .iter()
-            .map(|(id, a)| (id.0, a.culture))
-            .collect(),
+        cultures: sim.agents.iter().map(|(id, a)| (id.0, a.culture)).collect(),
         inventions: sim.inventions.clone(),
         next_invention_id: sim.next_invention_id,
     };
@@ -177,10 +165,24 @@ fn board_from_wire(
     u64,
 ) {
     let Some(hex_str) = wire.entries.first() else {
-        return (RichBoard::default(), 0, 0, BTreeMap::new(), BTreeMap::new(), 0);
+        return (
+            RichBoard::default(),
+            0,
+            0,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            0,
+        );
     };
     let Ok(bytes) = hex::decode(hex_str) else {
-        return (RichBoard::default(), 0, 0, BTreeMap::new(), BTreeMap::new(), 0);
+        return (
+            RichBoard::default(),
+            0,
+            0,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            0,
+        );
     };
     let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
         Ok(b) => b,
@@ -206,7 +208,7 @@ fn board_from_wire(
                         BTreeMap::new(),
                         BTreeMap::new(),
                         0,
-                    )
+                    );
                 }
             }
         }

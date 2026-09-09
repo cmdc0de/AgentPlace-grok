@@ -47,6 +47,27 @@ impl AbilitySheet {
         (ATTACK_DAMAGE as i32 + Self::modifier(self.strength) * 250).max(1) as u32
     }
 
+    /// Melee hit. Defender DEX 0 ⇒ always hit. Else d20 + STR_mod >= 10 + DEX_mod.
+    /// Stream is Invent-style `derive_seed`, not `RngBank.ensure`.
+    pub fn attack_hits(
+        master: u64,
+        tick: u64,
+        attacker: u64,
+        strength: u8,
+        defender_dex: u8,
+    ) -> bool {
+        if defender_dex == 0 {
+            return true;
+        }
+        let seed = crate::seeding::derive_seed(
+            master,
+            &format!("tick_{tick}_agent_{attacker}_attack_hit_0"),
+        );
+        let mut rng = crate::seeding::rng_from_seed(seed);
+        let d20: i32 = rng.random_range(1..=20);
+        d20 + Self::modifier(strength) >= 10 + Self::modifier(defender_dex)
+    }
+
     /// Move energy after DEX. Unused DEX leaves `base`. Zero base stays 0.
     pub fn adjust_move_cost(&self, base: u32) -> u32 {
         if base == 0 {
@@ -171,6 +192,7 @@ mod tests {
     fn unused_sheet_keeps_constants() {
         let s = AbilitySheet::default();
         assert_eq!(s.attack_damage(), ATTACK_DAMAGE);
+        assert!(AbilitySheet::attack_hits(1, 0, 0, 0, 0));
         assert_eq!(s.adjust_move_cost(200), 200);
         assert_eq!(s.adjust_move_cost(0), 0);
         assert_eq!(s.adjust_range(8), 8);

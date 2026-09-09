@@ -7,3 +7,12 @@ glb = "assets/models/optimized/deadly_nightshade.glb"
 near = "assets/models/optimized/deadly_nightshade.glb"
 mid  = "assets/models/optimized/nightshade.glb"
 far  = "assets/models/optimized/nightshade.glb"
+
+[sim]
+yield = "food"
+nutrition = 10.0
+toxicity = "allergenic"
+allergen_tag = "solanaceae"
+wood_yield = 0
+fiber_yield = 0
+grow_ticks = 35

@@ -7,10 +7,11 @@ mod ui;
 use bevy::asset::AssetPlugin;
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
-use commands::{crate_fill_scale, pack_fill_scale, CkptScrubber};
+use bevy::window::PrimaryWindow;
+use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
-use sim_bevy::{step_once, SimPlugin, SimState};
+use sim_bevy::{SimPlugin, SimState, step_once};
 use sim_core::combat_fx::CombatFxJob;
 use sim_core::markers::{self, MarkerShape, MarkerSpec};
 use sim_core::observation::{self, chebyshev};
@@ -102,9 +103,18 @@ fn main() {
             let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
                 panic!("failed to read {}: {e}", path.display());
             });
-            let config = ExperimentConfig::from_toml_str(&text).unwrap_or_else(|e| {
+            let mut config = ExperimentConfig::from_toml_str(&text).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
             });
+            let dir = parsed
+                .objects
+                .clone()
+                .or_else(sim_core::objects::default_objects_dir);
+            if let Some(dir) = &dir {
+                if let Ok(defs) = sim_core::load_object_defs(dir) {
+                    sim_core::apply_species_defs(&mut config.world.species, &defs);
+                }
+            }
             let mut sim = Simulation::new(config).unwrap_or_else(|e| {
                 panic!("failed to start sim: {e}");
             });
@@ -913,6 +923,7 @@ fn mesh_for_shape(shape: MarkerShape) -> Mesh {
 fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
     mut guard: ResMut<ui::ClickThroughGuard>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
@@ -920,7 +931,15 @@ fn handle_input(
     net: Option<Res<net::NetLink>>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    guard.tick(mouse.pressed(MouseButton::Left));
+    let window = windows.single().ok();
+    let focused = window.map(|w| w.focused).unwrap_or(false);
+    let cursor_in = window.and_then(|w| w.cursor_position()).is_some();
+    guard.tick(
+        mouse.pressed(MouseButton::Left),
+        mouse.just_released(MouseButton::Left),
+        focused,
+        cursor_in,
+    );
     let remote_ready = !state.remote || guard.armed();
     if keys.just_pressed(KeyCode::Escape) {
         ui.save_layout();
@@ -955,11 +974,11 @@ fn handle_input(
         if state.remote {
             if remote_ready {
                 if let Some(net) = net.as_ref() {
-                    let _ = net
-                        .tx
-                        .send(ClientMessage::Control(shared::protocol::ControlVerb::Step(
-                            1,
-                        )));
+                    let _ =
+                        net.tx
+                            .send(ClientMessage::Control(shared::protocol::ControlVerb::Step(
+                                1,
+                            )));
                 }
             }
         } else {

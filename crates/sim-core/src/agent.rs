@@ -278,7 +278,18 @@ impl Agent {
     }
 
     pub fn worn_pack_caps(&self, params: &crate::haul::StorageParams) -> (u32, u32) {
-        Self::worn_pack_caps_for(self.basket_count(), self.backpack_count(), params)
+        let (slots, weight) =
+            Self::worn_pack_caps_for(self.basket_count(), self.backpack_count(), params);
+        let m = crate::sheet::AbilitySheet::modifier(self.sheet.strength);
+        (adj_str_cap(slots, m), adj_str_cap(weight, m * 250))
+    }
+
+    /// Pocket slot cap after STR. Score 0 ⇒ `inventory_cap`. Do not write the field.
+    pub fn pocket_slot_cap(&self) -> u32 {
+        adj_str_cap(
+            self.inventory_cap,
+            crate::sheet::AbilitySheet::modifier(self.sheet.strength),
+        )
     }
 
     pub fn pack_count(&self) -> u32 {
@@ -361,7 +372,7 @@ impl Agent {
     }
 
     pub fn has_carry_room(&self, params: &crate::haul::StorageParams) -> bool {
-        self.inventory_count() < self.inventory_cap
+        self.inventory_count() < self.pocket_slot_cap()
             || (self.has_pack(params) && {
                 let (slot_cap, _) = self.worn_pack_caps(params);
                 self.pack_count() < slot_cap
@@ -374,7 +385,7 @@ impl Agent {
         extra_pocket_slots: u32,
     ) -> (Vec<(ItemId, u32)>, Vec<(ItemId, u32)>) {
         let mut room = self
-            .inventory_cap
+            .pocket_slot_cap()
             .saturating_sub(self.inventory_count())
             .saturating_add(extra_pocket_slots);
         let mut to_pockets = Vec::new();
@@ -415,7 +426,7 @@ impl Agent {
             return 0;
         }
         let used = self.inventory_count();
-        let room = self.inventory_cap.saturating_sub(used);
+        let room = self.pocket_slot_cap().saturating_sub(used);
         let add = qty.min(room);
         if add > 0 {
             *self.inventory.entry(item).or_insert(0) += add;
@@ -517,6 +528,14 @@ impl Agent {
         if self.culture != 0 {
             hasher.update([self.culture]);
         }
+    }
+}
+
+fn adj_str_cap(base: u32, delta: i32) -> u32 {
+    if base == 0 {
+        0
+    } else {
+        (base as i32 + delta).max(1) as u32
     }
 }
 

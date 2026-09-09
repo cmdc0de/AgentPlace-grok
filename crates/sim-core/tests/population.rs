@@ -100,9 +100,11 @@ fn sheet_on_rolls_and_changes_hash_ckpt_round_trip() {
     let mut off = Simulation::new(cfg.clone()).unwrap();
     let mut on = Simulation::new(cfg).unwrap();
     on.enable_sheet();
-    assert!(on.agents.values().all(|a| {
-        a.sheet.rows().iter().all(|(_, s)| (3..=18).contains(s))
-    }));
+    assert!(
+        on.agents
+            .values()
+            .all(|a| { a.sheet.rows().iter().all(|(_, s)| (3..=18).contains(s)) })
+    );
     off.run_ticks(4);
     on.run_ticks(4);
     assert_ne!(off.state_hash(), on.state_hash());
@@ -119,8 +121,16 @@ fn reproduction_overlay_off_not_legal() {
     let (a, _) = place_adjacent(&mut sim);
     let agent = sim.agents.get(&a).unwrap().clone();
     let legal = legal_actions(&sim, &agent);
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { .. })));
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Reproduce { .. })));
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::PairBond { .. }))
+    );
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::Reproduce { .. }))
+    );
 }
 
 #[test]
@@ -177,13 +187,34 @@ fn pair_bond_and_reproduce_writes_kin_and_calculated_sheet() {
     )));
     assert!(child.kinship.parents.contains(&a));
     assert!(child.kinship.parents.contains(&b));
-    assert!(sim.agents.get(&a).unwrap().kinship.children.contains(&child_id));
-    assert!(sim.agents.get(&b).unwrap().kinship.children.contains(&child_id));
+    assert!(
+        sim.agents
+            .get(&a)
+            .unwrap()
+            .kinship
+            .children
+            .contains(&child_id)
+    );
+    assert!(
+        sim.agents
+            .get(&b)
+            .unwrap()
+            .kinship
+            .children
+            .contains(&child_id)
+    );
     for (_, score) in child.sheet.rows() {
-        assert!((9..=11).contains(&score), "calculated around 10, got {score}");
+        assert!(
+            (9..=11).contains(&score),
+            "calculated around 10, got {score}"
+        );
     }
     let obs = sim_core::observation::build(&sim, child_id);
-    assert!(obs.kin.iter().any(|s| s.contains("parent #")), "{:?}", obs.kin);
+    assert!(
+        obs.kin.iter().any(|s| s.contains("parent #")),
+        "{:?}",
+        obs.kin
+    );
     fill_energy(&mut sim);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
     let kids: Vec<AgentId> = sim.agents.get(&a).unwrap().kinship.children.clone();
@@ -231,8 +262,14 @@ fn kin_of_scope_after_pair_bond_and_birth() {
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
     sim.inject_schedule_toml(KIN_FOOD).unwrap();
     sim.run_ticks(1);
-    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, a, "food"), 1000);
-    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, b, "food"), 1400);
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, a, "food"),
+        1000
+    );
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, b, "food"),
+        1400
+    );
     let child = sim
         .agents
         .keys()
@@ -300,7 +337,10 @@ multiplier = 1.4
     );
     sim.inject_schedule_toml(&toml).unwrap();
     sim.run_ticks(1);
-    assert_eq!(sim_core::incentive::resource_mult_milli(&sim, a, "food"), 1400);
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, a, "food"),
+        1400
+    );
     let outsider = sim
         .agents
         .keys()
@@ -344,9 +384,21 @@ fn aging_stamps_founders_gates_child() {
     sim.conflict_enabled = true;
     let ch = sim.agents.get(&child).unwrap().clone();
     let legal = legal_actions(&sim, &ch);
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Attack { .. })));
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { .. })));
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Reproduce { .. })));
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::Attack { .. }))
+    );
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::PairBond { .. }))
+    );
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::Reproduce { .. }))
+    );
     sim.run_ticks(1);
     assert!(sim.agents.get(&a).unwrap().age_ticks >= 201);
 }
@@ -364,12 +416,7 @@ fn aging_load_does_not_restamp_founder_age() {
     assert_ne!(age, 200);
 }
 
-fn land_neighbor(
-    sim: &Simulation,
-    x: u32,
-    y: u32,
-    occupied: &[(u32, u32)],
-) -> Option<(u32, u32)> {
+fn land_neighbor(sim: &Simulation, x: u32, y: u32, occupied: &[(u32, u32)]) -> Option<(u32, u32)> {
     for dx in -1i32..=1 {
         for dy in -1i32..=1 {
             if dx == 0 && dy == 0 {
@@ -463,7 +510,10 @@ fn pair_bond_home_member_store_outsider_cannot() {
             qty: 1,
         },
     );
-    assert!(sim.world.has_stockpile(home.0, home.1), "member stores at home");
+    assert!(
+        sim.world.has_stockpile(home.0, home.1),
+        "member stores at home"
+    );
     let home_qty = sim
         .world
         .stockpile_at(home.0, home.1)
@@ -503,7 +553,10 @@ fn pair_bond_home_member_store_outsider_cannot() {
         .stockpile_at(home.0, home.1)
         .and_then(|c| c.items.get(&ItemId::Food(1)).copied())
         .unwrap_or(0);
-    assert_eq!(home_qty2, 1, "outsider must not store at home via household rule");
+    assert_eq!(
+        home_qty2, 1,
+        "outsider must not store at home via household rule"
+    );
     let (ox, oy) = {
         let ag = sim.agents.get(&outsider).unwrap();
         (ag.x, ag.y)
@@ -651,7 +704,10 @@ fn str_18_vs_10_attack_damage() {
 fn dex_18_vs_3_move_cost() {
     let mut sim = Simulation::new(tiny(0x34_03)).unwrap();
     let id = AgentId(0);
-    sim.agents.get_mut(&id).unwrap().try_add_item(ItemId::Stone, 4);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Stone, 4);
     sim.agents.get_mut(&id).unwrap().sheet = scores(10, 18, 10, 10);
     let hi = sim.agents.get(&id).unwrap().move_cost_milli(&sim.storage);
     sim.agents.get_mut(&id).unwrap().sheet = scores(10, 3, 10, 10);
@@ -725,7 +781,11 @@ fn close_kin_pair_bond_illegal() {
     }
     let ch = sim.agents.get(&c0).unwrap().clone();
     let legal = legal_actions(&sim, &ch);
-    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == c1)));
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == c1))
+    );
     fill_energy(&mut sim);
     sim_core::execute::execute_primary(&mut sim, c0, &PrimaryAction::PairBond { target: c1 });
     assert!(matches!(
@@ -751,9 +811,11 @@ fn close_kin_pair_bond_illegal() {
     }
     let ch = sim.agents.get(&c0).unwrap().clone();
     let legal = legal_actions(&sim, &ch);
-    assert!(!legal
-        .iter()
-        .any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == a)));
+    assert!(
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::PairBond { target } if *target == a))
+    );
 }
 
 #[test]
@@ -763,5 +825,115 @@ fn unrelated_founders_pair_bond_still_legal() {
     let (a, _) = place_adjacent(&mut sim);
     let agent = sim.agents.get(&a).unwrap().clone();
     let legal = legal_actions(&sim, &agent);
-    assert!(legal.iter().any(|x| matches!(x, PrimaryAction::PairBond { .. })));
+    assert!(
+        legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::PairBond { .. }))
+    );
+}
+
+#[test]
+fn sheet_unused_attack_always_hits_pocket_cap_16() {
+    let mut sim = Simulation::new(tiny(0x41_10)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    let cap = sim.agents.get(&a).unwrap().pocket_slot_cap();
+    assert_eq!(cap, 16);
+    assert_eq!(sim.agents.get(&a).unwrap().inventory_cap, 16);
+    sim.agents.get_mut(&b).unwrap().health = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().rev().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(2000), "unused DEX always hits");
+}
+
+#[test]
+fn dex_18_can_miss_dex_0_always_hit() {
+    let mut sim = Simulation::new(tiny(0x41_11)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&b).unwrap().sheet.dexterity = 18;
+    let mut missed = false;
+    for t in 0..40 {
+        sim.tick = t;
+        fill_energy(&mut sim);
+        sim.agents.get_mut(&b).unwrap().health = 10_000;
+        sim.agents.get_mut(&b).unwrap().needs.energy = sim.config.energy_max_milli();
+        sim.agents.get_mut(&b).unwrap().incapacitated = false;
+        sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+        if sim.events.events.iter().any(|e| {
+            matches!(
+                e.kind,
+                SimEventKind::Attack { target, damage } if target == b && damage == 0
+            )
+        }) {
+            missed = true;
+            break;
+        }
+    }
+    assert!(missed, "DEX 18 must miss on some locked tick");
+
+    sim.agents.get_mut(&b).unwrap().sheet.dexterity = 0;
+    fill_energy(&mut sim);
+    sim.agents.get_mut(&b).unwrap().health = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::Attack { target, damage } if target == b && damage == 2000
+    )));
+}
+
+#[test]
+fn str_18_vs_3_pocket_and_pack_caps_crate_unchanged() {
+    let mut sim = Simulation::new(tiny(0x41_12)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 18;
+    assert_eq!(sim.agents.get(&id).unwrap().pocket_slot_cap(), 20);
+    assert_eq!(sim.agents.get(&id).unwrap().inventory_cap, 16);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Basket, 1);
+    let (slots_hi, w_hi) = sim.agents.get(&id).unwrap().worn_pack_caps(&sim.storage);
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 3;
+    assert_eq!(sim.agents.get(&id).unwrap().pocket_slot_cap(), 13);
+    let (slots_lo, w_lo) = sim.agents.get(&id).unwrap().worn_pack_caps(&sim.storage);
+    assert!(slots_hi > slots_lo, "{slots_hi} vs {slots_lo}");
+    assert!(w_hi > w_lo, "{w_hi} vs {w_lo}");
+    assert_eq!(sim.storage.slot_cap, sim_core::haul::SLOT_CAP);
+    assert_eq!(
+        sim.storage.weight_cap_milli,
+        sim_core::haul::WEIGHT_CAP_MILLI
+    );
+}
+
+#[test]
+fn load_restores_sheet_not_derived_cap() {
+    let mut sim = Simulation::new(tiny(0x41_13)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 18;
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Fiber, 2);
+    assert_eq!(sim.agents.get(&id).unwrap().inventory_cap, 16);
+    assert_eq!(sim.agents.get(&id).unwrap().pocket_slot_cap(), 20);
+    let qty = sim
+        .agents
+        .get(&id)
+        .unwrap()
+        .inventory
+        .get(&ItemId::Fiber)
+        .copied()
+        .unwrap_or(0);
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    let a = loaded.agents.get(&id).unwrap();
+    assert_eq!(a.sheet.strength, 18);
+    assert_eq!(a.inventory_cap, 16);
+    assert_eq!(a.pocket_slot_cap(), 20);
+    assert_eq!(a.inventory.get(&ItemId::Fiber).copied().unwrap_or(0), qty);
 }

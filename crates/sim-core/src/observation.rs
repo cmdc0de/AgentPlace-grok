@@ -699,7 +699,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
-            if energy >= cost && agent.inventory_count() < agent.inventory_cap {
+            if energy >= cost && agent.inventory_count() < agent.pocket_slot_cap() {
                 legal.push(PrimaryAction::Retrieve {
                     item: *item,
                     qty: 1,
@@ -726,7 +726,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let cost = crate::haul::haul_cost_milli(*item, 1, params.pack_haul_milli);
-            if energy >= cost && agent.inventory_count() < agent.inventory_cap {
+            if energy >= cost && agent.inventory_count() < agent.pocket_slot_cap() {
                 legal.push(PrimaryAction::Unpack {
                     item: *item,
                     qty: 1,
@@ -750,7 +750,9 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         if dist > ident {
             continue;
         }
-        let room = other.inventory_cap.saturating_sub(other.inventory_count());
+        let room = other
+            .pocket_slot_cap()
+            .saturating_sub(other.inventory_count());
         if room == 0 {
             continue;
         }

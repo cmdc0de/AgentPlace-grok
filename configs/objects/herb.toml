@@ -7,3 +7,12 @@ glb = "assets/models/optimized/plants_ready.glb"
 near = "assets/models/optimized/plants_ready.glb"
 mid  = "assets/models/optimized/plants_ready.glb"
 far  = "assets/models/optimized/plants_ready.glb"
+
+[sim]
+yield = "food"
+nutrition = 15.0
+toxicity = "safe"
+allergen_tag = ""
+wood_yield = 0
+fiber_yield = 1
+grow_ticks = 30

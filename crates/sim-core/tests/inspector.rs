@@ -93,10 +93,11 @@ fn inspector_board_and_metrics() {
         view.board.adopted
     );
     let row = view.agents.iter().find(|x| x.id == 0).unwrap();
-    assert!(row
-        .relationships
-        .iter()
-        .any(|r| r.id == 1 && r.trust == 400));
+    assert!(
+        row.relationships
+            .iter()
+            .any(|r| r.id == 1 && r.trust == 400)
+    );
     assert!(row.kinship.iter().any(|s| s.contains("household")));
     assert!(view.metrics.hungry >= 1);
     assert!(view.metrics.illness >= 1);

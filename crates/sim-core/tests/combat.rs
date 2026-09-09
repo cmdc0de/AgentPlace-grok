@@ -7,7 +7,7 @@ use sim_core::combat_fx::{
 use sim_core::conflict::{ATTACK_DAMAGE, ATTACK_ENERGY_COST, ConflictParams};
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::observation::legal_actions;
-use sim_core::{AgentId, HEALTH_MAX, ExperimentConfig, Simulation};
+use sim_core::{AgentId, ExperimentConfig, HEALTH_MAX, Simulation};
 
 fn tiny(seed: u64) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
@@ -62,9 +62,7 @@ fn overlay_parses_conflict() {
 
 #[test]
 fn overlay_parses_conflict_death() {
-    let p = ConflictParams::from_config_toml(
-        "[conflict]\nenabled = true\ndeath_enabled = true\n",
-    );
+    let p = ConflictParams::from_config_toml("[conflict]\nenabled = true\ndeath_enabled = true\n");
     assert!(p.enabled);
     assert!(p.death_enabled);
 }
@@ -87,7 +85,9 @@ fn overlay_off_attack_not_legal() {
     let agent = sim.agents.get(&a).unwrap().clone();
     let legal = legal_actions(&sim, &agent);
     assert!(
-        !legal.iter().any(|x| matches!(x, PrimaryAction::Attack { .. })),
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::Attack { .. })),
         "{legal:?}"
     );
     assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Flee)));
@@ -142,7 +142,12 @@ fn flee_moves_away_or_waits() {
         .events
         .iter()
         .any(|e| e.agent == a && matches!(e.kind, SimEventKind::Flee));
-    assert!(moved || waited, "pos ({},{}) vs start ({ax},{ay}) vs other ({bx},{by})", ag.x, ag.y);
+    assert!(
+        moved || waited,
+        "pos ({},{}) vs start ({ax},{ay}) vs other ({bx},{by})",
+        ag.x,
+        ag.y
+    );
     assert!(fled || waited, "{:?}", sim.events.events);
 }
 
@@ -181,7 +186,9 @@ fn health_zero_incapacitates() {
     let agent = sim.agents.get(&b).unwrap().clone();
     let legal = legal_actions(&sim, &agent);
     assert!(
-        !legal.iter().any(|x| matches!(x, PrimaryAction::Attack { .. })),
+        !legal
+            .iter()
+            .any(|x| matches!(x, PrimaryAction::Attack { .. })),
         "{legal:?}"
     );
     let atk = sim.agents.get(&a).unwrap().clone();

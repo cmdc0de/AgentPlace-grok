@@ -7,3 +7,12 @@ glb = "assets/models/optimized/big_low_poly_berry_bush.glb"
 near = "assets/models/optimized/big_low_poly_berry_bush.glb"
 mid  = "assets/models/optimized/big_low_poly_berry_bush.glb"
 far  = "assets/models/optimized/plants_ready.glb"
+
+[sim]
+yield = "food"
+nutrition = 20.0
+toxicity = "safe"
+allergen_tag = ""
+wood_yield = 0
+fiber_yield = 1
+grow_ticks = 40

@@ -213,8 +213,11 @@ pub fn retrieve<'a>(
     let qvec = query.map(project_text);
     let mut idx: Vec<usize> = (0..store.len()).collect();
     idx.sort_by(|a, b| {
-        retrieval_score(&store[*b], social_bonus, qvec.as_deref())
-            .cmp(&retrieval_score(&store[*a], social_bonus, qvec.as_deref()))
+        retrieval_score(&store[*b], social_bonus, qvec.as_deref()).cmp(&retrieval_score(
+            &store[*a],
+            social_bonus,
+            qvec.as_deref(),
+        ))
     });
     idx.into_iter().take(k).map(|i| &store[i]).collect()
 }

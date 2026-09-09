@@ -56,7 +56,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M38** | Done (tag `M38`) | [`M38-plan.md`](M38-plan.md), walkthrough [`M38-test-plan.md`](M38-test-plan.md) | Viewer 3D models, browser /inject /scrub + wasm32 CI |
 | **M39** | Done (tag `M39`) | [`M39-plan.md`](M39-plan.md), walkthrough [`M39-test-plan.md`](M39-test-plan.md) | Object definition files (visual + LOD + hashed catalog) |
 | **M40** | Done (tag `M40`) | [`M40-plan.md`](M40-plan.md), walkthrough [`M40-test-plan.md`](M40-test-plan.md) | Config-owned objects + recipes (except agent) |
-| **M41** | Planned — next | [`M41-plan.md`](M41-plan.md) | World species from TOML, DEX accuracy, STR haul |
+| **M41** | Done (tag `M41`) | [`M41-plan.md`](M41-plan.md), walkthrough [`M41-test-plan.md`](M41-test-plan.md) | World species from TOML, DEX accuracy, STR haul |
 | After M41 | Not started | listed at the bottom of `M41-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -147,7 +147,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 44b | `M39-test-plan.md` | M39 walkthrough (visual/LOD hash-neutral, hashed catalog Craft) |
 | 45 | `M40-plan.md` | Milestone 40 (done, tag `M40`): config-owned objects + recipes (except agent) |
 | 45b | `M40-test-plan.md` | M40 walkthrough (config-owned objects + recipes, optimized glb) |
-| 46 | `M41-plan.md` | Milestone 41 (planned): world species from TOML, DEX accuracy, STR haul |
+| 46 | `M41-plan.md` | Milestone 41 (done, tag `M41`): world species from TOML, DEX accuracy, STR haul |
+| 46b | `M41-test-plan.md` | M41 walkthrough (species from TOML, DEX miss, STR haul) |
 
 ---
 
@@ -156,7 +157,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M41-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M41 is next (`M41-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M41 is implemented (`M41-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -184,11 +185,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M40 are done. Next is [`M41-plan.md`](M41-plan.md) (world species from TOML, DEX accuracy, STR haul). Later work is at the bottom of that file.
+M1–M41 are done. M41 is implemented ([`M41-plan.md`](M41-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M41-plan.md.
-M41 is planned (world species from TOML, DEX accuracy, STR haul;
+M41 is implemented (world species from TOML, DEX accuracy, STR haul;
 PROTOCOL_VERSION=5). Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, or Bevy in the browser.
 CI stays provider=mock with no network.

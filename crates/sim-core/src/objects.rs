@@ -4,9 +4,15 @@
 use crate::action::Recipe;
 use crate::agent::ItemId;
 use crate::error::SimError;
+use crate::species::{FaunaSpecies, SpeciesTables, Toxicity, VegYield, VegetationSpecies};
 use serde::Deserialize;
 use sha2::Digest;
 use std::path::{Path, PathBuf};
+
+/// Built-in vegetation ids in today’s 1-based tag order. Extras append after these.
+pub const BUILTIN_VEG_IDS: &[&str] = &["berry_bush", "herb", "mushroom", "nightshade", "tree"];
+pub const BUILTIN_ANIMAL_IDS: &[&str] = &["hare"];
+pub const BUILTIN_FISH_IDS: &[&str] = &["perch"];
 
 pub const LOD_NEAR_CELLS: u32 = 8;
 pub const LOD_MID_CELLS: u32 = 24;
@@ -69,6 +75,20 @@ pub struct SimDef {
     pub weight_milli: Option<u32>,
     #[serde(default)]
     pub craft: Option<CraftDef>,
+    #[serde(default, rename = "yield")]
+    pub yield_kind: Option<VegYield>,
+    #[serde(default)]
+    pub nutrition: Option<f64>,
+    #[serde(default)]
+    pub toxicity: Option<Toxicity>,
+    #[serde(default)]
+    pub allergen_tag: Option<String>,
+    #[serde(default)]
+    pub wood_yield: Option<u32>,
+    #[serde(default)]
+    pub fiber_yield: Option<u32>,
+    #[serde(default)]
+    pub grow_ticks: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -144,6 +164,133 @@ pub fn load_object_defs(dir: &Path) -> Result<Vec<ObjectDef>, SimError> {
         defs.push(def);
     }
     Ok(defs)
+}
+
+fn patch_veg(row: &mut VegetationSpecies, sim: &SimDef) {
+    if let Some(y) = sim.yield_kind {
+        row.yield_kind = y;
+    }
+    if let Some(n) = sim.nutrition {
+        row.nutrition = n;
+    }
+    if let Some(t) = sim.toxicity {
+        row.toxicity = t;
+    }
+    if let Some(a) = &sim.allergen_tag {
+        row.allergen_tag = a.clone();
+    }
+    if let Some(w) = sim.wood_yield {
+        row.wood_yield = w;
+    }
+    if let Some(f) = sim.fiber_yield {
+        row.fiber_yield = f;
+    }
+    if let Some(g) = sim.grow_ticks {
+        row.grow_ticks = g;
+    }
+}
+
+fn patch_fauna(row: &mut FaunaSpecies, sim: &SimDef) {
+    if let Some(n) = sim.nutrition {
+        row.nutrition = n;
+    }
+    if let Some(t) = sim.toxicity {
+        row.toxicity = t;
+    }
+    if let Some(a) = &sim.allergen_tag {
+        row.allergen_tag = a.clone();
+    }
+}
+
+fn veg_from_sim(id: &str, sim: &SimDef) -> VegetationSpecies {
+    VegetationSpecies {
+        id: id.to_string(),
+        yield_kind: sim.yield_kind.unwrap_or_default(),
+        nutrition: sim.nutrition.unwrap_or(20.0),
+        toxicity: sim.toxicity.unwrap_or_default(),
+        allergen_tag: sim.allergen_tag.clone().unwrap_or_default(),
+        wood_yield: sim.wood_yield.unwrap_or(0),
+        fiber_yield: sim.fiber_yield.unwrap_or(0),
+        grow_ticks: sim.grow_ticks.unwrap_or(40),
+    }
+}
+
+fn fauna_from_sim(id: &str, sim: &SimDef) -> FaunaSpecies {
+    FaunaSpecies {
+        id: id.to_string(),
+        nutrition: sim.nutrition.unwrap_or(20.0),
+        toxicity: sim.toxicity.unwrap_or_default(),
+        allergen_tag: sim.allergen_tag.clone().unwrap_or_default(),
+    }
+}
+
+fn append_extras<'a>(
+    defs: &'a [ObjectDef],
+    kind: &str,
+    builtin: &[&str],
+    have: impl Fn(&str) -> bool,
+) -> Vec<&'a ObjectDef> {
+    let mut extra: Vec<&ObjectDef> = defs
+        .iter()
+        .filter(|d| {
+            d.kind == kind && d.sim.is_some() && !builtin.contains(&d.id.as_str()) && !have(&d.id)
+        })
+        .collect();
+    extra.sort_by(|a, b| a.id.cmp(&b.id));
+    extra
+}
+
+/// Merge vegetation/animal/fish `[sim]` into species tables.
+/// Built-in ids keep today’s tags; new slugs append in sorted id order.
+pub fn apply_species_defs(tables: &mut SpeciesTables, defs: &[ObjectDef]) {
+    tables.ensure_defaults();
+    for def in defs {
+        let Some(sim) = &def.sim else {
+            continue;
+        };
+        match def.kind.as_str() {
+            "vegetation" => {
+                if let Some(row) = tables.vegetation.iter_mut().find(|v| v.id == def.id) {
+                    patch_veg(row, sim);
+                }
+            }
+            "animal" => {
+                if let Some(row) = tables.animals.iter_mut().find(|v| v.id == def.id) {
+                    patch_fauna(row, sim);
+                }
+            }
+            "fish" => {
+                if let Some(row) = tables.fish.iter_mut().find(|v| v.id == def.id) {
+                    patch_fauna(row, sim);
+                }
+            }
+            _ => {}
+        }
+    }
+    let have_veg: Vec<String> = tables.vegetation.iter().map(|v| v.id.clone()).collect();
+    for d in append_extras(defs, "vegetation", BUILTIN_VEG_IDS, |id| {
+        have_veg.iter().any(|h| h == id)
+    }) {
+        tables
+            .vegetation
+            .push(veg_from_sim(&d.id, d.sim.as_ref().unwrap()));
+    }
+    let have_an: Vec<String> = tables.animals.iter().map(|v| v.id.clone()).collect();
+    for d in append_extras(defs, "animal", BUILTIN_ANIMAL_IDS, |id| {
+        have_an.iter().any(|h| h == id)
+    }) {
+        tables
+            .animals
+            .push(fauna_from_sim(&d.id, d.sim.as_ref().unwrap()));
+    }
+    let have_fi: Vec<String> = tables.fish.iter().map(|v| v.id.clone()).collect();
+    for d in append_extras(defs, "fish", BUILTIN_FISH_IDS, |id| {
+        have_fi.iter().any(|h| h == id)
+    }) {
+        tables
+            .fish
+            .push(fauna_from_sim(&d.id, d.sim.as_ref().unwrap()));
+    }
 }
 
 pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {

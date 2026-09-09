@@ -7,3 +7,8 @@ glb = "assets/models/optimized/lowpoly_fish.glb"
 near = "assets/models/optimized/lowpoly_fish.glb"
 mid  = "assets/models/optimized/lowpoly_fish.glb"
 far  = "assets/models/optimized/lowpoly_fish.glb"
+
+[sim]
+nutrition = 25.0
+toxicity = "safe"
+allergen_tag = ""

@@ -1,14 +1,14 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
 use crate::commands::{
-    help_text, parse_command, remote_control, run_command, CkptScrubber, WindowFlags,
+    CkptScrubber, WindowFlags, help_text, parse_command, remote_control, run_command,
 };
 use crate::net::NetLink;
 use bevy::prelude::*;
 use bevy_mod_imgui::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared::protocol::ClientMessage;
-use sim_bevy::{step_once, SimState};
+use sim_bevy::{SimState, step_once};
 use sim_core::event_log::SimEventKind;
 use sim_core::markers;
 use sim_core::{AgentId, ItemId};
@@ -21,40 +21,37 @@ const EVENT_CAP: usize = 200;
 const LOG_CAP: usize = 80;
 const HISTORY_CAP: usize = 50;
 
-/// Drops the mouse-up that click-throughs a newly focused window onto Play/Step.
+/// Drops launch / focus click-through onto imgui Play/Step.
 ///
-/// Launching the viewer often delivers the terminal/click mouse-up to the new
-/// Bevy window. Imgui `button("Play")` treats that as a real click, which used
-/// to unpause `--start-paused` the moment `--connect` opened. Wall-clock grace
-/// from Subscribe cannot cover this: Subscribe is sent before the window exists.
+/// Counting Update frames from process start is not enough: GLB load and window
+/// map happen later, the old 10-frame timer is already expired, and the
+/// click-to-focus mouse-up lands on Play. Arm only after the window is focused,
+/// the cursor is inside it, and the mouse has been up with no press/release.
 #[derive(Resource, Default, Debug, Clone)]
 pub struct ClickThroughGuard {
-    frames: u32,
-    mouse_up_frames: u32,
+    stable_frames: u32,
     armed: bool,
 }
 
 impl ClickThroughGuard {
-    pub const MIN_FRAMES: u32 = 10;
-    pub const MIN_MOUSE_UP_FRAMES: u32 = 2;
+    pub const MIN_STABLE_FRAMES: u32 = 20;
 
-    pub fn tick(&mut self, left_down: bool) {
-        self.frames = self.frames.saturating_add(1);
-        if left_down {
-            self.mouse_up_frames = 0;
-        } else {
-            self.mouse_up_frames = self.mouse_up_frames.saturating_add(1);
+    pub fn tick(&mut self, left_down: bool, just_released: bool, focused: bool, cursor_in: bool) {
+        if self.armed {
+            return;
         }
-        if !self.armed
-            && self.frames >= Self::MIN_FRAMES
-            && self.mouse_up_frames >= Self::MIN_MOUSE_UP_FRAMES
-        {
+        if !focused || !cursor_in || left_down || just_released {
+            self.stable_frames = 0;
+            return;
+        }
+        self.stable_frames = self.stable_frames.saturating_add(1);
+        if self.stable_frames >= Self::MIN_STABLE_FRAMES {
             self.armed = true;
         }
     }
 
-    /// Remote Play / Step / Space-toggle stay inert until the window has settled
-    /// with the mouse released. Once true, stays true so a later real click works.
+    /// Remote Play / Step stay inert until the attach window has settled.
+    /// Once true, stays true so a later real click works.
     pub fn armed(&self) -> bool {
         self.armed
     }
@@ -285,9 +282,10 @@ fn draw_status(
             }
             ui.same_line();
             ui.disabled(!armed, || {
-                if ui.button("Play") && armed {
+                if ui.button("Play") && armed && (!state.remote || ui.is_item_hovered()) {
                     state.paused = false;
                     if state.remote {
+                        eprintln!("viewer: sending Play");
                         send_control(
                             net,
                             ClientMessage::Control(shared::protocol::ControlVerb::Play),
@@ -295,8 +293,9 @@ fn draw_status(
                     }
                 }
                 ui.same_line();
-                if ui.button("Step") && armed {
+                if ui.button("Step") && armed && (!state.remote || ui.is_item_hovered()) {
                     if state.remote {
+                        eprintln!("viewer: sending Step");
                         send_control(
                             net,
                             ClientMessage::Control(shared::protocol::ControlVerb::Step(1)),
@@ -419,6 +418,11 @@ fn draw_inspector(ui: &Ui, state: &SimState, open: &mut bool) {
                 return;
             };
             ui.text(format!("agent {}  pos=({}, {})", id.0, a.x, a.y));
+            ui.text(format!(
+                "pockets {}/{}",
+                a.inventory_count(),
+                a.pocket_slot_cap()
+            ));
             if let Some(t) = &state.sim.last_tick_timing {
                 if let Some(at) = t.agents.iter().find(|x| x.agent == id.0) {
                     ui.text(format!(
@@ -931,34 +935,50 @@ fn item_label(item: ItemId, species: &sim_core::species::SpeciesTables) -> Strin
 mod tests {
     use super::*;
 
+    fn settle(g: &mut ClickThroughGuard) {
+        for _ in 0..ClickThroughGuard::MIN_STABLE_FRAMES {
+            g.tick(false, false, true, true);
+        }
+    }
+
     #[test]
-    fn click_through_guard_ignores_held_mouse() {
+    fn click_through_guard_ignores_unfocused_and_held_mouse() {
         let mut g = ClickThroughGuard::default();
         assert!(!g.armed());
-        for _ in 0..30 {
-            g.tick(true);
+        for _ in 0..40 {
+            g.tick(false, false, false, true);
+        }
+        assert!(!g.armed(), "unfocused window must not arm Play");
+        for _ in 0..40 {
+            g.tick(true, false, true, true);
         }
         assert!(!g.armed(), "mouse down must not arm Play");
-        g.tick(false);
-        assert!(!g.armed(), "the click-through mouse-up frame stays inert");
-        g.tick(false);
+        g.tick(false, true, true, true);
+        assert!(!g.armed(), "click-through mouse-up must reset");
+        settle(&mut g);
         assert!(g.armed());
-        g.tick(true);
+        g.tick(true, false, true, true);
         assert!(g.armed(), "a later real click must still work");
     }
 
     #[test]
-    fn click_through_guard_needs_settling_frames() {
+    fn click_through_guard_needs_stable_focus() {
         let mut g = ClickThroughGuard::default();
-        g.tick(false);
-        g.tick(false);
-        assert!(
-            !g.armed(),
-            "first frames are the click-through window even with mouse up"
-        );
-        for _ in 2..ClickThroughGuard::MIN_FRAMES {
-            g.tick(false);
+        g.tick(false, false, true, true);
+        g.tick(false, false, true, true);
+        assert!(!g.armed(), "first focused frames stay inert");
+        settle(&mut g);
+        assert!(g.armed());
+    }
+
+    #[test]
+    fn click_through_guard_cursor_outside_does_not_arm() {
+        let mut g = ClickThroughGuard::default();
+        for _ in 0..40 {
+            g.tick(false, false, true, false);
         }
+        assert!(!g.armed());
+        settle(&mut g);
         assert!(g.armed());
     }
 }

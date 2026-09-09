@@ -57,7 +57,12 @@ impl Kinship {
             hasher.update(id.0.to_le_bytes());
         }
         hasher.update([0xff]);
-        hasher.update(self.pair_bond.map(|id| id.0).unwrap_or(u64::MAX).to_le_bytes());
+        hasher.update(
+            self.pair_bond
+                .map(|id| id.0)
+                .unwrap_or(u64::MAX)
+                .to_le_bytes(),
+        );
         hasher.update(self.household.unwrap_or(u64::MAX).to_le_bytes());
     }
 
@@ -141,11 +146,7 @@ impl PopulationParams {
             culture_count: Option<u32>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
-        let culture_count = slice
-            .population
-            .culture_count
-            .unwrap_or(4)
-            .clamp(1, 255) as u8;
+        let culture_count = slice.population.culture_count.unwrap_or(4).clamp(1, 255) as u8;
         Self {
             reproduction: slice.population.reproduction.unwrap_or(false),
             aging: slice.population.aging.unwrap_or(false),

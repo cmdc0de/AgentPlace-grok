@@ -34,12 +34,8 @@ pub fn combat_fx_jobs(events: &[SimEvent], tick: u64) -> Vec<CombatFxJob> {
                 });
             }
             SimEventKind::Flee => jobs.push(CombatFxJob::Flee { agent: e.agent }),
-            SimEventKind::Incapacitated { .. } => {
-                jobs.push(CombatFxJob::Downed { agent: e.agent })
-            }
-            SimEventKind::CombatDeath { .. } => {
-                jobs.push(CombatFxJob::Death { agent: e.agent })
-            }
+            SimEventKind::Incapacitated { .. } => jobs.push(CombatFxJob::Downed { agent: e.agent }),
+            SimEventKind::CombatDeath { .. } => jobs.push(CombatFxJob::Death { agent: e.agent }),
             _ => {}
         }
     }

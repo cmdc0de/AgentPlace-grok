@@ -137,19 +137,20 @@ fn custom_insight_ok_on_tick_n() {
     sim.llm_reflect_every_n = 2;
     sim.run_ticks(1);
     assert_eq!(sim.tick, 1);
-    assert!(!sim
-        .agents
-        .values()
-        .any(|a| a.memory.iter().any(|e| e.kind == MemoryKind::Reflection)));
+    assert!(
+        !sim.agents
+            .values()
+            .any(|a| a.memory.iter().any(|e| e.kind == MemoryKind::Reflection))
+    );
     assert_eq!(stub.insight.load(Ordering::SeqCst), 0);
     sim.run_ticks(1);
     assert_eq!(sim.tick, 2);
     assert!(stub.insight.load(Ordering::SeqCst) >= 1);
     assert!(
-        sim.agents
-            .values()
-            .any(|a| a.memory.iter().any(|e| e.kind == MemoryKind::Reflection
-                && e.text.contains("quiet"))),
+        sim.agents.values().any(|a| a
+            .memory
+            .iter()
+            .any(|e| e.kind == MemoryKind::Reflection && e.text.contains("quiet"))),
         "expected insight Reflection"
     );
 }
@@ -178,10 +179,11 @@ fn custom_insight_plan_err_skips() {
     sim.run_ticks(4);
     assert!(stub.insight.load(Ordering::SeqCst) >= 1);
     assert!(stub.plan.load(Ordering::SeqCst) >= 1);
-    assert!(!sim
-        .agents
-        .values()
-        .any(|a| a.memory.iter().any(|e| e.kind == MemoryKind::Reflection)));
+    assert!(
+        !sim.agents
+            .values()
+            .any(|a| a.memory.iter().any(|e| e.kind == MemoryKind::Reflection))
+    );
     assert!(sim.agents.values().all(|a| a.plan.is_empty()));
 }
 
@@ -310,10 +312,7 @@ fn execute_plan_pops_legal_wait() {
     sim.chooser = Chooser::Custom(stub.clone());
     sim.llm_execute_plan = true;
     for a in sim.agents.values_mut() {
-        a.plan = vec![
-            r#"{"action":"Wait"}"#.into(),
-            r#"{"action":"Wait"}"#.into(),
-        ];
+        a.plan = vec![r#"{"action":"Wait"}"#.into(), r#"{"action":"Wait"}"#.into()];
     }
     let id = AgentId(0);
     sim.tick();
@@ -400,10 +399,11 @@ type = "force_reflect"
     a.run_ticks(3);
     b.run_ticks(3);
     assert_eq!(a.state_hash(), b.state_hash());
-    assert!(!b
-        .agents
-        .values()
-        .any(|ag| ag.memory.iter().any(|e| e.kind == MemoryKind::Reflection)));
+    assert!(
+        !b.agents
+            .values()
+            .any(|ag| ag.memory.iter().any(|e| e.kind == MemoryKind::Reflection))
+    );
 }
 
 #[test]
@@ -423,10 +423,11 @@ type = "force_reflect"
     .unwrap();
     sim.run_ticks(1);
     assert!(stub.insight.load(Ordering::SeqCst) >= 1);
-    assert!(sim.agents.values().any(|a| a
-        .memory
-        .iter()
-        .any(|e| e.kind == MemoryKind::Reflection && e.text.contains("quiet"))));
+    assert!(sim.agents.values().any(|a| {
+        a.memory
+            .iter()
+            .any(|e| e.kind == MemoryKind::Reflection && e.text.contains("quiet"))
+    }));
 }
 
 #[test]
@@ -600,4 +601,3 @@ fn old_jsonl_importance_call_round_trips() {
             .contains("importance")
     );
 }
-

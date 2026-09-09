@@ -4,9 +4,9 @@ mod overlay;
 mod server;
 
 use sim_core::{
-    append_decisions_jsonl, append_events_jsonl, append_timing_jsonl, compare_csv,
-    compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint, ExperimentConfig, Simulation,
+    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
+    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
+    summary_markdown, write_report, write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -220,10 +220,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return client::log_tail(url, token, quiet, allow_control);
     }
 
+    let objects_dir = objects_path
+        .clone()
+        .or_else(sim_core::objects::default_objects_dir);
     let mut sim = if let Some(path) = &load_path {
         Simulation::load_checkpoint(path)?
     } else {
-        let config = ExperimentConfig::load_path(&config_path)?;
+        let mut config = ExperimentConfig::load_path(&config_path)?;
+        if let Some(dir) = &objects_dir {
+            let defs = sim_core::load_object_defs(dir)?;
+            sim_core::apply_species_defs(&mut config.world.species, &defs);
+        }
         Simulation::new(config)?
     };
     if let Some(provider) = &llm_override {
@@ -292,11 +299,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             sim.enable_inventions(inv.share_delay_ticks);
         }
         let cat = sim_core::CatalogParams::from_config_toml(&text);
-        let dir = objects_path
-            .clone()
-            .or_else(sim_core::objects::default_objects_dir);
-        if let Some(dir) = dir {
-            let _ = sim.apply_objects_dir(&dir)?;
+        if let Some(dir) = &objects_dir {
+            let _ = sim.apply_objects_dir(dir)?;
         } else if catalog || cat.enabled {
             sim.enable_catalog(Vec::new());
         }

@@ -3,7 +3,7 @@
 use sim_core::action::PrimaryAction;
 use sim_core::agent::ItemId;
 use sim_core::event_log::SimEventKind;
-use sim_core::inventions::{apply_move_cost, apply_sense_range, invent_chance, InventionsParams};
+use sim_core::inventions::{InventionsParams, apply_move_cost, apply_sense_range, invent_chance};
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, InventionKind, Simulation};
 
@@ -187,10 +187,11 @@ fn execute_invent_move_then_sense() {
         .try_add_item(ItemId::Stone, 4);
     force_invent(&mut sim, a);
     force_invent_kind(&mut sim, a, InventionKind::MoveBonus);
-    assert!(sim
-        .inventions
-        .values()
-        .any(|i| i.kind == InventionKind::MoveBonus && i.inventor == a && !i.shared));
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::MoveBonus && i.inventor == a && !i.shared)
+    );
     let base_a = sim.agents.get(&a).unwrap().move_cost_milli(&sim.storage);
     let base_b = sim.agents.get(&b).unwrap().move_cost_milli(&sim.storage);
     let cost_a = apply_move_cost(base_a, &sim.inventions, a);
@@ -243,11 +244,12 @@ fn execute_invent_move_then_sense() {
     {
         sim.tick();
     }
-    assert!(sim
-        .inventions
-        .values()
-        .filter(|i| matches!(i.kind, InventionKind::MoveBonus | InventionKind::SenseBonus))
-        .all(|i| i.shared));
+    assert!(
+        sim.inventions
+            .values()
+            .filter(|i| matches!(i.kind, InventionKind::MoveBonus | InventionKind::SenseBonus))
+            .all(|i| i.shared)
+    );
     let cost_b = apply_move_cost(
         sim.agents.get(&b).unwrap().move_cost_milli(&sim.storage),
         &sim.inventions,
@@ -280,9 +282,11 @@ fn fourth_invent_waits_all_kinds_present() {
     let n_events = sim.events.events.len();
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Invent);
     assert_eq!(sim.inventions.len(), 3);
-    assert!(sim.events.events[n_events..]
-        .iter()
-        .any(|e| matches!(e.kind, SimEventKind::Wait)));
+    assert!(
+        sim.events.events[n_events..]
+            .iter()
+            .any(|e| matches!(e.kind, SimEventKind::Wait))
+    );
     let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
     assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
 }

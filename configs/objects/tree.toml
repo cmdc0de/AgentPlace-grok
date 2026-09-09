@@ -7,3 +7,12 @@ glb = "assets/models/optimized/maple_tree.glb"
 near = "assets/models/optimized/maple_tree.glb"
 mid  = "assets/models/optimized/tree.glb"
 far  = "assets/models/optimized/tree.glb"
+
+[sim]
+yield = "wood"
+nutrition = 0.0
+toxicity = "safe"
+allergen_tag = ""
+wood_yield = 3
+fiber_yield = 0
+grow_ticks = 80
