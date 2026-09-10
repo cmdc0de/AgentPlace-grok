@@ -1,7 +1,8 @@
 # M42 — CON illness/energy, INT memory, browser /ckpt /events
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M41 complete (`docs/M41-plan.md`, git tag `M41`, commit `7d6baff`)  
+**Walkthrough:** [`docs/M42-test-plan.md`](M42-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-4 CON/INT, PG-7 `/ckpt` `/events`)
 
 ## Context
@@ -124,7 +125,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: write `docs/M42-test-plan.md` on implement.
+Walkthrough: [`docs/M42-test-plan.md`](M42-test-plan.md).
 
 ```bash
 cargo test -p sim-core

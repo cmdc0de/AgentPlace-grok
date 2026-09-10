@@ -16,7 +16,7 @@
 </head>
 <body>
   <h1>AgentPlace browser attach</h1>
-  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Tables come from <code>Tick.metrics.inspector</code> JSON; Snapshot wasm is optional. <code>/set</code> <code>/give</code> need <code>--allow-control</code>.</p>
+  <p>Postcard <code>PROTOCOL_VERSION = 5</code> over <code>ws://</code> (no TLS). Tables come from <code>Tick.metrics.inspector</code> JSON; Snapshot wasm is optional. <code>/set</code> <code>/give</code> <code>/ckpt</code> <code>/events</code> need <code>--allow-control</code>.</p>
   <label>WebSocket URL <input id="url" size="40" value="ws://127.0.0.1:9001" /></label>
   <label>Token (optional) <input id="token" size="20" /></label>
   <button id="connect">Connect</button>
@@ -36,6 +36,10 @@
   <div>
     <label>/scrub <input id="scrub-tick" size="8" placeholder="tick" /></label>
     <button id="scrub" disabled>Scrub</button>
+    <button id="ckpt-prev" disabled>/ckpt prev</button>
+    <button id="ckpt-next" disabled>/ckpt next</button>
+    <label>/events <input id="events-tick" size="8" placeholder="tick" /></label>
+    <button id="events" disabled>Events</button>
     <label>/inject</label>
     <textarea id="inject-toml" rows="4" cols="48" placeholder="[[incentives]]"></textarea>
     <button id="inject" disabled>Inject</button>
@@ -121,6 +125,15 @@
     }
     function encodeScrub(tick) {
       return frame([3, 6, ...varint(tick)]);
+    }
+    function encodeCkptNext() {
+      return frame([3, 8]);
+    }
+    function encodeCkptPrev() {
+      return frame([3, 9]);
+    }
+    function encodeEvents(tick) {
+      return frame([3, 10, ...varint(tick)]);
     }
     function encodeInject(toml) {
       return frame([4, ...encodeStr(toml)]);
@@ -293,6 +306,9 @@
         document.getElementById("give").disabled = false;
         document.getElementById("set").disabled = false;
         document.getElementById("scrub").disabled = false;
+        document.getElementById("ckpt-prev").disabled = false;
+        document.getElementById("ckpt-next").disabled = false;
+        document.getElementById("events").disabled = false;
         document.getElementById("inject").disabled = false;
       };
       ws.onmessage = (ev) => {
@@ -342,6 +358,18 @@
       const tick = Number(document.getElementById("scrub-tick").value);
       if (!Number.isFinite(tick)) return;
       ws.send(encodeScrub(tick));
+    };
+    document.getElementById("ckpt-next").onclick = () => {
+      if (ws) ws.send(encodeCkptNext());
+    };
+    document.getElementById("ckpt-prev").onclick = () => {
+      if (ws) ws.send(encodeCkptPrev());
+    };
+    document.getElementById("events").onclick = () => {
+      if (!ws) return;
+      const tick = Number(document.getElementById("events-tick").value);
+      if (!Number.isFinite(tick)) return;
+      ws.send(encodeEvents(tick));
     };
     document.getElementById("inject").onclick = () => {
       if (!ws) return;

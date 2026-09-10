@@ -937,3 +937,124 @@ fn load_restores_sheet_not_derived_cap() {
     assert_eq!(a.pocket_slot_cap(), 20);
     assert_eq!(a.inventory.get(&ItemId::Fiber).copied().unwrap_or(0), qty);
 }
+
+#[test]
+fn con_18_vs_3_energy_max_and_illness() {
+    let mut sim = Simulation::new(tiny(0x42_01)).unwrap();
+    let id = AgentId(0);
+    let base = sim.config.energy_max_milli();
+    sim.agents.get_mut(&id).unwrap().sheet.constitution = 18;
+    assert_eq!(
+        sim.agents.get(&id).unwrap().sheet.energy_max(base),
+        base + 2000
+    );
+    sim.agents.get_mut(&id).unwrap().needs.energy = base;
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Rest);
+    let hi = sim.agents.get(&id).unwrap().needs.energy;
+    sim.agents.get_mut(&id).unwrap().sheet.constitution = 3;
+    sim.agents.get_mut(&id).unwrap().needs.energy = base;
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Rest);
+    let lo = sim.agents.get(&id).unwrap().needs.energy;
+    assert!(hi > lo, "CON 18 energy {hi} vs CON 3 {lo}");
+    assert_eq!(lo, sim.agents.get(&id).unwrap().sheet.energy_max(base));
+
+    let mushroom = sim
+        .config
+        .world
+        .species
+        .veg_tag_by_id("mushroom")
+        .expect("mushroom");
+    sim.agents.get_mut(&id).unwrap().sheet.constitution = 18;
+    sim.agents.get_mut(&id).unwrap().illness_ticks = 0;
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Food(mushroom), 1);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Eat {
+            item: ItemId::Food(mushroom),
+        },
+    );
+    assert_eq!(sim.agents.get(&id).unwrap().illness_ticks, 8);
+    sim.agents.get_mut(&id).unwrap().sheet.constitution = 3;
+    sim.agents.get_mut(&id).unwrap().illness_ticks = 0;
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Food(mushroom), 1);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Eat {
+            item: ItemId::Food(mushroom),
+        },
+    );
+    assert_eq!(sim.agents.get(&id).unwrap().illness_ticks, 15);
+}
+
+#[test]
+fn int_18_vs_3_memory_and_retrieval() {
+    let sim = Simulation::new(tiny(0x42_02)).unwrap();
+    let id = AgentId(0);
+    let base_cap = sim.config.memory_capacity();
+    let base_k = sim.config.agents.memory.retrieval_k;
+    assert_eq!(base_cap, 128);
+    assert_eq!(base_k, 8);
+    let mut a = sim.agents.get(&id).unwrap().clone();
+    a.sheet.intelligence = 18;
+    assert_eq!(a.sheet.memory_cap(base_cap), 144);
+    assert_eq!(a.sheet.retrieval_k(base_k), 12);
+    a.sheet.intelligence = 3;
+    assert_eq!(a.sheet.memory_cap(base_cap), 116);
+    assert_eq!(a.sheet.retrieval_k(base_k), 5);
+}
+
+#[test]
+fn unused_sheet_energy_memory_identity() {
+    let mut sim = Simulation::new(tiny(0x42_03)).unwrap();
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert!(a.sheet.is_unused());
+    assert_eq!(
+        a.sheet.energy_max(sim.config.energy_max_milli()),
+        sim.config.energy_max_milli()
+    );
+    assert_eq!(a.sheet.illness_duration(), 12);
+    assert_eq!(a.sheet.memory_cap(sim.config.memory_capacity()), 128);
+    assert_eq!(a.sheet.retrieval_k(sim.config.agents.memory.retrieval_k), 8);
+    let mushroom = sim.config.world.species.veg_tag_by_id("mushroom").unwrap();
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Food(mushroom), 1);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Eat {
+            item: ItemId::Food(mushroom),
+        },
+    );
+    assert_eq!(sim.agents.get(&id).unwrap().illness_ticks, 12);
+}
+
+#[test]
+fn load_restores_con_int_not_derived() {
+    let mut sim = Simulation::new(tiny(0x42_04)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet.constitution = 18;
+    sim.agents.get_mut(&id).unwrap().sheet.intelligence = 18;
+    sim.agents.get_mut(&id).unwrap().illness_ticks = 8;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    let a = loaded.agents.get(&id).unwrap();
+    assert_eq!(a.sheet.constitution, 18);
+    assert_eq!(a.sheet.intelligence, 18);
+    assert_eq!(a.illness_ticks, 8);
+    assert_eq!(
+        a.sheet.energy_max(loaded.config.energy_max_milli()),
+        loaded.config.energy_max_milli() + 2000
+    );
+    assert_eq!(a.sheet.memory_cap(loaded.config.memory_capacity()), 144);
+}

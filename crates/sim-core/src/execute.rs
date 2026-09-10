@@ -8,8 +8,6 @@ use crate::species::{Crop, Toxicity, VegYield};
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 
-const ILLNESS_TICKS: u32 = 12;
-
 pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction) {
     if let Some(reason) = rule_block(sim, id, action) {
         push(sim, id, SimEventKind::RuleBlocked { reason });
@@ -356,7 +354,12 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let floor = sim.config.energy_max_milli() / 2;
+    let floor = {
+        let Some(a) = sim.agents.get(&id) else {
+            return;
+        };
+        a.sheet.energy_max(sim.config.energy_max_milli()) / 2
+    };
     let Some(a) = sim.agents.get(&id) else {
         return;
     };
@@ -432,7 +435,7 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     child.needs = crate::agent::Needs::maxed(
         sim.config.hunger_max_milli(),
         sim.config.thirst_max_milli(),
-        sim.config.energy_max_milli(),
+        sheet.energy_max(sim.config.energy_max_milli()),
     );
     let pa = sim.agents.get(&id).unwrap();
     let pb = sim.agents.get(&with).unwrap();
@@ -846,8 +849,9 @@ fn skill_roll(
 
 fn rest(sim: &mut Simulation, id: AgentId) {
     let regen = sim.config.energy_regen_milli();
-    let max = sim.config.energy_max_milli();
+    let base = sim.config.energy_max_milli();
     if let Some(a) = sim.agents.get_mut(&id) {
+        let max = a.sheet.energy_max(base);
         a.needs.energy = (a.needs.energy + regen).min(max);
     }
     push(sim, id, SimEventKind::Rest);
@@ -1055,7 +1059,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         return;
     };
     let hunger_max = sim.config.hunger_max_milli();
-    let cap = sim.config.memory_capacity();
+    let base_cap = sim.config.memory_capacity();
     let policy = sim.config.agents.memory.eviction_policy;
     let bonus = sim.config.social_bonus_milli();
     let persist = sim.config.agents.memory.persistent_relationships;
@@ -1123,6 +1127,8 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
     let Some(agent) = sim.agents.get_mut(&id) else {
         return;
     };
+    let cap = agent.sheet.memory_cap(base_cap);
+    let illness = agent.sheet.illness_duration();
     if !agent.take_item(item, 1) && !agent.take_pack(item, 1) {
         push(sim, id, SimEventKind::Wait);
         return;
@@ -1138,7 +1144,7 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         agent.consumption.fish += 1;
     }
     if toxic {
-        agent.illness_ticks = agent.illness_ticks.max(ILLNESS_TICKS);
+        agent.illness_ticks = agent.illness_ticks.max(illness);
         agent.consumption.toxic_events += 1;
         agent.needs.energy = agent.needs.energy.saturating_sub(800);
         let _ = agent.remember(
@@ -1585,7 +1591,11 @@ fn remember_obs(sim: &mut Simulation, id: AgentId, species: u8, x: u32, y: u32) 
 }
 
 pub(crate) fn remember_agent(sim: &mut Simulation, id: AgentId, mut entry: MemoryEntry) {
-    let cap = sim.config.memory_capacity();
+    let cap = sim
+        .agents
+        .get(&id)
+        .map(|a| a.sheet.memory_cap(sim.config.memory_capacity()))
+        .unwrap_or_else(|| sim.config.memory_capacity());
     let policy = sim.config.agents.memory.eviction_policy;
     let bonus = sim.config.social_bonus_milli();
     let persist = sim.config.agents.memory.persistent_relationships;

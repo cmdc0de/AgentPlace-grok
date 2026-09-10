@@ -1168,6 +1168,34 @@ fn drain_until_tick(conn: &mut Connection) -> u64 {
 }
 
 #[test]
+fn ckpt_events_without_allow_control_is_disabled() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::CkptNext))
+        .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::ControlDisabled,
+            ..
+        } => {}
+        other => panic!("expected ControlDisabled, got {other:?}"),
+    }
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Events(1)))
+        .unwrap();
+    let msg: ServerMessage = conn.recv_msg().unwrap();
+    match msg {
+        ServerMessage::Error {
+            code: ErrorCode::ControlDisabled,
+            ..
+        } => {}
+        other => panic!("expected ControlDisabled, got {other:?}"),
+    }
+    let _ = conn.close();
+    let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
 fn set_without_allow_control_is_disabled() {
     let (mut child, url, out_h, err_h) = spawn_listen(&[]);
     let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
@@ -1483,6 +1511,9 @@ fn browser_page_ships_protocol_5() {
     assert!(text.contains("encodeSet"), "{text}");
     assert!(text.contains("encodeInject"), "{text}");
     assert!(text.contains("encodeScrub"), "{text}");
+    assert!(text.contains("encodeCkptNext"), "{text}");
+    assert!(text.contains("encodeCkptPrev"), "{text}");
+    assert!(text.contains("encodeEvents"), "{text}");
     assert!(text.contains("sim_wasm"), "{text}");
 }
 

@@ -821,7 +821,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         }
     }
     if sim.reproduction_enabled && !agent.incapacitated {
-        let floor = sim.config.energy_max_milli() / 2;
+        let floor = agent.sheet.energy_max(sim.config.energy_max_milli()) / 2;
         for other in sim.agents.values() {
             if other.id == agent.id || other.incapacitated {
                 continue;

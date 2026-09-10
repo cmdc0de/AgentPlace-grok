@@ -1,6 +1,7 @@
 //! Overlay `[agents.sheet]`. Not on `ExperimentConfig` (not hashed).
 
 use crate::agent::HEALTH_MAX;
+use crate::config::MIN_MEMORY_CAPACITY;
 use crate::conflict::ATTACK_DAMAGE;
 use rand::Rng;
 use rand_chacha::ChaCha20Rng;
@@ -40,6 +41,31 @@ impl AbilitySheet {
         }
         let m = Self::modifier(self.constitution);
         (HEALTH_MAX as i32 + m * 500).max(1) as u32
+    }
+
+    /// Energy cap after CON. Unused CON (mod 0) leaves `base`.
+    pub fn energy_max(&self, base: u32) -> u32 {
+        (base as i32 + Self::modifier(self.constitution) * 500).max(1) as u32
+    }
+
+    /// Toxic-eat illness ticks. Unused CON keeps 12.
+    pub fn illness_duration(&self) -> u32 {
+        (12 - Self::modifier(self.constitution)).max(1) as u32
+    }
+
+    /// Memory slot cap after INT. Unused INT (mod 0) leaves `base` (even if < 8).
+    /// When INT is used, floor `MIN_MEMORY_CAPACITY`.
+    pub fn memory_cap(&self, base: u32) -> u32 {
+        let m = Self::modifier(self.intelligence);
+        if m == 0 {
+            return base;
+        }
+        (base as i32 + m * 4).max(MIN_MEMORY_CAPACITY as i32) as u32
+    }
+
+    /// Retrieval k after INT. Unused INT leaves `base`. Floor 1.
+    pub fn retrieval_k(&self, base: u32) -> u32 {
+        (base as i32 + Self::modifier(self.intelligence)).max(1) as u32
     }
 
     /// Attack damage millipoints. Unused STR (0) keeps `ATTACK_DAMAGE`.
@@ -198,6 +224,10 @@ mod tests {
         assert_eq!(s.adjust_range(8), 8);
         assert_eq!(s.influence_vote_weight(50), 50);
         assert_eq!(s.influence_vote_weight(0), 1);
+        assert_eq!(s.energy_max(10_000), 10_000);
+        assert_eq!(s.illness_duration(), 12);
+        assert_eq!(s.memory_cap(128), 128);
+        assert_eq!(s.retrieval_k(8), 8);
     }
 
     #[test]
@@ -234,5 +264,29 @@ mod tests {
         assert_eq!(low.adjust_range(8), 5);
         assert_eq!(high.influence_vote_weight(1000), 1400);
         assert_eq!(mid.influence_vote_weight(1000), 1000);
+        let con_hi = AbilitySheet {
+            constitution: 18,
+            ..mid
+        };
+        let con_lo = AbilitySheet {
+            constitution: 3,
+            ..mid
+        };
+        assert_eq!(con_hi.energy_max(10_000), 12_000);
+        assert_eq!(con_lo.energy_max(10_000), 8_500);
+        assert_eq!(con_hi.illness_duration(), 8);
+        assert_eq!(con_lo.illness_duration(), 15);
+        let int_hi = AbilitySheet {
+            intelligence: 18,
+            ..mid
+        };
+        let int_lo = AbilitySheet {
+            intelligence: 3,
+            ..mid
+        };
+        assert_eq!(int_hi.memory_cap(128), 144);
+        assert_eq!(int_lo.memory_cap(128), 116);
+        assert_eq!(int_hi.retrieval_k(8), 12);
+        assert_eq!(int_lo.retrieval_k(8), 5);
     }
 }

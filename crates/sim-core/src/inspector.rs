@@ -106,7 +106,8 @@ impl InspectorView {
             if a.needs.thirst < tmax / 2 {
                 thirsty += 1;
             }
-            if a.needs.energy < emax / 2 {
+            let agent_emax = a.sheet.energy_max(emax);
+            if a.needs.energy < agent_emax / 2 {
                 tired += 1;
             }
             if a.illness_ticks > 0 {

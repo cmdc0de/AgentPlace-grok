@@ -574,7 +574,11 @@ impl Simulation {
 
     fn insert_reflection(&mut self, id: AgentId, summary: String) {
         let tick = self.tick;
-        let cap = self.config.memory_capacity();
+        let cap = self
+            .agents
+            .get(&id)
+            .map(|a| a.sheet.memory_cap(self.config.memory_capacity()))
+            .unwrap_or_else(|| self.config.memory_capacity());
         let policy = self.config.agents.memory.eviction_policy;
         let bonus = self.config.social_bonus_milli();
         let persist = self.config.agents.memory.persistent_relationships;
@@ -1109,7 +1113,11 @@ impl Simulation {
         let mut policy_branch;
         let retrieved_ids: Vec<u64> = {
             let bonus = self.config.social_bonus_milli();
-            let k = self.config.agents.memory.retrieval_k as usize;
+            let k = self
+                .agents
+                .get(&id)
+                .map(|a| a.sheet.retrieval_k(self.config.agents.memory.retrieval_k) as usize)
+                .unwrap_or(self.config.agents.memory.retrieval_k as usize);
             let query = if self.config.agents.memory.enable_embeddings {
                 let mut s = format!("h{} t{} e{}", obs.hunger, obs.thirst, obs.energy);
                 for h in &obs.heard {
@@ -1231,7 +1239,7 @@ impl Simulation {
                         energy,
                         self.config.thirst_max_milli(),
                         self.config.hunger_max_milli(),
-                        self.config.energy_max_milli(),
+                        agent.sheet.energy_max(self.config.energy_max_milli()),
                         &memory,
                         last_warn,
                         self.tick,

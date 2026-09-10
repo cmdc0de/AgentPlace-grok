@@ -1,7 +1,7 @@
 //! Length-prefixed postcard frames (`u32` LE length + payload).
 
 use crate::{MAX_FRAME_BYTES, PROTOCOL_VERSION};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -222,6 +222,16 @@ mod tests {
     fn scrub_postcard_bytes() {
         let frame = encode_frame(&ClientMessage::Control(ControlVerb::Scrub(3))).unwrap();
         assert_eq!(&frame[4..], &[3, 6, 3]);
+    }
+
+    #[test]
+    fn ckpt_events_postcard_bytes() {
+        let next = encode_frame(&ClientMessage::Control(ControlVerb::CkptNext)).unwrap();
+        assert_eq!(&next[4..], &[3, 8]);
+        let prev = encode_frame(&ClientMessage::Control(ControlVerb::CkptPrev)).unwrap();
+        assert_eq!(&prev[4..], &[3, 9]);
+        let ev = encode_frame(&ClientMessage::Control(ControlVerb::Events(2))).unwrap();
+        assert_eq!(&ev[4..], &[3, 10, 2]);
     }
 
     #[test]
