@@ -93,8 +93,9 @@ Reply: `ReportReady` whose text is the filtered JSONL lines (joined by `\n`). Vi
 | **M38** | Done — [`M38-plan.md`](M38-plan.md) — viewer 3D models, browser /inject /scrub + wasm32 CI |
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
 | **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
-| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
-| After M41 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
+| **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| **M42** | [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
+| After M42 | protobuf/TLS; Unix sockets; lockstep ack; wire `/set` |
 | Not M22 | Browser; combat; CI Win/mac; **wire `/set`** |
 
 ## Key decisions

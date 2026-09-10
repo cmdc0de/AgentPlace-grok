@@ -75,8 +75,9 @@ World gather / species **spawn** tables stay in Rust. Vegetation/animal **visual
 
 | Later | What |
 |---|---|
-| **M41** | [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
-| After M41 | protobuf/TLS; tech tree; string ItemId / ckpt bump; agent meshes; `/ckpt` in the page; skeletal animation; hot-reload glb |
+| **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
+| **M42** | [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
+| After M42 | protobuf/TLS; tech tree; string ItemId / ckpt bump; agent meshes; skeletal animation; hot-reload glb |
 | Not M40 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

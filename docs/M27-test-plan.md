@@ -1,6 +1,6 @@
 # M27 test plan — see each new feature
 
-Walkthrough for [`M27-plan.md`](M27-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (auto-execute plan, combat). Next slice: [`M41-plan.md`](M41-plan.md).
+Walkthrough for [`M27-plan.md`](M27-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (auto-execute plan, combat). Next slice: [`M42-plan.md`](M42-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -1,6 +1,6 @@
 # M41 test plan — see each new feature
 
-Walkthrough for [`M41-plan.md`](M41-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (species `[sim]` from objects TOML, DEX melee miss, STR haul caps). Next slice: later work at the bottom of [`M41-plan.md`](M41-plan.md).
+Walkthrough for [`M41-plan.md`](M41-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (species `[sim]` from objects TOML, DEX melee miss, STR haul caps). Next slice: [`M42-plan.md`](M42-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 
