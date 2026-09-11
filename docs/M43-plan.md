@@ -72,7 +72,8 @@ DEX already reduces **walk** energy (`adjust_move_cost`) and melee accuracy. Fle
 
 | Later | What |
 |---|---|
-| After M43 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; time-series charts; wasm32 on Win/mac |
+| **M44** | [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
+| After M44 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; time-series charts; wasm32 on Win/mac |
 | Not M43 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; extra LLM; illness **chance** RNG; writing `ToxinFact` from WIS |
 
 ## Key decisions

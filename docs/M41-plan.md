@@ -91,8 +91,9 @@ Use the helper in `try_add_item` / `has_carry_room` / legal Pack/Store/Gather/Gi
 | Later | What |
 |---|---|
 | **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
-| **M43** | [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
-| After M43 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap |
+| **M43** | Done — [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
+| **M44** | [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
+| After M44 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length |
 | Not M41 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions
