@@ -20,3 +20,6 @@ target
 # Local experiment output and viewer layout
 checkpoints/
 
+# Local glTF optimize scratch (do not ship)
+assets/models/optimized2/
+

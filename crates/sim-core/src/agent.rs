@@ -304,6 +304,21 @@ impl Agent {
         crate::haul::map_weight_milli(&self.inventory)
     }
 
+    /// How many of `item` still fit in pockets (slots + optional STR weight).
+    pub fn pocket_fit_qty(&self, item: ItemId) -> u32 {
+        let slot_room = self
+            .pocket_slot_cap()
+            .saturating_sub(self.inventory_count());
+        if let Some(cap) = self.sheet.pocket_weight_cap() {
+            let unit = crate::haul::item_weight_milli(item);
+            let wroom = cap.saturating_sub(self.pocket_weight_milli());
+            let by_w = if unit == 0 { slot_room } else { wroom / unit };
+            slot_room.min(by_w)
+        } else {
+            slot_room
+        }
+    }
+
     pub fn shows_satchel(&self, params: &crate::haul::StorageParams) -> bool {
         self.has_pack(params)
     }
@@ -372,7 +387,12 @@ impl Agent {
     }
 
     pub fn has_carry_room(&self, params: &crate::haul::StorageParams) -> bool {
-        self.inventory_count() < self.pocket_slot_cap()
+        let pocket = self.inventory_count() < self.pocket_slot_cap()
+            && self
+                .sheet
+                .pocket_weight_cap()
+                .is_none_or(|cap| self.pocket_weight_milli() < cap);
+        pocket
             || (self.has_pack(params) && {
                 let (slot_cap, _) = self.worn_pack_caps(params);
                 self.pack_count() < slot_cap
@@ -425,9 +445,7 @@ impl Agent {
         if qty == 0 {
             return 0;
         }
-        let used = self.inventory_count();
-        let room = self.pocket_slot_cap().saturating_sub(used);
-        let add = qty.min(room);
+        let add = qty.min(self.pocket_fit_qty(item));
         if add > 0 {
             *self.inventory.entry(item).or_insert(0) += add;
         }

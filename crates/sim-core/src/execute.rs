@@ -209,7 +209,7 @@ fn unpack_item(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    if agent.inventory_count().saturating_add(qty) > agent.pocket_slot_cap() {
+    if agent.pocket_fit_qty(item) < qty {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -321,6 +321,15 @@ fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
             return;
         }
         if crate::kinship::close_kin(a, b) {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+        if !crate::sheet::AbilitySheet::pair_bond_hits(
+            sim.config.master_seed,
+            sim.tick,
+            id.0,
+            a.sheet.charisma,
+        ) {
             push(sim, id, SimEventKind::Wait);
             return;
         }
@@ -678,10 +687,7 @@ fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: Agent
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let room = recv
-        .pocket_slot_cap()
-        .saturating_sub(recv.inventory_count());
-    let moved = qty.min(room);
+    let moved = qty.min(recv.pocket_fit_qty(item));
     let have_pockets = sender.inventory.get(&item).copied().unwrap_or(0);
     let have_pack = sender.pack.get(&item).copied().unwrap_or(0);
     if moved == 0 || have_pockets + have_pack < moved {
@@ -1353,11 +1359,7 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
     let has_all = need
         .iter()
         .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n);
-    let room = agent
-        .pocket_slot_cap()
-        .saturating_sub(agent.inventory_count())
-        >= qty
-        || agent.inventory.contains_key(&out);
+    let room = agent.pocket_fit_qty(out) >= qty || agent.inventory.contains_key(&out);
     if !has_all || !room {
         push(
             sim,
@@ -1527,7 +1529,12 @@ fn vote(sim: &mut Simulation, id: AgentId, proposal_id: u64, support: bool) {
         if let Some(author) = author {
             if author != id {
                 let (fwd, back) = if support {
-                    (crate::social::SUPPORT, crate::social::SUPPORT_BACK)
+                    let social = sim
+                        .agents
+                        .get(&id)
+                        .map(|a| a.sheet.support_social())
+                        .unwrap_or(crate::social::SUPPORT);
+                    (social, crate::social::SUPPORT_BACK)
                 } else {
                     (crate::social::OPPOSE, crate::social::OPPOSE_BACK)
                 };

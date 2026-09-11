@@ -58,6 +58,15 @@ fn fill_energy(sim: &mut Simulation) {
     }
 }
 
+/// CHA 0 skips the PairBond d20 so tests that need a bond always get one.
+fn zero_cha(sim: &mut Simulation, ids: &[AgentId]) {
+    for id in ids {
+        if let Some(a) = sim.agents.get_mut(id) {
+            a.sheet.charisma = 0;
+        }
+    }
+}
+
 #[test]
 fn overlay_parses_sheet_and_population() {
     let s = SheetParams::from_config_toml("[agents.sheet]\nenabled = true\n");
@@ -165,7 +174,10 @@ fn pair_bond_and_reproduce_writes_kin_and_calculated_sheet() {
     sim.agents.get_mut(&b).unwrap().sheet = ten;
     sim.agents.get_mut(&a).unwrap().health = 10_000;
     sim.agents.get_mut(&b).unwrap().health = 10_000;
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    sim.agents.get_mut(&a).unwrap().sheet = ten;
+    sim.agents.get_mut(&b).unwrap().sheet = ten;
     assert_eq!(sim.agents.get(&a).unwrap().kinship.pair_bond, Some(b));
     assert_eq!(sim.agents.get(&b).unwrap().kinship.pair_bond, Some(a));
     assert!(sim.events.events.iter().any(|e| matches!(
@@ -260,6 +272,7 @@ fn kin_of_scope_after_pair_bond_and_birth() {
     let (a, b) = place_adjacent(&mut sim);
     assert_eq!(a, AgentId(0));
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
     sim.inject_schedule_toml(KIN_FOOD).unwrap();
@@ -312,6 +325,7 @@ fn pair_bond_mints_household_child_inherits() {
     sim.enable_reproduction();
     let (a, b) = place_adjacent(&mut sim);
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     let ha = sim.agents.get(&a).unwrap().kinship.household;
     let hb = sim.agents.get(&b).unwrap().kinship.household;
@@ -374,6 +388,7 @@ fn aging_stamps_founders_gates_child() {
     assert!(sim.agents.values().all(|a| a.age_ticks == 200));
     let (a, b) = place_adjacent(&mut sim);
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
     let child = sim
@@ -457,6 +472,7 @@ fn pair_bond_without_crates_overlay_mints_no_home() {
     sim.enable_reproduction();
     let (a, b) = place_adjacent(&mut sim);
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     assert!(sim.household_home.is_empty());
 }
@@ -468,6 +484,7 @@ fn pair_bond_home_member_store_outsider_cannot() {
     sim.enable_household_crates();
     let (a, b) = place_adjacent(&mut sim);
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     let hid = sim.agents.get(&a).unwrap().kinship.household.unwrap();
     let home = *sim.household_home.get(&hid).expect("home minted");
@@ -577,6 +594,7 @@ fn household_home_load_does_not_remint() {
     sim.enable_household_crates();
     let (a, b) = place_adjacent(&mut sim);
     fill_energy(&mut sim);
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     let hid = sim.agents.get(&a).unwrap().kinship.household.unwrap();
     let home = *sim.household_home.get(&hid).unwrap();
@@ -619,6 +637,7 @@ fn culture_founders_child_copies_load_no_reroll() {
     fill_energy(&mut sim);
     let ca = sim.agents.get(&a).unwrap().culture;
     let cb = sim.agents.get(&b).unwrap().culture;
+    zero_cha(&mut sim, &[a, b]);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Reproduce { with: b });
     let child = sim
@@ -1473,4 +1492,230 @@ fn load_restores_wis_cha_dex_not_derived() {
     assert_eq!(a.sheet.speech_importance(50), 70);
     assert_eq!(a.sheet.speak_affinity(), 90);
     assert_eq!(a.sheet.flee_steps(), 3);
+}
+
+#[test]
+fn unused_sheet_board_support_pocket_identity() {
+    let mut sim = Simulation::new(tiny(0x44_00)).unwrap();
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert!(a.sheet.is_unused());
+    assert_eq!(a.sheet.board_cells(8), 8);
+    assert_eq!(a.sheet.support_social(), (200, 0, 100, 0));
+    assert_eq!(a.sheet.pocket_weight_cap(), None);
+    assert_eq!(a.pocket_fit_qty(ItemId::Stone), 16);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Stone, 16);
+    assert_eq!(
+        sim.agents.get(&id).unwrap().inventory.get(&ItemId::Stone),
+        Some(&16)
+    );
+}
+
+#[test]
+fn wis_18_vs_0_board_past_ident() {
+    let mut sim = Simulation::new(tiny(0x44_01)).unwrap();
+    sim.config.proposals.public_board_always_visible = false;
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let author = ids[0];
+    let viewer = ids[1];
+    for id in [author, viewer] {
+        sim.agents.get_mut(&id).unwrap().personality.perceptiveness = 50;
+        sim.agents.get_mut(&id).unwrap().sheet.wisdom = 0;
+    }
+    let (ax, ay, vx, vy) = land_pair_at_dist(&sim, 14);
+    sim.agents.get_mut(&author).unwrap().x = ax;
+    sim.agents.get_mut(&author).unwrap().y = ay;
+    sim.agents.get_mut(&viewer).unwrap().x = vx;
+    sim.agents.get_mut(&viewer).unwrap().y = vy;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        author,
+        &PrimaryAction::Propose {
+            text: "do not eat mushroom".into(),
+            rule: None,
+        },
+    );
+    let ident0 =
+        observation::perceive_range(sim.config.observation.base_agent_identity_range, 50, 0);
+    assert_eq!(ident0, 8);
+    sim.agents.get_mut(&viewer).unwrap().sheet.wisdom = 18;
+    let obs18 = observation::build(&sim, viewer);
+    let post = obs18
+        .board
+        .iter()
+        .find(|p| p.text.contains("mushroom"))
+        .expect("WIS 18 sees post");
+    assert!(post.author.is_none(), "past ident: unnamed author");
+    sim.agents.get_mut(&viewer).unwrap().sheet.wisdom = 0;
+    let obs0 = observation::build(&sim, viewer);
+    assert!(obs0.board.iter().all(|p| !p.text.contains("mushroom")));
+    sim.agents.get_mut(&viewer).unwrap().sheet.wisdom = 10;
+    let obs10 = observation::build(&sim, viewer);
+    assert!(obs10.board.iter().all(|p| !p.text.contains("mushroom")));
+}
+
+#[test]
+fn cha_18_vs_3_support_social() {
+    let mut sim = Simulation::new(tiny(0x44_02)).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        a,
+        &PrimaryAction::Propose {
+            text: "rule".into(),
+            rule: None,
+        },
+    );
+    let pid = sim.board.proposals[0].id;
+    sim.agents.get_mut(&b).unwrap().sheet.charisma = 18;
+    sim.agents.get_mut(&b).unwrap().relationships.clear();
+    sim_core::execute::execute_primary(&mut sim, b, &PrimaryAction::Support { proposal_id: pid });
+    assert!(sim.board.proposals[0].supporters.contains(&b));
+    assert_eq!(
+        sim.board.proposals[0].supporters.len(),
+        2,
+        "author plus one Support id, not CHA-weighted extra votes"
+    );
+    assert_eq!(
+        sim.agents
+            .get(&b)
+            .unwrap()
+            .relationships
+            .get(&a)
+            .map(|r| (r.trust, r.respect)),
+        Some((400, 200))
+    );
+
+    let mut sim = Simulation::new(tiny(0x44_02)).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        a,
+        &PrimaryAction::Propose {
+            text: "rule".into(),
+            rule: None,
+        },
+    );
+    let pid = sim.board.proposals[0].id;
+    sim.agents.get_mut(&b).unwrap().sheet.charisma = 3;
+    sim.agents.get_mut(&b).unwrap().relationships.clear();
+    sim_core::execute::execute_primary(&mut sim, b, &PrimaryAction::Support { proposal_id: pid });
+    assert_eq!(sim.board.proposals[0].supporters.len(), 2);
+    assert_eq!(
+        sim.agents
+            .get(&b)
+            .unwrap()
+            .relationships
+            .get(&a)
+            .map(|r| (r.trust, r.respect)),
+        Some((50, 25))
+    );
+}
+
+#[test]
+fn cha_0_pair_bond_always_if_legal() {
+    let mut sim = Simulation::new(tiny(0x44_03)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    sim.agents.get_mut(&a).unwrap().sheet.charisma = 0;
+    assert_eq!(sim.agents.get(&a).unwrap().sheet.charisma, 0);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    assert_eq!(sim.agents.get(&a).unwrap().kinship.pair_bond, Some(b));
+    assert_eq!(sim.agents.get(&b).unwrap().kinship.pair_bond, Some(a));
+}
+
+#[test]
+fn cha_18_vs_3_pair_bond_odds() {
+    let mut sim = Simulation::new(tiny(0x44_04)).unwrap();
+    sim.enable_reproduction();
+    let (a, b) = place_adjacent(&mut sim);
+    fill_energy(&mut sim);
+    let master = sim.config.master_seed;
+    sim.agents.get_mut(&a).unwrap().sheet.charisma = 18;
+    let mut hits18 = 0u32;
+    for t in 0..40 {
+        sim.tick = t;
+        sim.agents.get_mut(&a).unwrap().kinship.pair_bond = None;
+        sim.agents.get_mut(&b).unwrap().kinship.pair_bond = None;
+        sim.agents.get_mut(&a).unwrap().kinship.household = None;
+        sim.agents.get_mut(&b).unwrap().kinship.household = None;
+        sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+        if sim.agents.get(&a).unwrap().kinship.pair_bond == Some(b) {
+            hits18 += 1;
+        }
+        assert_eq!(
+            sim.agents.get(&a).unwrap().kinship.pair_bond.is_some(),
+            AbilitySheet::pair_bond_hits(master, t, a.0, 18)
+        );
+    }
+    sim.agents.get_mut(&a).unwrap().sheet.charisma = 3;
+    let mut hits3 = 0u32;
+    for t in 0..40 {
+        sim.tick = t;
+        sim.agents.get_mut(&a).unwrap().kinship.pair_bond = None;
+        sim.agents.get_mut(&b).unwrap().kinship.pair_bond = None;
+        sim.agents.get_mut(&a).unwrap().kinship.household = None;
+        sim.agents.get_mut(&b).unwrap().kinship.household = None;
+        sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+        if sim.agents.get(&a).unwrap().kinship.pair_bond == Some(b) {
+            hits3 += 1;
+        }
+    }
+    assert!(hits18 > hits3, "CHA 18 hits {hits18} vs CHA 3 {hits3}");
+    assert!(hits18 >= 20, "CHA 18 should succeed often");
+}
+
+#[test]
+fn str_18_vs_3_pocket_weight() {
+    let mut sim = Simulation::new(tiny(0x44_05)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().inventory_cap = 32;
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 3;
+    assert_eq!(
+        sim.agents.get(&id).unwrap().sheet.pocket_weight_cap(),
+        Some(7250)
+    );
+    let n = sim
+        .agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Stone, 25);
+    assert_eq!(
+        n, 24,
+        "STR 3 cap 7250 holds 24 stones (7200), not 25 (7500)"
+    );
+    sim.agents.get_mut(&id).unwrap().inventory.clear();
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 18;
+    assert_eq!(
+        sim.agents.get(&id).unwrap().sheet.pocket_weight_cap(),
+        Some(9000)
+    );
+    let n = sim
+        .agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Stone, 31);
+    assert_eq!(n, 30, "STR 18 cap 9000 holds 30 stones (9000), not 31");
+}
+
+#[test]
+fn load_restores_wis_cha_str_not_derived() {
+    let mut sim = Simulation::new(tiny(0x44_06)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet.wisdom = 18;
+    sim.agents.get_mut(&id).unwrap().sheet.charisma = 18;
+    sim.agents.get_mut(&id).unwrap().sheet.strength = 18;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    let a = loaded.agents.get(&id).unwrap();
+    assert_eq!(a.sheet.wisdom, 18);
+    assert_eq!(a.sheet.charisma, 18);
+    assert_eq!(a.sheet.strength, 18);
+    assert_eq!(a.sheet.board_cells(8), 12);
+    assert_eq!(a.sheet.support_social(), (400, 0, 200, 0));
+    assert_eq!(a.sheet.pocket_weight_cap(), Some(9000));
 }

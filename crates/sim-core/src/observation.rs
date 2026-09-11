@@ -274,7 +274,7 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
 
     let heard = heard_last_tick(sim, agent, hear, ident);
     let legal = legal_actions(sim, agent);
-    let board = board_view(sim, ident, agent);
+    let board = board_view(sim, ident, agent.sheet.board_cells(ident), agent);
     let relationships = agents
         .iter()
         .filter_map(|v| {
@@ -422,13 +422,13 @@ fn open_proposal_visible(
         .is_some_and(|a| chebyshev(agent.x, agent.y, a.x, a.y) <= ident)
 }
 
-fn board_view(sim: &Simulation, ident: u32, agent: &Agent) -> Vec<ProposalView> {
+fn board_view(sim: &Simulation, ident: u32, board: u32, agent: &Agent) -> Vec<ProposalView> {
     sim.board
         .proposals
         .iter()
         .filter(|p| {
             p.status != crate::board::ProposalStatus::Open
-                || open_proposal_visible(sim, agent, ident, p)
+                || open_proposal_visible(sim, agent, board, p)
         })
         .map(|p| {
             let named = ident >= 255
@@ -711,7 +711,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let cost = crate::haul::haul_cost_milli(*item, 1, params.haul_milli);
-            if energy >= cost && agent.inventory_count() < agent.pocket_slot_cap() {
+            if energy >= cost && agent.pocket_fit_qty(*item) >= 1 {
                 legal.push(PrimaryAction::Retrieve {
                     item: *item,
                     qty: 1,
@@ -738,7 +738,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let cost = crate::haul::haul_cost_milli(*item, 1, params.pack_haul_milli);
-            if energy >= cost && agent.inventory_count() < agent.pocket_slot_cap() {
+            if energy >= cost && agent.pocket_fit_qty(*item) >= 1 {
                 legal.push(PrimaryAction::Unpack {
                     item: *item,
                     qty: 1,
@@ -762,10 +762,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         if dist > ident {
             continue;
         }
-        let room = other
-            .pocket_slot_cap()
-            .saturating_sub(other.inventory_count());
-        if room == 0 {
+        if other.inventory_count() >= other.pocket_slot_cap() {
             continue;
         }
         let mut xfer_seen = Vec::new();
@@ -792,7 +789,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 params.haul_milli
             };
             let cost = crate::haul::haul_cost_milli(item, 1, haul);
-            if energy < cost {
+            if energy < cost || other.pocket_fit_qty(item) < 1 {
                 continue;
             }
             if Agent::is_pack_carrier(item) && !can_drop_worn_carrier(sim, agent, item, 1, None) {

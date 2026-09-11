@@ -59,7 +59,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M41** | Done (tag `M41`) | [`M41-plan.md`](M41-plan.md), walkthrough [`M41-test-plan.md`](M41-test-plan.md) | World species from TOML, DEX accuracy, STR haul |
 | **M42** | Done (tag `M42`) | [`M42-plan.md`](M42-plan.md), walkthrough [`M42-test-plan.md`](M42-test-plan.md) | CON illness/energy, INT memory, browser /ckpt /events |
 | **M43** | Done (tag `M43`) | [`M43-plan.md`](M43-plan.md), walkthrough [`M43-test-plan.md`](M43-test-plan.md) | WIS toxin detect, CHA speech, DEX flee |
-| **M44** | Planned — next | [`M44-plan.md`](M44-plan.md) | WIS board range, CHA support/pair-bond, STR pocket weight |
+| **M44** | Done (tag `M44`) | [`M44-plan.md`](M44-plan.md), walkthrough [`M44-test-plan.md`](M44-test-plan.md) | WIS board range, CHA support/pair-bond, STR pocket weight |
 | After M44 | Not started | listed at the bottom of `M44-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -156,7 +156,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 47b | `M42-test-plan.md` | M42 walkthrough (CON/INT sheet, page /ckpt /events) |
 | 48 | `M43-plan.md` | Milestone 43 (done, tag `M43`): WIS toxin detect, CHA speech, DEX flee |
 | 48b | `M43-test-plan.md` | M43 walkthrough (WIS toxin detect, CHA speech, DEX flee) |
-| 49 | `M44-plan.md` | Milestone 44 (planned): WIS board range, CHA support/pair-bond, STR pocket weight |
+| 49 | `M44-plan.md` | Milestone 44 (done, tag `M44`): WIS board range, CHA support/pair-bond, STR pocket weight |
+| 49b | `M44-test-plan.md` | M44 walkthrough (WIS board range, CHA Support/PairBond, STR pocket weight) |
 
 ---
 
@@ -165,7 +166,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M44-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M44 is next (`M44-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M44 is implemented (`M44-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -193,11 +194,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M43 are done. Next is [`M44-plan.md`](M44-plan.md) (WIS board range, CHA support/pair-bond, STR pocket weight). Later work is at the bottom of that file.
+M1–M44 are done. M44 is implemented ([`M44-plan.md`](M44-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M44-plan.md.
-M44 is planned (WIS board range, CHA support/pair-bond, STR pocket weight;
+M44 is implemented (WIS board range, CHA support/pair-bond, STR pocket weight;
 PROTOCOL_VERSION=5). Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, or Bevy in the browser.
 CI stays provider=mock with no network.

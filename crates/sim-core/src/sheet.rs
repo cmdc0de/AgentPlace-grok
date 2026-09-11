@@ -112,6 +112,45 @@ impl AbilitySheet {
         Self::modifier(self.wisdom) > 0
     }
 
+    /// Open-board cells. Unused / low WIS leaves `ident` (does not shrink).
+    pub fn board_cells(&self, ident: u32) -> u32 {
+        ident.saturating_add(Self::modifier(self.wisdom).max(0) as u32)
+    }
+
+    /// SUPPORT social tuple after CHA. Unused CHA ⇒ (200, 0, 100, 0).
+    pub fn support_social(&self) -> (i16, i16, i16, i16) {
+        let m = Self::modifier(self.charisma);
+        (
+            (200 + m * 50).max(0) as i16,
+            0,
+            (100 + m * 25).max(0) as i16,
+            0,
+        )
+    }
+
+    /// PairBond hit. CHA 0 ⇒ always. Else d20 + CHA_mod >= 10.
+    /// Stream is Invent-style `derive_seed`, not `RngBank.ensure`.
+    pub fn pair_bond_hits(master: u64, tick: u64, agent: u64, charisma: u8) -> bool {
+        if charisma == 0 {
+            return true;
+        }
+        let seed =
+            crate::seeding::derive_seed(master, &format!("tick_{tick}_agent_{agent}_pair_bond_0"));
+        let mut rng = crate::seeding::rng_from_seed(seed);
+        let d20: i32 = rng.random_range(1..=20);
+        d20 + Self::modifier(charisma) >= 10
+    }
+
+    /// Pocket weight cap milli. STR_mod 0 ⇒ none (unlimited, today).
+    pub fn pocket_weight_cap(&self) -> Option<u32> {
+        let m = Self::modifier(self.strength);
+        if m == 0 {
+            None
+        } else {
+            Some((8000 + m * 250).max(1) as u32)
+        }
+    }
+
     /// Speaker CHA added to hear/shout cells. Unused CHA leaves `base`.
     pub fn adjust_speech_range(&self, base: u32) -> u32 {
         (base as i32 + Self::modifier(self.charisma)).max(0) as u32
@@ -258,6 +297,10 @@ mod tests {
         assert_eq!(s.speech_importance(50), 50);
         assert_eq!(s.speak_affinity(), 50);
         assert_eq!(s.flee_steps(), 1);
+        assert_eq!(s.board_cells(8), 8);
+        assert_eq!(s.support_social(), (200, 0, 100, 0));
+        assert!(AbilitySheet::pair_bond_hits(1, 0, 0, 0));
+        assert_eq!(s.pocket_weight_cap(), None);
     }
 
     #[test]
@@ -337,5 +380,21 @@ mod tests {
         };
         assert_eq!(dex14.flee_steps(), 2);
         assert_eq!(low.flee_steps(), 1);
+        assert_eq!(high.board_cells(8), 12);
+        assert_eq!(mid.board_cells(8), 8);
+        assert_eq!(low.board_cells(8), 8);
+        assert_eq!(high.support_social(), (400, 0, 200, 0));
+        assert_eq!(low.support_social(), (50, 0, 25, 0));
+        assert_eq!(mid.support_social(), (200, 0, 100, 0));
+        assert_eq!(high.pocket_weight_cap(), Some(9000));
+        assert_eq!(low.pocket_weight_cap(), Some(7250));
+        assert_eq!(mid.pocket_weight_cap(), None);
+        let str_hi = AbilitySheet {
+            strength: 18,
+            ..mid
+        };
+        let str_lo = AbilitySheet { strength: 3, ..mid };
+        assert_eq!(str_hi.pocket_weight_cap(), Some(9000));
+        assert_eq!(str_lo.pocket_weight_cap(), Some(7250));
     }
 }

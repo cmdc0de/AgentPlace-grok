@@ -1,7 +1,8 @@
 # M44 — WIS board range, CHA support/pair-bond, STR pocket weight
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M43 complete (`docs/M43-plan.md`, git tag `M43`, commit `0f9377d`)  
+**Walkthrough:** [`docs/M44-test-plan.md`](M44-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-4 remaining WIS/CHA/STR)
 
 ## Context
@@ -120,7 +121,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: write `docs/M44-test-plan.md` on implement.
+Walkthrough: [`docs/M44-test-plan.md`](M44-test-plan.md).
 
 ```bash
 cargo test -p sim-core
