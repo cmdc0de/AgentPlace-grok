@@ -68,7 +68,8 @@ Pockets today: **slot cap only** (`try_add_item`). Worn pack already has STR-adj
 
 | Later | What |
 |---|---|
-| After M44 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; time-series charts; wasm32 on Win/mac |
+| **M45** | [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| After M45 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; STR gather/hunt payoff; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings |
 | Not M44 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; extra LLM; changing Equal vote counts |
 
 ## Key decisions

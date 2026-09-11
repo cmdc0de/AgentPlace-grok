@@ -1,6 +1,6 @@
 # M32 test plan — see each new feature
 
-Walkthrough for [`M32-plan.md`](M32-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (kin_of incentives, household, aging). Next slice: [`M44-plan.md`](M44-plan.md).
+Walkthrough for [`M32-plan.md`](M32-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (kin_of incentives, household, aging). Next slice: [`M45-plan.md`](M45-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -85,8 +85,9 @@ Do **not** implement embeddings, Unix sockets, protobuf/TLS, HP/incapacitation, 
 | **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
 | **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
 | **M43** | Done — [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
-| **M44** | [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
-| After M44 | protobuf/TLS; Unix sockets; hashed pipeline events |
+| **M44** | Done — [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
+| **M45** | [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| After M45 | protobuf/TLS; Unix sockets; hashed pipeline events |
 | Not M27 | Browser; CI Win/mac; PROTOCOL bump |
 
 ## Key decisions

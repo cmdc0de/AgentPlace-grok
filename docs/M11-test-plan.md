@@ -1,6 +1,6 @@
 # M11 test plan — see each new feature
 
-Walkthrough for [`M11-plan.md`](M11-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (events JSONL, `--compare`, satchel, `/give basket`). Next slice: [`M44-plan.md`](M44-plan.md).
+Walkthrough for [`M11-plan.md`](M11-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (events JSONL, `--compare`, satchel, `/give basket`). Next slice: [`M45-plan.md`](M45-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network. Live Ollama needs Spark.
 
