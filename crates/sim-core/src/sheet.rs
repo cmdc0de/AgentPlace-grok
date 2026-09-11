@@ -107,6 +107,31 @@ impl AbilitySheet {
         (base as i32 + Self::modifier(self.wisdom)).max(0) as u32
     }
 
+    /// Visible `Toxicity::Toxic` species join observation when WIS_mod > 0.
+    pub fn detects_toxins(&self) -> bool {
+        Self::modifier(self.wisdom) > 0
+    }
+
+    /// Speaker CHA added to hear/shout cells. Unused CHA leaves `base`.
+    pub fn adjust_speech_range(&self, base: u32) -> u32 {
+        (base as i32 + Self::modifier(self.charisma)).max(0) as u32
+    }
+
+    /// Heard-utterance importance. Unused CHA leaves `base`. Floor 1.
+    pub fn speech_importance(&self, base: u32) -> u32 {
+        (base as i32 + Self::modifier(self.charisma) * 5).max(1) as u32
+    }
+
+    /// SPEAK affinity millipoints. Unused CHA ⇒ 50.
+    pub fn speak_affinity(&self) -> i16 {
+        (50 + Self::modifier(self.charisma) * 10).max(0) as i16
+    }
+
+    /// Flee orthogonal steps. Unused / low DEX ⇒ 1.
+    pub fn flee_steps(&self) -> u32 {
+        1 + Self::modifier(self.dexterity).max(0) as u32 / 2
+    }
+
     /// Influence vote weight. Does not write `influence_factor`.
     pub fn influence_vote_weight(&self, influence_factor: u32) -> u64 {
         (influence_factor as i32 + Self::modifier(self.charisma) * 100).max(1) as u64
@@ -228,6 +253,11 @@ mod tests {
         assert_eq!(s.illness_duration(), 12);
         assert_eq!(s.memory_cap(128), 128);
         assert_eq!(s.retrieval_k(8), 8);
+        assert!(!s.detects_toxins());
+        assert_eq!(s.adjust_speech_range(18), 18);
+        assert_eq!(s.speech_importance(50), 50);
+        assert_eq!(s.speak_affinity(), 50);
+        assert_eq!(s.flee_steps(), 1);
     }
 
     #[test]
@@ -288,5 +318,24 @@ mod tests {
         assert_eq!(int_lo.memory_cap(128), 116);
         assert_eq!(int_hi.retrieval_k(8), 12);
         assert_eq!(int_lo.retrieval_k(8), 5);
+        assert!(high.detects_toxins());
+        assert!(!mid.detects_toxins());
+        assert!(!low.detects_toxins());
+        assert_eq!(high.adjust_speech_range(18), 22);
+        assert_eq!(low.adjust_speech_range(18), 15);
+        assert_eq!(mid.adjust_speech_range(18), 18);
+        assert_eq!(high.speech_importance(50), 70);
+        assert_eq!(low.speech_importance(50), 35);
+        assert_eq!(high.speak_affinity(), 90);
+        assert_eq!(low.speak_affinity(), 20);
+        assert_eq!(mid.speak_affinity(), 50);
+        assert_eq!(high.flee_steps(), 3);
+        assert_eq!(mid.flee_steps(), 1);
+        let dex14 = AbilitySheet {
+            dexterity: 14,
+            ..mid
+        };
+        assert_eq!(dex14.flee_steps(), 2);
+        assert_eq!(low.flee_steps(), 1);
     }
 }

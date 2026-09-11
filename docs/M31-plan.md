@@ -82,8 +82,9 @@ CLI: `--reproduction` implies `--sheet`.
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
 | **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
 | **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
-| **M42** | [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
-| After M42 | protobuf/TLS; Unix sockets; hashed pipeline events |
+| **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
+| **M43** | [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
+| After M43 | protobuf/TLS; Unix sockets; hashed pipeline events |
 | Not M31 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

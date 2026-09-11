@@ -1,9 +1,11 @@
 //! M31 sheet, kinship, reproduction.
 
-use sim_core::action::PrimaryAction;
+use sim_core::action::{PrimaryAction, Speak, SpeakTarget};
 use sim_core::event_log::SimEventKind;
 use sim_core::kinship::PopulationParams;
-use sim_core::observation::legal_actions;
+use sim_core::memory::MemoryKind;
+use sim_core::observation::{self, legal_actions};
+use sim_core::policy;
 use sim_core::sheet::{AbilitySheet, SheetParams};
 use sim_core::voting::VotingParams;
 use sim_core::{AgentId, ExperimentConfig, ItemId, Simulation};
@@ -1057,4 +1059,418 @@ fn load_restores_con_int_not_derived() {
         loaded.config.energy_max_milli() + 2000
     );
     assert_eq!(a.sheet.memory_cap(loaded.config.memory_capacity()), 144);
+}
+
+fn land_pair_at_dist(sim: &Simulation, dist: u32) -> (u32, u32, u32, u32) {
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            if !sim.world.is_land(x, y) {
+                continue;
+            }
+            for y2 in 0..sim.world.height {
+                for x2 in 0..sim.world.width {
+                    if sim.world.is_land(x2, y2) && observation::chebyshev(x, y, x2, y2) == dist {
+                        return (x, y, x2, y2);
+                    }
+                }
+            }
+        }
+    }
+    panic!("no land pair at chebyshev {dist}");
+}
+
+fn land_line(sim: &Simulation, len: u32) -> (u32, u32, i32, i32) {
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            if !sim.world.is_land(x, y) {
+                continue;
+            }
+            if (0..len).all(|i| {
+                let nx = x as i32 + i as i32;
+                sim.world.in_bounds(nx, y as i32) && sim.world.is_land(nx as u32, y)
+            }) {
+                return (x, y, 1, 0);
+            }
+            if (0..len).all(|i| {
+                let ny = y as i32 + i as i32;
+                sim.world.in_bounds(x as i32, ny) && sim.world.is_land(x, ny as u32)
+            }) {
+                return (x, y, 0, 1);
+            }
+        }
+    }
+    panic!("no land line of length {len}");
+}
+
+#[test]
+fn unused_sheet_wis_cha_dex_identity() {
+    let mut sim = Simulation::new(tiny(0x43_00)).unwrap();
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert!(a.sheet.is_unused());
+    assert!(!a.sheet.detects_toxins());
+    assert_eq!(a.sheet.adjust_speech_range(18), 18);
+    assert_eq!(a.sheet.speech_importance(50), 50);
+    assert_eq!(a.sheet.speak_affinity(), 50);
+    assert_eq!(a.sheet.flee_steps(), 1);
+    let mushroom = sim.config.world.species.veg_tag_by_id("mushroom").unwrap();
+    let (x, y) = {
+        let a = sim.agents.get(&id).unwrap();
+        (a.x, a.y)
+    };
+    sim.world.set_vegetation(x, y, mushroom);
+    sim.agents.get_mut(&id).unwrap().memory.clear();
+    let obs = observation::build(&sim, id);
+    assert!(!obs.toxins.iter().any(|t| t == "mushroom"));
+    let filtered = policy::avoid_toxic(
+        &obs,
+        &sim.agents.get(&id).unwrap().memory,
+        &sim.config.world.species,
+    );
+    assert!(
+        filtered
+            .legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Gather { species } if *species == mushroom))
+    );
+    assert!(
+        !sim.agents
+            .get(&id)
+            .unwrap()
+            .memory
+            .iter()
+            .any(|m| m.kind == MemoryKind::ToxinFact)
+    );
+}
+
+#[test]
+fn wis_18_vs_0_detects_visible_toxin() {
+    let mut sim = Simulation::new(tiny(0x43_01)).unwrap();
+    let id = AgentId(0);
+    let mushroom = sim.config.world.species.veg_tag_by_id("mushroom").unwrap();
+    let nightshade = sim
+        .config
+        .world
+        .species
+        .veg_tag_by_id("nightshade")
+        .unwrap();
+    let (x, y) = {
+        let a = sim.agents.get(&id).unwrap();
+        (a.x, a.y)
+    };
+    sim.world.set_vegetation(x, y, mushroom);
+    for (dx, dy) in [(1i32, 0), (0, 1), (-1, 0), (0, -1)] {
+        let nx = x as i32 + dx;
+        let ny = y as i32 + dy;
+        if sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32) {
+            sim.world.set_vegetation(nx as u32, ny as u32, nightshade);
+            break;
+        }
+    }
+    sim.agents.get_mut(&id).unwrap().memory.clear();
+    sim.agents.get_mut(&id).unwrap().sheet.wisdom = 18;
+    let obs = observation::build(&sim, id);
+    assert!(obs.toxins.iter().any(|t| t == "mushroom"));
+    assert!(!obs.toxins.iter().any(|t| t == "nightshade"));
+    let mem = sim.agents.get(&id).unwrap().memory.clone();
+    let filtered = policy::avoid_toxic(&obs, &mem, &sim.config.world.species);
+    assert!(
+        !filtered
+            .legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Gather { species } if *species == mushroom))
+    );
+    assert!(!mem.iter().any(|m| m.kind == MemoryKind::ToxinFact));
+
+    sim.agents.get_mut(&id).unwrap().sheet.wisdom = 0;
+    let obs0 = observation::build(&sim, id);
+    assert!(!obs0.toxins.iter().any(|t| t == "mushroom"));
+    let f0 = policy::avoid_toxic(
+        &obs0,
+        &sim.agents.get(&id).unwrap().memory,
+        &sim.config.world.species,
+    );
+    assert!(
+        f0.legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Gather { species } if *species == mushroom))
+    );
+    assert!(
+        !sim.agents
+            .get(&id)
+            .unwrap()
+            .memory
+            .iter()
+            .any(|m| m.kind == MemoryKind::ToxinFact)
+    );
+}
+
+#[test]
+fn wis_10_toxin_same_as_unused() {
+    let mut sim = Simulation::new(tiny(0x43_02)).unwrap();
+    let id = AgentId(0);
+    let mushroom = sim.config.world.species.veg_tag_by_id("mushroom").unwrap();
+    let (x, y) = {
+        let a = sim.agents.get(&id).unwrap();
+        (a.x, a.y)
+    };
+    sim.world.set_vegetation(x, y, mushroom);
+    sim.agents.get_mut(&id).unwrap().memory.clear();
+    sim.agents.get_mut(&id).unwrap().sheet.wisdom = 10;
+    assert!(!sim.agents.get(&id).unwrap().sheet.detects_toxins());
+    let obs = observation::build(&sim, id);
+    assert!(!obs.toxins.iter().any(|t| t == "mushroom"));
+    let filtered = policy::avoid_toxic(
+        &obs,
+        &sim.agents.get(&id).unwrap().memory,
+        &sim.config.world.species,
+    );
+    assert!(
+        filtered
+            .legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::Gather { species } if *species == mushroom))
+    );
+}
+
+#[test]
+fn cha_18_vs_3_speech_range_and_weight() {
+    let mut sim = Simulation::new(tiny(0x43_03)).unwrap();
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let speaker = ids[0];
+    let listener = ids[1];
+    for id in [speaker, listener] {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.personality.perceptiveness = 50;
+        a.sheet.wisdom = 0;
+        a.memory.clear();
+        a.relationships.clear();
+    }
+    let (sx, sy, lx, ly) = land_pair_at_dist(&sim, 1);
+    sim.agents.get_mut(&speaker).unwrap().x = sx;
+    sim.agents.get_mut(&speaker).unwrap().y = sy;
+    sim.agents.get_mut(&listener).unwrap().x = lx;
+    sim.agents.get_mut(&listener).unwrap().y = ly;
+
+    sim.agents.get_mut(&speaker).unwrap().sheet.charisma = 18;
+    sim.apply_speak(
+        speaker,
+        Speak {
+            to: SpeakTarget::Broadcast,
+            shout: false,
+            text: "hello".into(),
+        },
+    );
+    assert_eq!(
+        sim.agents
+            .get(&speaker)
+            .unwrap()
+            .relationships
+            .get(&listener)
+            .map(|r| r.affinity),
+        Some(90)
+    );
+    sim.tick = 1;
+    let obs = observation::build(&sim, listener);
+    assert!(obs.heard.iter().any(|h| h.text == "hello"));
+    sim_core::execute::apply_heard_memories(&mut sim, listener, &obs.heard);
+    let imp18 = sim
+        .agents
+        .get(&listener)
+        .unwrap()
+        .memory
+        .iter()
+        .find(|m| m.kind == MemoryKind::Utterance && m.text == "hello")
+        .map(|m| m.importance)
+        .expect("utterance");
+    assert_eq!(imp18, 70);
+
+    let mut sim = Simulation::new(tiny(0x43_03)).unwrap();
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let speaker = ids[0];
+    let listener = ids[1];
+    for id in [speaker, listener] {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.personality.perceptiveness = 50;
+        a.sheet.wisdom = 0;
+        a.memory.clear();
+        a.relationships.clear();
+    }
+    let (sx, sy, lx, ly) = land_pair_at_dist(&sim, 1);
+    sim.agents.get_mut(&speaker).unwrap().x = sx;
+    sim.agents.get_mut(&speaker).unwrap().y = sy;
+    sim.agents.get_mut(&listener).unwrap().x = lx;
+    sim.agents.get_mut(&listener).unwrap().y = ly;
+    sim.agents.get_mut(&speaker).unwrap().sheet.charisma = 3;
+    sim.apply_speak(
+        speaker,
+        Speak {
+            to: SpeakTarget::Broadcast,
+            shout: false,
+            text: "hello".into(),
+        },
+    );
+    assert_eq!(
+        sim.agents
+            .get(&speaker)
+            .unwrap()
+            .relationships
+            .get(&listener)
+            .map(|r| r.affinity),
+        Some(20)
+    );
+    sim.tick = 1;
+    let obs = observation::build(&sim, listener);
+    sim_core::execute::apply_heard_memories(&mut sim, listener, &obs.heard);
+    let imp3 = sim
+        .agents
+        .get(&listener)
+        .unwrap()
+        .memory
+        .iter()
+        .find(|m| m.kind == MemoryKind::Utterance && m.text == "hello")
+        .map(|m| m.importance)
+        .expect("utterance");
+    assert_eq!(imp3, 35);
+
+    let mut far = Simulation::new(tiny(0x43_03)).unwrap();
+    let ids: Vec<AgentId> = far.agents.keys().copied().collect();
+    let speaker = ids[0];
+    let listener = ids[1];
+    for id in [speaker, listener] {
+        let a = far.agents.get_mut(&id).unwrap();
+        a.personality.perceptiveness = 50;
+        a.sheet.wisdom = 0;
+    }
+    let (sx, sy, lx, ly) = land_pair_at_dist(&far, 17);
+    far.agents.get_mut(&speaker).unwrap().x = sx;
+    far.agents.get_mut(&speaker).unwrap().y = sy;
+    far.agents.get_mut(&listener).unwrap().x = lx;
+    far.agents.get_mut(&listener).unwrap().y = ly;
+    far.agents.get_mut(&speaker).unwrap().sheet.charisma = 18;
+    far.apply_speak(
+        speaker,
+        Speak {
+            to: SpeakTarget::Broadcast,
+            shout: false,
+            text: "carry".into(),
+        },
+    );
+    far.tick = 1;
+    let heard18 = observation::build(&far, listener)
+        .heard
+        .iter()
+        .any(|h| h.text == "carry");
+    far.agents.get_mut(&speaker).unwrap().sheet.charisma = 3;
+    far.tick = 0;
+    far.events.events.clear();
+    far.apply_speak(
+        speaker,
+        Speak {
+            to: SpeakTarget::Broadcast,
+            shout: false,
+            text: "carry".into(),
+        },
+    );
+    far.tick = 1;
+    let heard3 = observation::build(&far, listener)
+        .heard
+        .iter()
+        .any(|h| h.text == "carry");
+    assert!(heard18, "CHA 18 should be heard at dist 17");
+    assert!(!heard3, "CHA 3 should not be heard at dist 17");
+}
+
+#[test]
+fn dex_18_vs_0_flee_steps() {
+    let mut sim = Simulation::new(tiny(0x43_04)).unwrap();
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let fleer = ids[0];
+    let threat = ids[1];
+    let (x, y, dx, dy) = land_line(&sim, 5);
+    let fx = (x as i32 + dx) as u32;
+    let fy = (y as i32 + dy) as u32;
+    sim.agents.get_mut(&threat).unwrap().x = x;
+    sim.agents.get_mut(&threat).unwrap().y = y;
+    sim.agents.get_mut(&fleer).unwrap().x = fx;
+    sim.agents.get_mut(&fleer).unwrap().y = fy;
+    sim.conflict_enabled = true;
+    fill_energy(&mut sim);
+    let emax = sim.agents.get(&fleer).unwrap().needs.energy;
+    let cost0 = sim
+        .agents
+        .get(&fleer)
+        .unwrap()
+        .move_cost_milli(&sim.storage);
+    sim.agents.get_mut(&fleer).unwrap().sheet.dexterity = 0;
+    sim_core::execute::execute_primary(&mut sim, fleer, &PrimaryAction::Flee);
+    let a = sim.agents.get(&fleer).unwrap();
+    assert_eq!(a.x, (fx as i32 + dx) as u32);
+    assert_eq!(a.y, (fy as i32 + dy) as u32);
+    assert_eq!(emax - a.needs.energy, cost0);
+    let flees = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| e.agent == fleer && matches!(e.kind, SimEventKind::Flee))
+        .count();
+    let moves = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| e.agent == fleer && matches!(e.kind, SimEventKind::Move { .. }))
+        .count();
+    assert_eq!(flees, 1);
+    assert_eq!(moves, 0);
+
+    sim.agents.get_mut(&fleer).unwrap().x = fx;
+    sim.agents.get_mut(&fleer).unwrap().y = fy;
+    fill_energy(&mut sim);
+    sim.agents.get_mut(&fleer).unwrap().sheet.dexterity = 18;
+    let emax = sim.agents.get(&fleer).unwrap().needs.energy;
+    let cost18 = sim
+        .agents
+        .get(&fleer)
+        .unwrap()
+        .move_cost_milli(&sim.storage);
+    sim.events.events.clear();
+    sim_core::execute::execute_primary(&mut sim, fleer, &PrimaryAction::Flee);
+    let a = sim.agents.get(&fleer).unwrap();
+    assert_eq!(a.x, (fx as i32 + dx * 3) as u32);
+    assert_eq!(a.y, (fy as i32 + dy * 3) as u32);
+    assert_eq!(emax - a.needs.energy, cost18);
+    let flees = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| e.agent == fleer && matches!(e.kind, SimEventKind::Flee))
+        .count();
+    let moves = sim
+        .events
+        .events
+        .iter()
+        .filter(|e| e.agent == fleer && matches!(e.kind, SimEventKind::Move { .. }))
+        .count();
+    assert_eq!(flees, 1);
+    assert_eq!(moves, 0);
+}
+
+#[test]
+fn load_restores_wis_cha_dex_not_derived() {
+    let mut sim = Simulation::new(tiny(0x43_05)).unwrap();
+    let id = AgentId(0);
+    sim.agents.get_mut(&id).unwrap().sheet.wisdom = 18;
+    sim.agents.get_mut(&id).unwrap().sheet.charisma = 18;
+    sim.agents.get_mut(&id).unwrap().sheet.dexterity = 18;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    let a = loaded.agents.get(&id).unwrap();
+    assert_eq!(a.sheet.wisdom, 18);
+    assert_eq!(a.sheet.charisma, 18);
+    assert_eq!(a.sheet.dexterity, 18);
+    assert!(a.sheet.detects_toxins());
+    assert_eq!(a.sheet.adjust_speech_range(18), 22);
+    assert_eq!(a.sheet.speech_importance(50), 70);
+    assert_eq!(a.sheet.speak_affinity(), 90);
+    assert_eq!(a.sheet.flee_steps(), 3);
 }

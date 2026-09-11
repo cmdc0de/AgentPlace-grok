@@ -87,8 +87,9 @@ Helper (sim-core, no Bevy): list ticks in a dir; `ckpt_at_or_before(dir, tick) -
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
 | **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
 | **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
-| **M42** | [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
-| After M42 | protobuf/TLS |
+| **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
+| **M43** | [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
+| After M43 | protobuf/TLS |
 | Not M14 | Browser; combat; CI Win/mac; extra LLM calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

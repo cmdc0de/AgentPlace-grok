@@ -373,15 +373,28 @@ fn maybe_warn(
     None
 }
 
-/// Filter eat/gather using agent memory (called from simulation).
-pub fn avoid_toxic(obs: &Observation, memory: &[crate::memory::MemoryEntry]) -> Observation {
+/// Filter eat/gather using agent memory and WIS-detected names on `obs.toxins`.
+pub fn avoid_toxic(
+    obs: &Observation,
+    memory: &[crate::memory::MemoryEntry],
+    species: &SpeciesTables,
+) -> Observation {
+    let named = obs.toxins.clone();
     let mut obs = obs.clone();
     obs.legal.retain(|a| match a {
         PrimaryAction::Eat {
             item: ItemId::Food(tag),
-        } => !knows_toxin(memory, *tag),
-        PrimaryAction::Gather { species } if *species != 0 => !knows_toxin(memory, *species),
+        } => !knows_toxin(memory, *tag) && !named_toxin(&named, species, *tag),
+        PrimaryAction::Gather { species: tag } if *tag != 0 => {
+            !knows_toxin(memory, *tag) && !named_toxin(&named, species, *tag)
+        }
         _ => true,
     });
     obs
+}
+
+fn named_toxin(names: &[String], species: &SpeciesTables, tag: u8) -> bool {
+    species
+        .veg(tag)
+        .is_some_and(|s| names.iter().any(|n| n == &s.id))
 }

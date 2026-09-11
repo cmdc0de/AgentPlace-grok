@@ -5,7 +5,7 @@ use crate::event_log::SimEventKind;
 use crate::incentive;
 use crate::memory::MemoryKind;
 use crate::simulation::Simulation;
-use crate::species::{SpeciesTables, VegYield};
+use crate::species::{SpeciesTables, Toxicity, VegYield};
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 
@@ -88,7 +88,7 @@ pub struct Observation {
     pub pack: Vec<InventoryView>,
     #[serde(default)]
     pub allergies: Vec<String>,
-    /// Named toxin facts from memory (species ids).
+    /// Named toxin facts from memory, plus WIS-detected visible toxic species.
     #[serde(default)]
     pub toxins: Vec<String>,
     /// Active incentives that `applies_to` this agent and are not `visibility = "hidden"`.
@@ -322,6 +322,18 @@ pub fn build(sim: &Simulation, id: AgentId) -> Observation {
             toxins.push(name);
         }
     }
+    if agent.sheet.detects_toxins() {
+        for tile in &tiles {
+            if let Some(spec) = species.veg(tile.vegetation) {
+                if spec.toxicity == Toxicity::Toxic
+                    && !spec.id.is_empty()
+                    && !toxins.contains(&spec.id)
+                {
+                    toxins.push(spec.id.clone());
+                }
+            }
+        }
+    }
     let incentives = sim
         .incentives
         .incentives
@@ -463,7 +475,7 @@ fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) ->
         let Some(speaker) = sim.agents.get(&event.agent) else {
             continue;
         };
-        let range = if *shout {
+        let range = speaker.sheet.adjust_speech_range(if *shout {
             perceive_range_for(
                 sim,
                 listener,
@@ -472,7 +484,7 @@ fn heard_last_tick(sim: &Simulation, listener: &Agent, hear: u32, ident: u32) ->
             )
         } else {
             hear
-        };
+        });
         let dist = chebyshev(listener.x, listener.y, speaker.x, speaker.y);
         if sim.config.observation.full_information {
             // audible

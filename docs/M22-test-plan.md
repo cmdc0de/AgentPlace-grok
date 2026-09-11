@@ -1,6 +1,6 @@
 # M22 test plan — see each new feature
 
-Walkthrough for [`M22-plan.md`](M22-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (wire Give, remote `/ckpt`, remote `/events`). Next slice: [`M42-plan.md`](M42-plan.md).
+Walkthrough for [`M22-plan.md`](M22-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (wire Give, remote `/ckpt`, remote `/events`). Next slice: [`M43-plan.md`](M43-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -72,7 +72,8 @@ Do not add time-series charts, wasm32 on Win/mac, or `/save` in the page.
 
 | Later | What |
 |---|---|
-| After M42 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; WIS toxin detect; CHA speech; pocket **weight** cap; DEX flee bonus; time-series charts; wasm32 on Win/mac |
+| **M43** | [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
+| After M43 | protobuf/TLS/`wss`; Unix sockets; hashed pipeline events; agent meshes; tech tree / patents; string ItemId / ckpt bump; skeletal animation; hot-reload glb; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; time-series charts; wasm32 on Win/mac |
 | Not M42 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

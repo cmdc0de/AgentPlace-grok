@@ -1219,7 +1219,7 @@ impl Simulation {
                     let Some(agent) = self.agents.get(&id) else {
                         return timing;
                     };
-                    let filtered = avoid_toxic(&obs, &agent.memory);
+                    let filtered = avoid_toxic(&obs, &agent.memory, &self.config.world.species);
                     let identified = filtered.agents.iter().any(|a| a.id.is_some());
                     let thirst = agent.needs.thirst;
                     let hunger = agent.needs.hunger;
@@ -1390,14 +1390,17 @@ impl Simulation {
         };
         if self.config.agents.social.track_relationships {
             let partners: Vec<AgentId> = if broadcast {
-                let hear = crate::observation::perceive_range_for(
-                    self,
-                    &speaker,
-                    self.config
-                        .communication
-                        .base_speech_range
-                        .max(self.config.observation.base_hearing_range),
-                );
+                let hear =
+                    speaker
+                        .sheet
+                        .adjust_speech_range(crate::observation::perceive_range_for(
+                            self,
+                            &speaker,
+                            self.config
+                                .communication
+                                .base_speech_range
+                                .max(self.config.observation.base_hearing_range),
+                        ));
                 self.agents
                     .values()
                     .filter(|t| t.id != id)
@@ -1422,7 +1425,10 @@ impl Simulation {
             let (fwd, back) = if shout {
                 (crate::social::SHOUT, crate::social::SHOUT_BACK)
             } else {
-                (crate::social::SPEAK, crate::social::SPEAK_BACK)
+                (
+                    (0, speaker.sheet.speak_affinity(), 0, 0),
+                    crate::social::SPEAK_BACK,
+                )
             };
             for pid in &partners {
                 if let Some(a) = self.agents.get_mut(&id) {

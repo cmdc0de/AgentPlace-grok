@@ -593,12 +593,33 @@ fn invent(sim: &mut Simulation, id: AgentId) {
     push(sim, id, SimEventKind::Invented { inventor: id, kind });
 }
 
+fn flee_away_step(sim: &Simulation, ax: u32, ay: u32, ox: u32, oy: u32) -> Option<(i32, i32)> {
+    let here = crate::observation::chebyshev(ax, ay, ox, oy);
+    let mut best: Option<(i32, i32, u32)> = None;
+    for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
+        let nx = ax as i32 + dx;
+        let ny = ay as i32 + dy;
+        if !sim.world.in_bounds(nx, ny) || !sim.world.is_land(nx as u32, ny as u32) {
+            continue;
+        }
+        let nd = crate::observation::chebyshev(nx as u32, ny as u32, ox, oy);
+        if nd <= here {
+            continue;
+        }
+        if best.is_none_or(|(_, _, d)| nd > d) {
+            best = Some((dx, dy, nd));
+        }
+    }
+    best.map(|(dx, dy, _)| (dx, dy))
+}
+
 fn flee(sim: &mut Simulation, id: AgentId) {
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
     let ax = agent.x;
     let ay = agent.y;
+    let steps = agent.sheet.flee_steps();
     let mut nearest: Option<(u32, u32, u32)> = None;
     for other in sim.agents.values() {
         if other.id == id {
@@ -615,28 +636,12 @@ fn flee(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let here = crate::observation::chebyshev(ax, ay, ox, oy);
     let cost = crate::inventions::apply_move_cost(
         agent.move_cost_milli(&sim.storage),
         &sim.inventions,
         id,
     );
-    let mut best: Option<(i32, i32, u32)> = None;
-    for (dx, dy) in [(0i32, -1), (0, 1), (-1, 0), (1, 0)] {
-        let nx = ax as i32 + dx;
-        let ny = ay as i32 + dy;
-        if !sim.world.in_bounds(nx, ny) || !sim.world.is_land(nx as u32, ny as u32) {
-            continue;
-        }
-        let nd = crate::observation::chebyshev(nx as u32, ny as u32, ox, oy);
-        if nd <= here {
-            continue;
-        }
-        if best.is_none_or(|(_, _, d)| nd > d) {
-            best = Some((dx, dy, nd));
-        }
-    }
-    let Some((dx, dy, _)) = best else {
+    let Some((dx, dy)) = flee_away_step(sim, ax, ay, ox, oy) else {
         push(sim, id, SimEventKind::Wait);
         return;
     };
@@ -644,14 +649,24 @@ fn flee(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    move_rel(sim, id, dx, dy);
-    if let Some(last) = sim.events.events.last_mut() {
-        if last.agent == id && last.tick == sim.tick {
-            if matches!(last.kind, SimEventKind::Move { .. }) {
-                last.kind = SimEventKind::Flee;
-            }
-        }
+    if !pay_energy(sim, id, cost) {
+        push(sim, id, SimEventKind::Wait);
+        return;
     }
+    let mut x = (ax as i32 + dx) as u32;
+    let mut y = (ay as i32 + dy) as u32;
+    for _ in 1..steps {
+        let Some((sx, sy)) = flee_away_step(sim, x, y, ox, oy) else {
+            break;
+        };
+        x = (x as i32 + sx) as u32;
+        y = (y as i32 + sy) as u32;
+    }
+    if let Some(a) = sim.agents.get_mut(&id) {
+        a.x = x;
+        a.y = y;
+    }
+    push(sim, id, SimEventKind::Flee);
 }
 
 fn transfer(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32, to: AgentId) {
@@ -1642,6 +1657,15 @@ pub fn apply_heard_memories(
                 }
             })
             .collect();
+        let importance = {
+            let mut sheet = crate::sheet::AbilitySheet::default();
+            if let Some(sid) = h.speaker {
+                if let Some(sp) = sim.agents.get(&sid) {
+                    sheet = sp.sheet;
+                }
+            }
+            sheet.speech_importance(50) as u8
+        };
         remember_agent(
             sim,
             id,
@@ -1649,7 +1673,7 @@ pub fn apply_heard_memories(
                 tick,
                 kind: MemoryKind::Utterance,
                 text: h.text.clone(),
-                importance: 50,
+                importance,
                 last_accessed: tick,
                 species_tag: 0,
                 id: 0,

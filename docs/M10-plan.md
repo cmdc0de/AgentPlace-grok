@@ -117,8 +117,9 @@ cost = qty * unit_weight_milli * haul_milli / 1000
 | **M39** | Done — [`M39-plan.md`](M39-plan.md) — object definition files (visual + LOD + hashed catalog) |
 | **M40** | Done — [`M40-plan.md`](M40-plan.md) — config-owned objects + recipes (except agent) |
 | **M41** | Done — [`M41-plan.md`](M41-plan.md) — world species from TOML, DEX accuracy, STR haul |
-| **M42** | [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
-| After M42 | Protobuf / JSON envelope; TLS/`wss` |
+| **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
+| **M43** | [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
+| After M43 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M10 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

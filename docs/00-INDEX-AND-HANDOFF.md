@@ -58,7 +58,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M40** | Done (tag `M40`) | [`M40-plan.md`](M40-plan.md), walkthrough [`M40-test-plan.md`](M40-test-plan.md) | Config-owned objects + recipes (except agent) |
 | **M41** | Done (tag `M41`) | [`M41-plan.md`](M41-plan.md), walkthrough [`M41-test-plan.md`](M41-test-plan.md) | World species from TOML, DEX accuracy, STR haul |
 | **M42** | Done (tag `M42`) | [`M42-plan.md`](M42-plan.md), walkthrough [`M42-test-plan.md`](M42-test-plan.md) | CON illness/energy, INT memory, browser /ckpt /events |
-| After M42 | Not started | listed at the bottom of `M42-plan.md` | protobuf/TLS |
+| **M43** | Done (tag `M43`) | [`M43-plan.md`](M43-plan.md), walkthrough [`M43-test-plan.md`](M43-test-plan.md) | WIS toxin detect, CHA speech, DEX flee |
+| After M43 | Not started | listed at the bottom of `M43-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -152,15 +153,17 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 46b | `M41-test-plan.md` | M41 walkthrough (species from TOML, DEX miss, STR haul) |
 | 47 | `M42-plan.md` | Milestone 42 (done, tag `M42`): CON illness/energy, INT memory, browser /ckpt /events |
 | 47b | `M42-test-plan.md` | M42 walkthrough (CON/INT sheet, page /ckpt /events) |
+| 48 | `M43-plan.md` | Milestone 43 (done, tag `M43`): WIS toxin detect, CHA speech, DEX flee |
+| 48b | `M43-test-plan.md` | M43 walkthrough (WIS toxin detect, CHA speech, DEX flee) |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M42-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M43-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M42 is implemented (`M42-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M43 is implemented (`M43-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -188,11 +191,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M42 are done. M42 is implemented ([`M42-plan.md`](M42-plan.md)); later work is at the bottom of that file.
+M1–M43 are done. M43 is implemented ([`M43-plan.md`](M43-plan.md)); later work is at the bottom of that file.
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M42-plan.md.
-M42 is implemented (CON illness/energy, INT memory, browser /ckpt /events;
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M43-plan.md.
+M43 is implemented (WIS toxin detect, CHA speech, DEX flee;
 PROTOCOL_VERSION=5). Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, or Bevy in the browser.
 CI stays provider=mock with no network.
