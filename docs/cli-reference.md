@@ -135,7 +135,7 @@ There is no viewer `--listen`, `--start-paused`, or `--pipeline-events`. Put tho
 
 `--lockstep` on the **server** is what makes the attached viewer paint every tick.
 
-On startup the viewer prints each unique authored glb to stderr (and the Log pane): path, **file bytes**, then in-game AABB meters once the mesh is ready (`loaded glb …` / `model … size=… m`). A **configured** path that is missing logs `glb miss {id} -> sentinel` and uses a magenta cuboid. Empty / omitted `[visual]` still uses the primitive (not logged).
+On startup the viewer prints each unique authored glb to stderr (and the Log pane): path, **file bytes**, then in-game AABB meters once the mesh is ready (`loaded glb …` / `model … size=… m`). A **configured** path that is missing logs `glb miss {id} -> sentinel` and uses a magenta cuboid. Empty / omitted `[visual]` still uses the primitive (not logged). Agent meshes come from `configs/objects/agent.toml` (`[visual]`); no visual ⇒ capsule. Authored agent glbs are uniformly scaled to the capsule height (1.11) once the AABB is known. Changing a loaded `.glb` on disk reloads it (~0.5 s) and logs `glb reload {id} {path}`.
 
 | Key | What it does |
 |---|---|

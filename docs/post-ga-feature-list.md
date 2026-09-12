@@ -24,6 +24,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-10 | Missing-asset sentinel | Done (M47) | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
 | PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
+| PG-13 | Object visual scale | Open | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -186,7 +187,7 @@ Constraints for a later `/spec`:
 - `cargo test -p viewer` must not download `.glb` and must not require a GPU window.
 - Do not block CI on GPU art.
 
-Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture, household-home / invention / downed poses. Missing-path sentinel is **PG-10**.
+Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture, household-home / invention / downed poses. Missing-path sentinel is **PG-10**. Per-object glb **scale** is **PG-13**.
 
 ---
 
@@ -234,6 +235,7 @@ kind = "vegetation"          # vegetation | animal | fish | item | agent | crate
 [visual]
 # not hashed
 glb = "assets/models/berry_bush.glb"
+scale = 1.0                  # omit = 1.0; **PG-13**
 [visual.lod]
 near = "assets/models/berry_bush.glb"
 mid  = "assets/models/berry_bush_lod1.glb"
@@ -245,6 +247,7 @@ far  = "assets/models/berry_bush_lod2.glb"
 | **New item / craft** | Add a definition + recipe table; agents can Gather/Craft/Store it. No new Rust `ItemId` arm for that experiment (postcard strategy locked in `/spec`: string id vs append-only enum alias). |
 | **Change the look** | Point `glb` / `lod` at different files. Same sim, new art (hash-neutral if `[sim]` unchanged). |
 | **LOD** | Viewer picks near/mid/far from camera (or agent) distance. Missing file ⇒ coarser LOD, then primitive. |
+| **Scale** | **PG-13** — per-object (and later per-glb) multiplier so each mesh can be sized in TOML. |
 
 Constraints for a later `/spec`:
 
@@ -254,7 +257,7 @@ Constraints for a later `/spec`:
 - Mock + catalog-off ⇒ idle hash `70e5204d…`. `cargo test` never needs the network. Missing glb never fails CI.
 - Postcard enums stay **append only** if ids stay numeric; a string-id catalog is a `/spec` lock (and may be a PROTOCOL/ckpt bump — do not sneak it).
 
-Out of this theme until picked: full tech tree (PG-5), procedural mesh generation, runtime hot-reload of glb from disk while the window is open. Growing the **number** of crafts is **PG-9** (content milestone). Missing configured glb is **PG-10**.
+Out of this theme until picked: full tech tree (PG-5), procedural mesh generation, runtime hot-reload of glb from disk while the window is open. Growing the **number** of crafts is **PG-9** (content milestone). Missing configured glb is **PG-10**. Per-object glb **scale** is **PG-13**.
 
 ---
 
@@ -379,6 +382,45 @@ Out of this theme until picked: mouse-drag orbit, scroll zoom, gamepad, cinemati
 
 ---
 
+## PG-13 — Object visual scale
+
+**Shipped today:** object TOML has `[visual] glb` + LOD paths (PG-8 / M40). Agent glbs are auto-fit to the capsule height (1.11) in the viewer. Other kinds load at export scale. There is **no** per-object or per-file scale in the definition. Changing size means re-exporting the glb.
+
+**Wanted:** each object file can set a **scale factor** for its authored mesh so a researcher sizes that object without touching the glb.
+
+```toml
+# sketch — lock fields in a later /spec
+id = "tree"
+kind = "vegetation"
+
+[visual]
+glb = "assets/models/optimized/maple_tree.glb"
+scale = 0.4                 # omit = 1.0; uniform XYZ
+[visual.lod]
+near = "assets/models/optimized/maple_tree.glb"
+# later: per-LOD scale if a lod file needs a different multiplier
+```
+
+| Case | Scale |
+|---|---|
+| `scale` omitted / `1.0` | Today’s load size (agent still auto-fits to the capsule unless a later `/spec` says explicit scale **replaces** auto-fit) |
+| `scale = N` | Uniform multiplier on that object’s authored glb (and LOD unless overridden) |
+| Primitive / sentinel | Unchanged (no TOML scale) |
+| Per-LOD / non-uniform XYZ | Later unless that `/spec` wants it |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** `scale` lives on `[visual]`, never in `state_hash` or AGTN. Same rule as `glb` / LOD.
+- One scale **per object file** so each kind can be sized independently (`tree` vs `berry_bush` vs `agent`).
+- Native Bevy window only. `cargo test -p viewer` must not need a GPU; unit-test “def.scale 2.0 → transform scale 2.0” with fake defs.
+- Missing / non-finite / `<= 0` scale ⇒ treat as `1.0` (do not fail CI or skip the mesh).
+- Do not change shipping `default.toml` / `coop.toml`. No PROTOCOL bump.
+- Sentinel and empty-path primitives stay unscaled.
+
+Out of this theme until picked: skeletal animation, per-agent clothing, Bevy in the browser, non-uniform XYZ unless the `/spec` locks it.
+
+---
+
 ## How these interact
 
 ```
@@ -391,7 +433,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`l`), hash-neutral, native window only.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`d`), hash-neutral, native window only. PG-13 is **per-object `[visual] scale`** so each glb can be sized in TOML without re-exporting.
 
 ---
 
@@ -407,4 +449,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, and viewer camera pan are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, and per-object visual scale are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12 / PG-13**, not parking-lot one-liners.

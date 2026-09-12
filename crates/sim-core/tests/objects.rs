@@ -14,8 +14,7 @@ use std::path::{Path, PathBuf};
 /// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
 /// (includes M46 plank/charcoal/knife/net catalog `[sim]`).
 const IDLE_2: &str = "5f2313783257960c08253b6717514019459533da6923884a981b1ab2c8068fc2";
-const IDLE_2_NO_CATALOG: &str =
-    "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
+const IDLE_2_NO_CATALOG: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 
 fn shipped_objects() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
@@ -974,12 +973,7 @@ fn catalog_on_craft_plank() {
     let mut sim = Simulation::new(tiny(0x46_11)).unwrap();
     apply_shipped(&mut sim);
     let a = AgentId(0);
-    let plank = sim
-        .catalog
-        .iter()
-        .find(|e| e.slug == "plank")
-        .unwrap()
-        .item;
+    let plank = sim.catalog.iter().find(|e| e.slug == "plank").unwrap().item;
     let ItemId::Catalog(n) = plank else {
         panic!("plank should be catalog");
     };

@@ -22,12 +22,17 @@ use std::env;
 use std::path::{Path, PathBuf};
 use ui::UiState;
 
-const CAPSULE_RADIUS: f32 = 0.28;
-const CAPSULE_LENGTH: f32 = 0.55;
+#[derive(Clone, Copy, Debug)]
+struct AgentFit {
+    scale: f32,
+    offset: Vec3,
+}
 
 #[derive(Component)]
 struct AgentVisual {
     id: AgentId,
+    /// Set once the authored glb AABB is known so height matches the capsule.
+    fit: Option<AgentFit>,
 }
 
 #[derive(Component)]
@@ -77,6 +82,7 @@ struct ModelLabel {
     id: String,
     path: PathBuf,
     file_bytes: u64,
+    mtime: Option<std::time::SystemTime>,
 }
 
 #[derive(Resource, Default)]
@@ -256,12 +262,14 @@ fn main() {
             (
                 net::apply_remote,
                 handle_input,
-                sync_agent_transforms,
                 sync_combat_tints,
                 sync_combat_fx,
                 sync_stockpile_markers,
                 sync_satchel_markers,
+                reload_changed_glbs,
                 report_model_sizes,
+                fit_agent_meshes,
+                sync_agent_transforms,
                 update_camera,
                 update_vision_overlay,
                 update_fog_visibility,
@@ -505,7 +513,10 @@ fn setup_scene(
         }
     }
 
-    let capsule = meshes.add(Capsule3d::new(CAPSULE_RADIUS, CAPSULE_LENGTH));
+    let capsule = meshes.add(Capsule3d::new(
+        models::AGENT_CAPSULE_RADIUS,
+        models::AGENT_CAPSULE_LENGTH,
+    ));
     for agent in state.sim.agents.values() {
         let hue = (agent.id.0 as f32 * 47.0) % 360.0;
         let color = Color::hsl(hue, 0.7, 0.55);
@@ -517,7 +528,10 @@ fn setup_scene(
             "agent",
             models::camera_dist_cells(world.width, world.height, agent.x, agent.y),
             tf,
-            AgentVisual { id: agent.id },
+            AgentVisual {
+                id: agent.id,
+                fit: None,
+            },
         ) {
             commands.spawn((
                 Mesh3d(capsule.clone()),
@@ -527,7 +541,10 @@ fn setup_scene(
                     ..default()
                 })),
                 tf,
-                AgentVisual { id: agent.id },
+                AgentVisual {
+                    id: agent.id,
+                    fit: None,
+                },
                 Visibility::default(),
             ));
         }
@@ -819,7 +836,9 @@ fn try_spawn_model(
 ) -> bool {
     match models::resolve_visual_kind(&visuals.defs, stem, dist_cells) {
         models::VisualKind::Authored(path) => {
-            let file_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let meta = std::fs::metadata(&path).ok();
+            let file_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let mtime = meta.and_then(|m| m.modified().ok());
             let handle = assets
                 .load_builder()
                 .override_unapproved()
@@ -832,6 +851,7 @@ fn try_spawn_model(
                     id: stem.to_string(),
                     path,
                     file_bytes,
+                    mtime,
                 },
                 Visibility::default(),
             ));
@@ -854,6 +874,42 @@ fn try_spawn_model(
             true
         }
         models::VisualKind::Primitive => false,
+    }
+}
+
+fn reload_changed_glbs(
+    time: Res<Time>,
+    mut acc: Local<f32>,
+    assets: Res<AssetServer>,
+    mut labels: Query<(&mut ModelLabel, Option<&mut AgentVisual>)>,
+    mut reported: ResMut<ReportedModels>,
+    mut ui: ResMut<UiState>,
+) {
+    *acc += time.delta_secs();
+    if *acc < 0.5 {
+        return;
+    }
+    *acc = 0.0;
+    for (mut label, agent) in &mut labels {
+        let Ok(meta) = std::fs::metadata(&label.path) else {
+            continue;
+        };
+        let Ok(mtime) = meta.modified() else {
+            continue;
+        };
+        if !models::should_reload(label.mtime, Some(mtime)) {
+            continue;
+        }
+        assets.reload(label.path.clone());
+        let line = format!("glb reload {} {}", label.id, label.path.display());
+        eprintln!("{line}");
+        ui.scrollback.push(line);
+        reported.sizes.remove(&label.path);
+        if let Some(mut agent) = agent {
+            agent.fit = None;
+        }
+        label.mtime = Some(mtime);
+        label.file_bytes = meta.len();
     }
 }
 
@@ -907,13 +963,13 @@ fn report_model_sizes(
     }
 }
 
-fn model_size_meters(
+fn model_aabb_local(
     root: Entity,
     root_tf: &GlobalTransform,
     children: &Query<&Children>,
     meshes: &Query<(&GlobalTransform, &Mesh3d)>,
     assets: &Assets<Mesh>,
-) -> Option<(f32, f32, f32)> {
+) -> Option<(Vec3, Vec3)> {
     let inv = root_tf.affine().inverse();
     let mut min = Vec3::splat(f32::MAX);
     let mut max = Vec3::splat(f32::MIN);
@@ -946,8 +1002,50 @@ fn model_size_meters(
     if !found {
         return None;
     }
+    Some((min, max))
+}
+
+fn model_size_meters(
+    root: Entity,
+    root_tf: &GlobalTransform,
+    children: &Query<&Children>,
+    meshes: &Query<(&GlobalTransform, &Mesh3d)>,
+    assets: &Assets<Mesh>,
+) -> Option<(f32, f32, f32)> {
+    let (min, max) = model_aabb_local(root, root_tf, children, meshes, assets)?;
     let s = max - min;
     Some((s.x.abs(), s.y.abs(), s.z.abs()))
+}
+
+fn fit_agent_meshes(
+    mut agents: Query<(Entity, &ModelLabel, &GlobalTransform, &mut AgentVisual)>,
+    children: Query<&Children>,
+    meshes: Query<(&GlobalTransform, &Mesh3d)>,
+    assets: Res<Assets<Mesh>>,
+) {
+    for (entity, label, root_tf, mut visual) in &mut agents {
+        if visual.fit.is_some() || label.id != "agent" {
+            continue;
+        }
+        let Some((min, max)) = model_aabb_local(entity, root_tf, &children, &meshes, &assets)
+        else {
+            continue;
+        };
+        let (scale, offset) = models::fit_aabb_to_height(
+            [min.x, min.y, min.z],
+            [max.x, max.y, max.z],
+            models::AGENT_CAPSULE_HEIGHT,
+        );
+        visual.fit = Some(AgentFit {
+            scale,
+            offset: Vec3::new(offset[0], offset[1], offset[2]),
+        });
+        eprintln!(
+            "agent fit scale={scale:.4} src_height={:.3} -> {}",
+            (max.y - min.y).abs(),
+            models::AGENT_CAPSULE_HEIGHT
+        );
+    }
 }
 
 fn spawn_marker(
@@ -1365,7 +1463,14 @@ fn sync_agent_transforms(
 ) {
     for (visual, mut transform) in &mut agents {
         if let Some(agent) = state.sim.agents.get(&visual.id) {
-            transform.translation = agent_world_pos(&state.sim.world, agent.x, agent.y);
+            let pos = agent_world_pos(&state.sim.world, agent.x, agent.y);
+            if let Some(fit) = visual.fit {
+                transform.translation = pos + fit.offset;
+                transform.scale = Vec3::splat(fit.scale);
+            } else {
+                transform.translation = pos;
+                transform.scale = Vec3::ONE;
+            }
         }
     }
     for (visual, mut transform) in &mut satchels {

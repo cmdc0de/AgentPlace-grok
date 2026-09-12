@@ -43,8 +43,10 @@ fn telemetry_on_records_and_same_hash() {
     assert_eq!(on.telemetry_ticks.count(), 4);
     assert!(on.telemetry_ticks.total() > 0);
     assert!(on.telemetry_ticks.min() <= on.telemetry_ticks.max());
-    assert_eq!(on.telemetry_ticks.average() * 4, on.telemetry_ticks.total()
-        - (on.telemetry_ticks.total() % 4));
+    assert_eq!(
+        on.telemetry_ticks.average() * 4,
+        on.telemetry_ticks.total() - (on.telemetry_ticks.total() % 4)
+    );
     assert_eq!(off.telemetry_ticks.count(), 0);
     assert!(on.telemetry_otlp_endpoint.is_empty());
 }

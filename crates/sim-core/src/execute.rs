@@ -556,7 +556,8 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let chance = crate::inventions::invent_chance(agent.sheet.intelligence);
+    let intel = agent.sheet.intelligence;
+    let chance = crate::inventions::invent_chance(intel);
     let seed = crate::seeding::derive_seed(
         sim.config.master_seed,
         &format!("tick_{}_agent_{}_invent_0", sim.tick, id.0),
@@ -577,11 +578,9 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         shared: false,
     };
     sim.inventions.insert(iid, inv);
+    let gain = crate::inventions::inventor_influence(intel);
     if let Some(a) = sim.agents.get_mut(&id) {
-        a.influence_factor = a
-            .influence_factor
-            .saturating_add(crate::inventions::INVENTOR_INFLUENCE)
-            .min(10_000);
+        a.influence_factor = a.influence_factor.saturating_add(gain).min(10_000);
     }
     remember_agent(
         sim,

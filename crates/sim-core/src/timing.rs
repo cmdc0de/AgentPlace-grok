@@ -212,8 +212,10 @@ mod tests {
         );
         assert!(p.enabled);
         assert_eq!(p.otlp_endpoint, "http://127.0.0.1:4318");
-        assert!(TelemetryParams::from_config_toml("[telemetry]\nenabled = true\n")
-            .otlp_endpoint
-            .is_empty());
+        assert!(
+            TelemetryParams::from_config_toml("[telemetry]\nenabled = true\n")
+                .otlp_endpoint
+                .is_empty()
+        );
     }
 }

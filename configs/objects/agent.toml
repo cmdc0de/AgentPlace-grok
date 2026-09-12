@@ -1,0 +1,5 @@
+id = "agent"
+kind = "agent"
+
+[visual]
+glb = "assets/models/optimized/low_poly_human_character.glb"

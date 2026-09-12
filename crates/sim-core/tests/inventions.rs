@@ -4,7 +4,9 @@ use sim_core::PipelineParams;
 use sim_core::action::PrimaryAction;
 use sim_core::agent::ItemId;
 use sim_core::event_log::SimEventKind;
-use sim_core::inventions::{InventionsParams, apply_move_cost, apply_sense_range, invent_chance};
+use sim_core::inventions::{
+    InventionsParams, apply_move_cost, apply_sense_range, invent_chance, inventor_influence,
+};
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, InventionKind, Simulation};
 
@@ -179,6 +181,59 @@ fn invent_chance_int_18_higher_than_unused() {
     assert_eq!(invent_chance(0), 400);
     assert_eq!(invent_chance(18), 400 + 4 * 50);
     assert!(invent_chance(18) > invent_chance(0));
+}
+
+#[test]
+fn unused_int_invent_influence_200() {
+    assert_eq!(inventor_influence(0), 200);
+    assert_eq!(invent_chance(0), 400);
+    let mut sim = Simulation::new(tiny(0x48_01)).unwrap();
+    sim.enable_inventions(8);
+    let a = AgentId(0);
+    assert_eq!(sim.agents.get(&a).unwrap().sheet.intelligence, 0);
+    let before = sim.agents.get(&a).unwrap().influence_factor;
+    force_invent(&mut sim, a);
+    let after = sim.agents.get(&a).unwrap().influence_factor;
+    assert_eq!(after, before.saturating_add(200).min(10_000));
+}
+
+#[test]
+fn int_18_vs_3_invent_quality() {
+    assert_eq!(invent_chance(18), 600);
+    assert_eq!(invent_chance(3), 250);
+    assert_eq!(inventor_influence(18), 400);
+    assert_eq!(inventor_influence(3), 50);
+    let mut hi = Simulation::new(tiny(0x48_02)).unwrap();
+    let mut lo = Simulation::new(tiny(0x48_02)).unwrap();
+    hi.enable_inventions(8);
+    lo.enable_inventions(8);
+    hi.agents.get_mut(&AgentId(0)).unwrap().sheet.intelligence = 18;
+    lo.agents.get_mut(&AgentId(0)).unwrap().sheet.intelligence = 3;
+    let before_hi = hi.agents.get(&AgentId(0)).unwrap().influence_factor;
+    let before_lo = lo.agents.get(&AgentId(0)).unwrap().influence_factor;
+    force_invent(&mut hi, AgentId(0));
+    force_invent(&mut lo, AgentId(0));
+    let gain_hi = hi.agents.get(&AgentId(0)).unwrap().influence_factor - before_hi;
+    let gain_lo = lo.agents.get(&AgentId(0)).unwrap().influence_factor - before_lo;
+    assert_eq!(gain_hi, 400);
+    assert_eq!(gain_lo, 50);
+}
+
+#[test]
+fn invent_quality_load_does_not_double() {
+    let mut sim = Simulation::new(tiny(0x48_03)).unwrap();
+    sim.enable_inventions(8);
+    sim.agents.get_mut(&AgentId(0)).unwrap().sheet.intelligence = 18;
+    force_invent(&mut sim, AgentId(0));
+    let inf = sim.agents.get(&AgentId(0)).unwrap().influence_factor;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.enable_inventions(8);
+    assert_eq!(
+        loaded.agents.get(&AgentId(0)).unwrap().influence_factor,
+        inf,
+        "must not re-apply invent quality on --load"
+    );
 }
 
 #[test]

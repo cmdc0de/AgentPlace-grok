@@ -2,6 +2,7 @@
 //! Configured path missing ⇒ sentinel; no/empty visual ⇒ primitive.
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// How to draw an object id in the native viewer. Visuals are never hashed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,6 +147,38 @@ pub fn resolve_visual_kind(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u
     VisualKind::Primitive
 }
 
+/// Bevy `Capsule3d::new(radius, length)` standing height (`length + 2*radius`).
+pub const AGENT_CAPSULE_RADIUS: f32 = 0.28;
+pub const AGENT_CAPSULE_LENGTH: f32 = 0.55;
+pub const AGENT_CAPSULE_HEIGHT: f32 = AGENT_CAPSULE_LENGTH + 2.0 * AGENT_CAPSULE_RADIUS;
+
+/// Uniform scale + local offset so AABB height matches the fallback capsule
+/// and the AABB center sits on the transform origin (capsule center).
+pub fn fit_aabb_to_height(min: [f32; 3], max: [f32; 3], target_height: f32) -> (f32, [f32; 3]) {
+    let h = (max[1] - min[1]).abs();
+    if h < 1e-6 {
+        return (1.0, [0.0, 0.0, 0.0]);
+    }
+    let scale = target_height / h;
+    let center = [
+        (min[0] + max[0]) * 0.5,
+        (min[1] + max[1]) * 0.5,
+        (min[2] + max[2]) * 0.5,
+    ];
+    (
+        scale,
+        [-center[0] * scale, -center[1] * scale, -center[2] * scale],
+    )
+}
+
+/// Reload when the on-disk mtime is strictly newer. Missing/equal/older ⇒ keep.
+pub fn should_reload(prev: Option<SystemTime>, now: Option<SystemTime>) -> bool {
+    match (prev, now) {
+        (Some(p), Some(n)) => n > p,
+        _ => false,
+    }
+}
+
 /// Chebyshev cell distance from the default setup camera xz to `(x, y)`.
 pub fn camera_dist_cells(world_w: u32, world_h: u32, x: u32, y: u32) -> u32 {
     let cx = world_w as f32 * 0.5;
@@ -162,6 +195,131 @@ mod tests {
     use super::*;
     use sim_core::{ExperimentConfig, Simulation};
     use std::fs;
+
+    #[test]
+    fn fit_aabb_matches_capsule_height_and_centers() {
+        let (s, o) = fit_aabb_to_height(
+            [0.0, 0.0, 0.0],
+            [1.0, AGENT_CAPSULE_HEIGHT, 1.0],
+            AGENT_CAPSULE_HEIGHT,
+        );
+        assert!((s - 1.0).abs() < 1e-5, "scale={s}");
+        assert!(
+            (o[1] + AGENT_CAPSULE_HEIGHT * 0.5).abs() < 1e-5,
+            "oy={}",
+            o[1]
+        );
+        let (s2, o2) = fit_aabb_to_height([0.0, 0.0, 0.0], [0.5, 2.22, 0.5], AGENT_CAPSULE_HEIGHT);
+        assert!((s2 - 0.5).abs() < 1e-5, "scale={s2}");
+        assert!((s2 * 2.22 - AGENT_CAPSULE_HEIGHT).abs() < 1e-4);
+        assert!((o2[1] + 1.11 * 0.5).abs() < 1e-4, "oy={}", o2[1]);
+        let (s0, o0) = fit_aabb_to_height([0.0, 1.0, 0.0], [0.0, 1.0, 0.0], AGENT_CAPSULE_HEIGHT);
+        assert_eq!(s0, 1.0);
+        assert_eq!(o0, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn should_reload_newer_only() {
+        let t0 = SystemTime::UNIX_EPOCH;
+        let t1 = t0 + std::time::Duration::from_secs(1);
+        assert!(should_reload(Some(t0), Some(t1)));
+        assert!(!should_reload(Some(t1), Some(t1)));
+        assert!(!should_reload(Some(t1), Some(t0)));
+        assert!(!should_reload(None, Some(t1)));
+        assert!(!should_reload(Some(t0), None));
+    }
+
+    #[test]
+    fn agent_empty_visual_is_primitive() {
+        assert_eq!(resolve_visual_kind(&[], "agent", 0), VisualKind::Primitive);
+        let empty = sim_core::ObjectDef {
+            id: "agent".into(),
+            kind: "agent".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some(String::new()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[empty], "agent", 0),
+            VisualKind::Primitive
+        );
+    }
+
+    #[test]
+    fn agent_toml_authored_human() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects");
+        let defs = sim_core::load_object_defs(&dir).expect("load shipped objects");
+        match resolve_visual_kind(&defs, "agent", 0) {
+            VisualKind::Authored(p) => {
+                let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                assert!(name.contains("low_poly_human_character"), "agent glb {p:?}");
+                assert!(p.is_file(), "{}", p.display());
+            }
+            other => panic!("expected Authored, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn agent_configured_missing_is_sentinel() {
+        let def = sim_core::ObjectDef {
+            id: "agent".into(),
+            kind: "agent".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some("/nope/agentplace-missing-agent.glb".into()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "agent", 0),
+            VisualKind::Sentinel
+        );
+    }
+
+    #[test]
+    fn agent_visual_not_hashed() {
+        let cfg = ExperimentConfig::from_toml_str(
+            r#"
+master_seed = 1
+[simulation]
+max_ticks = 10
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 2
+"#,
+        )
+        .unwrap();
+        let mut a = Simulation::new(cfg.clone()).unwrap();
+        a.run_ticks(2);
+        let hash = a.state_hash();
+        let agent_only = std::env::temp_dir().join("agentplace-m48-agent-only");
+        let _ = fs::remove_dir_all(&agent_only);
+        fs::create_dir_all(&agent_only).unwrap();
+        fs::write(
+            agent_only.join("agent.toml"),
+            r#"
+id = "agent"
+kind = "agent"
+[visual]
+glb = "assets/models/optimized/low_poly_human_character.glb"
+"#,
+        )
+        .unwrap();
+        let mut b = Simulation::new(cfg).unwrap();
+        b.apply_objects_dir(&agent_only).unwrap();
+        b.run_ticks(2);
+        assert_eq!(
+            b.state_hash(),
+            hash,
+            "visual-only agent.toml must not enter state_hash"
+        );
+        let _ = fs::remove_dir_all(&agent_only);
+    }
 
     #[test]
     fn path_map_covers_locked_stems() {

@@ -97,6 +97,17 @@ pub fn invent_chance(intelligence: u8) -> i32 {
         .clamp(1, 1000)
 }
 
+/// Influence gain on a successful Invent. INT 0 ⇒ today's +200.
+pub fn inventor_influence(intelligence: u8) -> u32 {
+    if intelligence == 0 {
+        INVENTOR_INFLUENCE
+    } else {
+        (INVENTOR_INFLUENCE as i32
+            + crate::sheet::AbilitySheet::modifier(intelligence) * INVENT_INT_CHANCE)
+            .max(1) as u32
+    }
+}
+
 pub fn next_kind(table: &BTreeMap<u64, Invention>, tree: bool) -> Option<InventionKind> {
     for (i, k) in InventionKind::ALL.into_iter().enumerate() {
         if table.values().any(|inv| inv.kind == k) {
@@ -157,6 +168,21 @@ pub fn observation_lines(table: &BTreeMap<u64, Invention>, id: AgentId) -> Vec<S
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inventor_influence_unused_and_scores() {
+        assert_eq!(invent_chance(0), 400);
+        assert_eq!(invent_chance(18), 600);
+        assert_eq!(invent_chance(3), 250);
+        assert_eq!(inventor_influence(0), 200);
+        assert_eq!(inventor_influence(18), 400);
+        assert_eq!(inventor_influence(3), 50);
+    }
 }
 
 pub fn hash_table(table: &BTreeMap<u64, Invention>, hasher: &mut impl sha2::Digest) {

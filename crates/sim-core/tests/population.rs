@@ -1772,8 +1772,7 @@ fn str_18_vs_3_gather_qty() {
         }
         assert!(placed, "no adjacent land for tree");
         sim.agents.get_mut(&id).unwrap().sheet.strength = str_;
-        sim.agents.get_mut(&id).unwrap().needs =
-            sim_core::Needs::maxed(10_000, 10_000, 10_000);
+        sim.agents.get_mut(&id).unwrap().needs = sim_core::Needs::maxed(10_000, 10_000, 10_000);
         let before = sim
             .agents
             .get(&id)

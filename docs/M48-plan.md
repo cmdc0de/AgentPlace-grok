@@ -1,8 +1,8 @@
 # M48 — INT invent quality, agent meshes, hot-reload glb
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M47 complete (`docs/M47-plan.md`, git tag `M47`, commit `49e2795`)  
-**Walkthrough:** written on implement (`docs/M48-test-plan.md`)  
+**Walkthrough:** [`docs/M48-test-plan.md`](M48-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-4 INT quality, PG-6 agent meshes); hot-reload parked on PG-6 / After-M later-tables
 
 ## Context
@@ -130,7 +130,7 @@ cargo run -p viewer -- --connect 127.0.0.1:7000 --objects configs/objects
 
 ## Verification
 
-Walkthrough written on implement: [`docs/M48-test-plan.md`](M48-test-plan.md).
+Walkthrough: [`docs/M48-test-plan.md`](M48-test-plan.md).
 
 ```bash
 cargo test -p sim-core

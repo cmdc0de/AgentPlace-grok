@@ -16,7 +16,7 @@ The placeholder agent is a Bevy capsule (`Capsule3d::new(0.28, 0.55)`). `length`
 | Footprint | ~0.56 across |
 | Pivot | capsule **center**, **0.7** above the terrain cell |
 
-A standing human-scale mesh should be about **1.1 units tall**, origin at **mid-body** (not the feet). +Z forward if facing matters.
+A standing human-scale mesh should be about **1.1 units tall**, origin at **mid-body** (not the feet). +Z forward if facing matters. If an **agent** glb is a different height, the native viewer uniformly scales it to the capsule (1.11) and recenters on the capsule origin.
 
 ## Other primitives (same units)
 
