@@ -74,6 +74,8 @@ pub use seeding::{RngBank, derive_seed};
 pub use sheet::{AbilitySheet, SheetParams};
 pub use simulation::{Simulation, StateHash};
 pub use social::{RelationView, RelationshipSummary};
-pub use timing::{AgentTiming, PipelineParams, TickTiming, append_timing_jsonl};
+pub use timing::{
+    AgentTiming, DurationStats, PipelineParams, TelemetryParams, TickTiming, append_timing_jsonl,
+};
 pub use voting::{CouncilTally, VoteAccept, VoteWeight, VotingParams};
 pub use world::World;

@@ -981,8 +981,13 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
             .agents
             .get(&id)
             .is_some_and(|a| a.has_tool(ItemId::Basket));
+        let str_qty = sim
+            .agents
+            .get(&id)
+            .map(|a| a.sheet.resource_qty(1 + u32::from(basket)))
+            .unwrap_or(1);
         crate::incentive::scale_u32(
-            1 + u32::from(basket),
+            str_qty,
             crate::incentive::resource_mult_milli(sim, id, "food"),
         )
         .max(1)
@@ -992,7 +997,8 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
         match spec.yield_kind {
             VegYield::Wood => {
                 got_item = ItemId::Wood;
-                qty = a.add_to_pockets_or_pack(ItemId::Wood, spec.wood_yield.max(1), &params);
+                let n = a.sheet.resource_qty(spec.wood_yield.max(1));
+                qty = a.add_to_pockets_or_pack(ItemId::Wood, n, &params);
             }
             VegYield::Food => {
                 got_item = ItemId::Food(species);
@@ -1048,7 +1054,8 @@ fn gather_stone(sim: &mut Simulation, id: AgentId) {
     let params = sim.storage;
     if ok {
         if let Some(a) = sim.agents.get_mut(&id) {
-            qty = a.add_to_pockets_or_pack(ItemId::Stone, 1, &params);
+            let n = a.sheet.resource_qty(1);
+            qty = a.add_to_pockets_or_pack(ItemId::Stone, n, &params);
         }
         let i = (y * sim.world.width + x) as usize;
         if i < sim.world.minerals.len() {
@@ -1144,6 +1151,13 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         nutr,
         crate::incentive::resource_mult_milli(sim, id, resource),
     );
+    let master = sim.config.master_seed;
+    let con = sim
+        .agents
+        .get(&id)
+        .map(|a| a.sheet.constitution)
+        .unwrap_or(0);
+    let apply_ill = crate::sheet::AbilitySheet::illness_hits(master, tick, id.0, con);
 
     let Some(agent) = sim.agents.get_mut(&id) else {
         return;
@@ -1165,27 +1179,29 @@ fn eat(sim: &mut Simulation, id: AgentId, item: ItemId) {
         agent.consumption.fish += 1;
     }
     if toxic {
-        agent.illness_ticks = agent.illness_ticks.max(illness);
         agent.consumption.toxic_events += 1;
-        agent.needs.energy = agent.needs.energy.saturating_sub(800);
-        let _ = agent.remember(
-            cap,
-            policy,
-            bonus,
-            persist,
-            MemoryEntry {
-                tick,
-                kind: MemoryKind::Sickness,
-                text: format!("ate {name} and felt sick"),
-                importance: 90,
-                last_accessed: tick,
-                species_tag: tag,
-                id: 0,
-                participants: Vec::new(),
-                valence: -80,
-                ..Default::default()
-            },
-        );
+        if apply_ill {
+            agent.illness_ticks = agent.illness_ticks.max(illness);
+            agent.needs.energy = agent.needs.energy.saturating_sub(800);
+            let _ = agent.remember(
+                cap,
+                policy,
+                bonus,
+                persist,
+                MemoryEntry {
+                    tick,
+                    kind: MemoryKind::Sickness,
+                    text: format!("ate {name} and felt sick"),
+                    importance: 90,
+                    last_accessed: tick,
+                    species_tag: tag,
+                    id: 0,
+                    participants: Vec::new(),
+                    valence: -80,
+                    ..Default::default()
+                },
+            );
+        }
         let _ = agent.remember(
             cap,
             policy,
@@ -1248,7 +1264,8 @@ fn hunt(sim: &mut Simulation, id: AgentId) {
             .unwrap_or(3000);
         let params = sim.storage;
         if let Some(a) = sim.agents.get_mut(&id) {
-            let _ = a.add_to_pockets_or_pack(ItemId::Food(100), 1, &params);
+            let n = a.sheet.resource_qty(1);
+            let _ = a.add_to_pockets_or_pack(ItemId::Food(100), n, &params);
         }
         let _ = nutr;
     }

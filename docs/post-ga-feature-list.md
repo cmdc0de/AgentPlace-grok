@@ -23,6 +23,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. |
 | PG-10 | Missing-asset sentinel | Open | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
+| PG-12 | Viewer camera pan (keys) | Open | Arrow keys pan at constant height; `u` up, `l` down. Hash-neutral. Native window only. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -349,6 +350,35 @@ Out of this theme until picked: protobuf/TLS on the **sim wire** (different from
 
 ---
 
+## PG-12 — Viewer camera pan (keys)
+
+**Shipped today:** the 3D camera starts at a fixed offset looking at map center. `/follow ID` (or digit keys) snaps the camera to an agent each frame. There is **no** free pan. `L` currently **toggles the legend** (imgui), not camera height.
+
+**Wanted:** a researcher in the native viewer can fly the camera over the map without changing sim state.
+
+| Key | Motion (world XZ, **Y unchanged** unless noted) |
+|---|---|
+| Arrow **Right** | Pan right (camera-right, projected on the ground plane) |
+| Arrow **Left** | Pan left |
+| Arrow **Up** (forward) | Pan forward (look direction on XZ; do not dive into the terrain) |
+| Arrow **Down** (back) | Pan back |
+| `u` | Raise camera (**+Y** only) |
+| `l` | Lower camera (**−Y** only), clamp above the terrain |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** Camera transform is viewer-only. No events, no `state_hash`.
+- Step size: lock cells-per-tap (or hold-to-repeat) in `/spec`. Stay at the current height for arrows.
+- **Key clash:** `L` is legend today. Lock one of: (a) camera `l` wins and legend moves (e.g. `Shift+L` / imgui only), or (b) keep legend on `L` and pick another down key. The wanted binding is `u` / `l` as above.
+- While `/follow` is on, first pan **cancels follow** (free cam) so arrows are not fighting the follow snap.
+- Ignore these keys when the imgui console has keyboard focus (`want_keyboard`), same as other viewer shortcuts.
+- Native Bevy window only. Not the browser page. `cargo test -p viewer` must not need a GPU; unit-test the pan delta helper with fake transforms.
+- Do not change shipping TOML. No PROTOCOL bump.
+
+Out of this theme until picked: mouse-drag orbit, scroll zoom, gamepad, cinematic paths, Bevy in the browser.
+
+---
+
 ## How these interact
 
 ```
@@ -361,7 +391,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`l`), hash-neutral, native window only.
 
 ---
 
@@ -377,4 +407,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, and OpenTelemetry performance metrics are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, and viewer camera pan are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12**, not parking-lot one-liners.

@@ -11,8 +11,11 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects.
-const IDLE_2: &str = "cd1e085363099fdda8a3abeb848cf7a4182131da12690d3e8d0b0075cabeb130";
+/// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
+/// (includes M46 plank/charcoal/knife/net catalog `[sim]`).
+const IDLE_2: &str = "5f2313783257960c08253b6717514019459533da6923884a981b1ab2c8068fc2";
+const IDLE_2_NO_CATALOG: &str =
+    "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 
 fn shipped_objects() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
@@ -106,6 +109,15 @@ fn default_mock_two_ticks_idle_hash() {
     apply_shipped(&mut sim);
     sim.run_ticks(2);
     assert_eq!(sim.state_hash().to_string(), IDLE_2);
+}
+
+#[test]
+fn catalog_off_two_ticks_hash_ignores_new_recipes() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/default.toml");
+    let cfg = ExperimentConfig::load_path(&path).unwrap();
+    let mut off = Simulation::new(cfg).unwrap();
+    off.run_ticks(2);
+    assert_eq!(off.state_hash().to_string(), IDLE_2_NO_CATALOG);
 }
 
 #[test]
@@ -613,8 +625,18 @@ fn builtin_slugs_are_not_catalog_u16() {
     assert_eq!(basket.item, ItemId::Basket);
     assert_eq!(basket.recipe, Some(Recipe::Basket));
     let cord = entries.iter().find(|e| e.slug == "cord").unwrap();
-    assert_eq!(cord.item, ItemId::Catalog(0));
-    assert_eq!(cord.recipe, Some(Recipe::Catalog(0)));
+    let ItemId::Catalog(n) = cord.item else {
+        panic!("cord should be catalog");
+    };
+    assert_eq!(cord.recipe, Some(Recipe::Catalog(n)));
+    for slug in ["plank", "charcoal", "knife", "net"] {
+        let e = entries.iter().find(|x| x.slug == slug).unwrap();
+        assert!(
+            matches!(e.item, ItemId::Catalog(_)),
+            "{slug} should be catalog"
+        );
+        assert!(e.recipe.is_some(), "{slug} should have a recipe");
+    }
 }
 
 #[test]
@@ -920,4 +942,81 @@ output_qty = 1
             .unwrap_or(0),
         0
     );
+}
+
+#[test]
+fn catalog_off_plank_not_legal_same_hash() {
+    let cfg = tiny(0x46_10);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut flagged = Simulation::new(cfg).unwrap();
+    let a = AgentId(0);
+    for sim in [&mut off, &mut flagged] {
+        if let Some(ag) = sim.agents.get_mut(&a) {
+            ag.try_add_item(ItemId::Wood, 4);
+            ag.try_add_item(ItemId::Fiber, 4);
+            ag.try_add_item(ItemId::Stone, 2);
+        }
+    }
+    let legal = legal_actions(&off, off.agents.get(&a).unwrap());
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: Recipe::Catalog(_)
+        }
+    )));
+    off.run_ticks(3);
+    flagged.run_ticks(3);
+    assert_eq!(off.state_hash(), flagged.state_hash());
+}
+
+#[test]
+fn catalog_on_craft_plank() {
+    let mut sim = Simulation::new(tiny(0x46_11)).unwrap();
+    apply_shipped(&mut sim);
+    let a = AgentId(0);
+    let plank = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "plank")
+        .unwrap()
+        .item;
+    let ItemId::Catalog(n) = plank else {
+        panic!("plank should be catalog");
+    };
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.try_add_item(ItemId::Wood, 8);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(
+        legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Catalog(k)
+            } if *k == n
+        )),
+        "{legal:?}"
+    );
+    for _ in 0..64 {
+        if let Some(ag) = sim.agents.get_mut(&a) {
+            ag.try_add_item(ItemId::Wood, 4);
+        }
+        sim_core::execute::execute_primary(
+            &mut sim,
+            a,
+            &PrimaryAction::Craft {
+                recipe: Recipe::Catalog(n),
+            },
+        );
+        if sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&plank).copied())
+            .unwrap_or(0)
+            >= 1
+        {
+            return;
+        }
+    }
+    panic!("plank craft never succeeded");
 }

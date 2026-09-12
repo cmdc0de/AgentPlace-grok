@@ -979,40 +979,10 @@ fn con_18_vs_3_energy_max_and_illness() {
     assert!(hi > lo, "CON 18 energy {hi} vs CON 3 {lo}");
     assert_eq!(lo, sim.agents.get(&id).unwrap().sheet.energy_max(base));
 
-    let mushroom = sim
-        .config
-        .world
-        .species
-        .veg_tag_by_id("mushroom")
-        .expect("mushroom");
     sim.agents.get_mut(&id).unwrap().sheet.constitution = 18;
-    sim.agents.get_mut(&id).unwrap().illness_ticks = 0;
-    sim.agents
-        .get_mut(&id)
-        .unwrap()
-        .try_add_item(ItemId::Food(mushroom), 1);
-    sim_core::execute::execute_primary(
-        &mut sim,
-        id,
-        &PrimaryAction::Eat {
-            item: ItemId::Food(mushroom),
-        },
-    );
-    assert_eq!(sim.agents.get(&id).unwrap().illness_ticks, 8);
+    assert_eq!(sim.agents.get(&id).unwrap().sheet.illness_duration(), 8);
     sim.agents.get_mut(&id).unwrap().sheet.constitution = 3;
-    sim.agents.get_mut(&id).unwrap().illness_ticks = 0;
-    sim.agents
-        .get_mut(&id)
-        .unwrap()
-        .try_add_item(ItemId::Food(mushroom), 1);
-    sim_core::execute::execute_primary(
-        &mut sim,
-        id,
-        &PrimaryAction::Eat {
-            item: ItemId::Food(mushroom),
-        },
-    );
-    assert_eq!(sim.agents.get(&id).unwrap().illness_ticks, 15);
+    assert_eq!(sim.agents.get(&id).unwrap().sheet.illness_duration(), 15);
 }
 
 #[test]
@@ -1045,6 +1015,8 @@ fn unused_sheet_energy_memory_identity() {
     assert_eq!(a.sheet.illness_duration(), 12);
     assert_eq!(a.sheet.memory_cap(sim.config.memory_capacity()), 128);
     assert_eq!(a.sheet.retrieval_k(sim.config.agents.memory.retrieval_k), 8);
+    assert_eq!(a.sheet.plan_length(4), 4);
+    assert_eq!(a.sheet.resource_qty(3), 3);
     let mushroom = sim.config.world.species.veg_tag_by_id("mushroom").unwrap();
     sim.agents
         .get_mut(&id)
@@ -1718,4 +1690,130 @@ fn load_restores_wis_cha_str_not_derived() {
     assert_eq!(a.sheet.board_cells(8), 12);
     assert_eq!(a.sheet.support_social(), (400, 0, 200, 0));
     assert_eq!(a.sheet.pocket_weight_cap(), Some(9000));
+}
+
+#[test]
+fn con_18_vs_3_illness_chance() {
+    let mushroom = {
+        let sim = Simulation::new(tiny(0x46_01)).unwrap();
+        sim.config.world.species.veg_tag_by_id("mushroom").unwrap()
+    };
+    let eat_n = |con: u8| -> u32 {
+        let mut sim = Simulation::new(tiny(0x46_01)).unwrap();
+        let id = AgentId(0);
+        sim.agents.get_mut(&id).unwrap().sheet.constitution = con;
+        let mut sick = 0u32;
+        for t in 1..40u64 {
+            sim.tick = t;
+            sim.agents.get_mut(&id).unwrap().illness_ticks = 0;
+            sim.agents
+                .get_mut(&id)
+                .unwrap()
+                .try_add_item(ItemId::Food(mushroom), 1);
+            sim_core::execute::execute_primary(
+                &mut sim,
+                id,
+                &PrimaryAction::Eat {
+                    item: ItemId::Food(mushroom),
+                },
+            );
+            if sim.agents.get(&id).unwrap().illness_ticks > 0 {
+                sick += 1;
+            }
+        }
+        sick
+    };
+    let always = eat_n(0);
+    assert_eq!(always, 39, "CON 0 always sick");
+    let hi = eat_n(18);
+    let lo = eat_n(3);
+    assert!(hi < lo, "CON 18 sick {hi} vs CON 3 {lo}");
+}
+
+#[test]
+fn int_18_vs_3_plan_length() {
+    let sim = Simulation::new(tiny(0x46_02)).unwrap();
+    let base = sim.llm_plan_length;
+    assert_eq!(base, 4);
+    let mut a = sim.agents.get(&AgentId(0)).unwrap().clone();
+    assert_eq!(a.sheet.plan_length(base), 4);
+    a.sheet.intelligence = 18;
+    assert_eq!(a.sheet.plan_length(base), 8);
+    a.sheet.intelligence = 3;
+    assert_eq!(a.sheet.plan_length(base), 1);
+}
+
+#[test]
+fn str_18_vs_3_gather_qty() {
+    let tree = {
+        let sim = Simulation::new(tiny(0x46_03)).unwrap();
+        sim.config.world.species.veg_tag_by_id("tree").unwrap()
+    };
+    let gather_wood = |str_: u8| -> u32 {
+        let mut sim = Simulation::new(tiny(0x46_03)).unwrap();
+        let id = AgentId(0);
+        let (x, y) = {
+            let a = sim.agents.get(&id).unwrap();
+            (a.x, a.y)
+        };
+        let mut placed = false;
+        for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+            let nx = x as i32 + dx;
+            let ny = y as i32 + dy;
+            if nx < 0 || ny < 0 {
+                continue;
+            }
+            let (nx, ny) = (nx as u32, ny as u32);
+            if sim.world.is_land(nx, ny) {
+                sim.world.set_vegetation(nx, ny, tree);
+                placed = true;
+                break;
+            }
+        }
+        assert!(placed, "no adjacent land for tree");
+        sim.agents.get_mut(&id).unwrap().sheet.strength = str_;
+        sim.agents.get_mut(&id).unwrap().needs =
+            sim_core::Needs::maxed(10_000, 10_000, 10_000);
+        let before = sim
+            .agents
+            .get(&id)
+            .unwrap()
+            .inventory
+            .get(&ItemId::Wood)
+            .copied()
+            .unwrap_or(0);
+        for _ in 0..64 {
+            sim_core::execute::execute_primary(
+                &mut sim,
+                id,
+                &PrimaryAction::Gather { species: tree },
+            );
+            let have = sim
+                .agents
+                .get(&id)
+                .unwrap()
+                .inventory
+                .get(&ItemId::Wood)
+                .copied()
+                .unwrap_or(0);
+            if have > before {
+                return have - before;
+            }
+            if let Some(a) = sim.agents.get(&id) {
+                for (dx, dy) in [(-1i32, 0), (1, 0), (0, -1), (0, 1)] {
+                    let nx = a.x as i32 + dx;
+                    let ny = a.y as i32 + dy;
+                    if nx >= 0 && ny >= 0 {
+                        sim.world.set_vegetation(nx as u32, ny as u32, tree);
+                    }
+                }
+            }
+        }
+        panic!("gather wood never succeeded");
+    };
+    let hi = gather_wood(18);
+    let lo = gather_wood(3);
+    let unused = gather_wood(0);
+    assert_eq!(unused, 3, "unused STR keeps tree wood_yield");
+    assert!(hi > lo, "STR 18 wood {hi} vs STR 3 {lo}");
 }

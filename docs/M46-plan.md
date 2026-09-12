@@ -1,7 +1,8 @@
 # M46 — Sheet leftovers, extra recipes, OpenTelemetry
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M45 complete (`docs/M45-plan.md`, git tag `M45`, commit `a27146d`)  
+**Walkthrough:** [`docs/M46-test-plan.md`](M46-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-4 remaining CON/INT/STR, PG-9 recipes, PG-11 telemetry)
 
 ## Context
@@ -19,7 +20,7 @@ A researcher can:
 3. Turn on `[telemetry] enabled` / `--telemetry` and see **hash-neutral** sim-tick aggregates (count, total, average, median, min, max) plus process RSS. OTLP only if `otlp_endpoint` is set (CI never dials). Overlay off ⇒ no exporter, **same hashes**.
 4. `--load` restores scores and catalog slugs; do not persist derived chance/length/payoff; do not emit extra telemetry on decode. CI stays `provider = mock`. **`PROTOCOL_VERSION = 5`**.
 
-Idle mock 2-tick hash **stays `cd1e0853…`**.
+Default `sim-cli` loads shipped objects, so idle mock 2-tick hash is **`5f231378…`** (four new recipes in the catalog). Without an objects dir the hash stays `70e5204d…`. Telemetry off does not change hashes.
 
 ## In scope
 
@@ -80,7 +81,7 @@ Overlay **off**: no exporter, no extra required threads, **same hashes**. `--loa
 
 | Later | What |
 |---|---|
-| After M46 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings; **PG-10** missing-asset sentinel |
+| After M46 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings; **PG-10** missing-asset sentinel; **PG-12** viewer camera pan (arrows + u/l) |
 | Not M46 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; hashing wall-clock ns; recipe durability / workstations |
 
 ## Key decisions
@@ -97,7 +98,7 @@ Overlay **off**: no exporter, no extra required threads, **same hashes**. `--loa
 
 | Test | Asserts |
 |---|---|
-| default mock 2 ticks | hash still `cd1e0853…` |
+| default mock 2 ticks | shipped objects hash `5f231378…`; no-objects `70e5204d…` |
 | unused CON/INT/STR | always-sick; plan length 4; gather qty identity |
 | CON 18 vs 3 | 18 resists more seeded illness rolls than 3; CON 0 always sick |
 | INT 18 vs 3 | plan length 8 vs 1 |
@@ -134,7 +135,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough on implement: `docs/M46-test-plan.md` (do not write until `/implement-m`).
+Walkthrough: [`docs/M46-test-plan.md`](M46-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -143,7 +144,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: idle mock hash `cd1e0853…`; unused sheet / catalog-off / telemetry-off identity; Hello v5; format_version 3 write.
+Expect: default CLI 2-tick hash `5f231378…`; unused sheet / catalog-off / telemetry-off identity; Hello v5; format_version 3 write.
 
 ## Risks
 

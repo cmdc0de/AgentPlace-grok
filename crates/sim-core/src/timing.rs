@@ -14,6 +14,90 @@ pub struct PipelineParams {
     pub hash_events: bool,
 }
 
+/// Overlay `[telemetry]`. Not on `ExperimentConfig` (not hashed).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TelemetryParams {
+    pub enabled: bool,
+    pub otlp_endpoint: String,
+}
+
+impl TelemetryParams {
+    pub fn from_config_toml(s: &str) -> Self {
+        #[derive(Default, Deserialize)]
+        struct Slice {
+            #[serde(default)]
+            telemetry: Table,
+        }
+        #[derive(Default, Deserialize)]
+        struct Table {
+            enabled: Option<bool>,
+            otlp_endpoint: Option<String>,
+        }
+        let slice: Slice = toml::from_str(s).unwrap_or_default();
+        Self {
+            enabled: slice.telemetry.enabled.unwrap_or(false),
+            otlp_endpoint: slice
+                .telemetry
+                .otlp_endpoint
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
+        }
+    }
+}
+
+/// Hash-neutral duration samples (sim ticks or viewer frames).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DurationStats {
+    samples: Vec<u64>,
+}
+
+impl DurationStats {
+    pub fn record(&mut self, ns: u64) {
+        self.samples.push(ns);
+    }
+
+    pub fn count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn total(&self) -> u64 {
+        self.samples.iter().copied().sum()
+    }
+
+    pub fn average(&self) -> u64 {
+        if self.samples.is_empty() {
+            0
+        } else {
+            self.total() / self.samples.len() as u64
+        }
+    }
+
+    pub fn median(&self) -> u64 {
+        if self.samples.is_empty() {
+            return 0;
+        }
+        let mut v = self.samples.clone();
+        v.sort_unstable();
+        v[v.len() / 2]
+    }
+
+    pub fn min(&self) -> u64 {
+        self.samples.iter().copied().min().unwrap_or(0)
+    }
+
+    pub fn max(&self) -> u64 {
+        self.samples.iter().copied().max().unwrap_or(0)
+    }
+}
+
+/// Best-effort RSS in bytes. None if the host cannot report it.
+pub fn process_rss_bytes() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/self/statm").ok()?;
+    let pages: u64 = text.split_whitespace().nth(1)?.parse().ok()?;
+    Some(pages.saturating_mul(4096))
+}
+
 impl PipelineParams {
     pub fn from_config_toml(s: &str) -> Self {
         #[derive(Default, Deserialize)]
@@ -99,5 +183,37 @@ impl AgentTiming {
             agent: id.0,
             ..Self::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duration_stats_known_series() {
+        let mut s = DurationStats::default();
+        for n in [10u64, 20, 30, 40, 50] {
+            s.record(n);
+        }
+        assert_eq!(s.count(), 5);
+        assert_eq!(s.total(), 150);
+        assert_eq!(s.average(), 30);
+        assert_eq!(s.median(), 30);
+        assert_eq!(s.min(), 10);
+        assert_eq!(s.max(), 50);
+    }
+
+    #[test]
+    fn telemetry_overlay_parses() {
+        assert!(!TelemetryParams::from_config_toml("").enabled);
+        let p = TelemetryParams::from_config_toml(
+            "[telemetry]\nenabled = true\notlp_endpoint = \"http://127.0.0.1:4318\"\n",
+        );
+        assert!(p.enabled);
+        assert_eq!(p.otlp_endpoint, "http://127.0.0.1:4318");
+        assert!(TelemetryParams::from_config_toml("[telemetry]\nenabled = true\n")
+            .otlp_endpoint
+            .is_empty());
     }
 }

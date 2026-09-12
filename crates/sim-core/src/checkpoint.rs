@@ -539,6 +539,11 @@ impl Simulation {
             catalog: Vec::new(),
             ckpt_catalog_slugs: blob_slugs,
             pipeline_hash_events: false,
+            telemetry_enabled: false,
+            telemetry_otlp_endpoint: String::new(),
+            telemetry_ticks: crate::timing::DurationStats::default(),
+            telemetry_rss_last: None,
+            telemetry_rss_peak: None,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;

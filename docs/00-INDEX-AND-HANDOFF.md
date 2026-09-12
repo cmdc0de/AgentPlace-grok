@@ -61,7 +61,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M43** | Done (tag `M43`) | [`M43-plan.md`](M43-plan.md), walkthrough [`M43-test-plan.md`](M43-test-plan.md) | WIS toxin detect, CHA speech, DEX flee |
 | **M44** | Done (tag `M44`) | [`M44-plan.md`](M44-plan.md), walkthrough [`M44-test-plan.md`](M44-test-plan.md) | WIS board range, CHA support/pair-bond, STR pocket weight |
 | **M45** | Done (tag `M45`) | [`M45-plan.md`](M45-plan.md), walkthrough [`M45-test-plan.md`](M45-test-plan.md) | Tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
-| **M46** | Planned — next | [`M46-plan.md`](M46-plan.md) | CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
+| **M46** | Done (tag `M46`) | [`M46-plan.md`](M46-plan.md), walkthrough [`M46-test-plan.md`](M46-test-plan.md) | CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
 | After M46 | Not started | listed at the bottom of `M46-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -83,7 +83,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
 | 6b | `missing-features.md` | Open researcher gaps found in use (not After-M later-table) |
-| 6c | `post-ga-feature-list.md` | Post-GA backlog (sheet leftovers, inventions, 3D, catalog, extra recipes, missing-asset sentinel, OpenTelemetry metrics). Not a milestone plan. |
+| 6c | `post-ga-feature-list.md` | Post-GA backlog (sheet leftovers, inventions, 3D, catalog, extra recipes, missing-asset sentinel, OpenTelemetry, viewer camera pan). Not a milestone plan. |
 | 6d | `art-scale.md` | Viewer world units for authored glb (agent capsule = reference) |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
@@ -166,7 +166,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 50b | `M45-test-plan.md` | M45 walkthrough (tech tree/patents, pipeline events, format_version 3) |
 | 50c | `cli-reference.md` | Researcher CLI (sim-cli, viewer, slash commands) |
 | 50d | `config-reference.md` | Researcher config directory (`default.toml`, incentives, objects) |
-| 51 | `M46-plan.md` | Milestone 46 (planned): CON/INT/STR leftovers, extra recipes, OpenTelemetry |
+| 51 | `M46-plan.md` | Milestone 46 (done, tag `M46`): CON/INT/STR leftovers, extra recipes, OpenTelemetry |
+| 51b | `M46-test-plan.md` | M46 walkthrough (illness chance, plan length, gather qty, recipes, telemetry) |
 
 ---
 
@@ -175,7 +176,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M46-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M46 is next (`M46-plan.md`). Do not expand into items it defers (protobuf/TLS, agent meshes, PG-10 sentinel).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M46 is implemented (`M46-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes, PG-10 sentinel).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -203,13 +204,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M45 are done. Next is M46 ([`M46-plan.md`](M46-plan.md)).
+M1–M46 are done. M46 is implemented ([`M46-plan.md`](M46-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M46-plan.md.
-M46 is planned (CON illness chance, INT plan length, STR gather/hunt,
-extra recipes plank/charcoal/knife/net, [telemetry] / --telemetry;
+M46 is implemented (CON illness chance, INT plan length, STR gather/hunt,
+extra recipes, [telemetry] / --telemetry;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
+Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, PG-10 sentinel, or Bevy in the browser.
 CI stays provider=mock with no network.
 ```

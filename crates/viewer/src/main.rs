@@ -187,6 +187,9 @@ fn main() {
             }
             sim.pipeline_hash_events =
                 sim_core::PipelineParams::from_config_toml(&text).hash_events;
+            let tel = sim_core::TelemetryParams::from_config_toml(&text);
+            sim.telemetry_enabled = tel.enabled;
+            sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
             let defs = apply_viewer_objects(
                 &mut sim,
                 parsed.objects.as_deref(),

@@ -141,6 +141,40 @@ impl AbilitySheet {
         d20 + Self::modifier(charisma) >= 10
     }
 
+    /// Toxic-eat applies illness. CON 0 ⇒ always. Else save `d20 + CON_mod >= 12` resists.
+    /// Stream is Invent-style `derive_seed`, not `RngBank.ensure`.
+    pub fn illness_hits(master: u64, tick: u64, agent: u64, constitution: u8) -> bool {
+        if constitution == 0 {
+            return true;
+        }
+        let seed =
+            crate::seeding::derive_seed(master, &format!("tick_{tick}_agent_{agent}_illness_0"));
+        let mut rng = crate::seeding::rng_from_seed(seed);
+        let d20: i32 = rng.random_range(1..=20);
+        d20 + Self::modifier(constitution) < 12
+    }
+
+    /// Plan step cap. Unused INT (mod 0) leaves `base`. Floor 1.
+    pub fn plan_length(&self, base: u32) -> u32 {
+        let m = Self::modifier(self.intelligence);
+        if m == 0 {
+            return base.max(1);
+        }
+        (base as i32 + m).max(1) as u32
+    }
+
+    /// Gather/hunt count after STR. Unused STR leaves `base`. Zero base stays 0.
+    pub fn resource_qty(&self, base: u32) -> u32 {
+        if base == 0 {
+            return 0;
+        }
+        let m = Self::modifier(self.strength);
+        if m == 0 {
+            return base;
+        }
+        ((base as i64) * (1000 + i64::from(m) * 50) / 1000).max(1) as u32
+    }
+
     /// Pocket weight cap milli. STR_mod 0 ⇒ none (unlimited, today).
     pub fn pocket_weight_cap(&self) -> Option<u32> {
         let m = Self::modifier(self.strength);
@@ -300,6 +334,9 @@ mod tests {
         assert_eq!(s.board_cells(8), 8);
         assert_eq!(s.support_social(), (200, 0, 100, 0));
         assert!(AbilitySheet::pair_bond_hits(1, 0, 0, 0));
+        assert!(AbilitySheet::illness_hits(1, 0, 0, 0));
+        assert_eq!(s.plan_length(4), 4);
+        assert_eq!(s.resource_qty(3), 3);
         assert_eq!(s.pocket_weight_cap(), None);
     }
 
@@ -396,5 +433,23 @@ mod tests {
         let str_lo = AbilitySheet { strength: 3, ..mid };
         assert_eq!(str_hi.pocket_weight_cap(), Some(9000));
         assert_eq!(str_lo.pocket_weight_cap(), Some(7250));
+        assert_eq!(int_hi.plan_length(4), 8);
+        assert_eq!(int_lo.plan_length(4), 1);
+        assert_eq!(str_hi.resource_qty(3), 3);
+        assert_eq!(str_lo.resource_qty(3), 2);
+        let mut sick_hi = 0u32;
+        let mut sick_lo = 0u32;
+        for t in 1..40u64 {
+            if AbilitySheet::illness_hits(1, t, 0, 18) {
+                sick_hi += 1;
+            }
+            if AbilitySheet::illness_hits(1, t, 0, 3) {
+                sick_lo += 1;
+            }
+        }
+        assert!(
+            sick_hi < sick_lo,
+            "CON 18 sick {sick_hi} vs CON 3 {sick_lo}"
+        );
     }
 }

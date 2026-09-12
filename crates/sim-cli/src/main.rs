@@ -61,6 +61,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut inventions = false;
     let mut pipeline_events = false;
     let mut catalog = false;
+    let mut telemetry = false;
     let mut objects_path: Option<PathBuf> = None;
     let mut i = 0;
     while i < args.len() {
@@ -162,6 +163,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--inventions" => inventions = true,
             "--pipeline-events" => pipeline_events = true,
             "--catalog" => catalog = true,
+            "--telemetry" => telemetry = true,
             "--objects" => {
                 i += 1;
                 objects_path = Some(PathBuf::from(
@@ -310,6 +312,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         } else if catalog || cat.enabled {
             sim.enable_catalog(Vec::new());
         }
+        let tel = sim_core::TelemetryParams::from_config_toml(&text);
+        sim.telemetry_enabled = telemetry || tel.enabled;
+        sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -493,7 +498,7 @@ Usage:
           [--conflict] [--conflict-death]
           [--sheet] [--reproduction] [--aging]
           [--household-crates] [--culture] [--inventions]
-          [--pipeline-events] [--catalog] [--objects DIR]
+          [--pipeline-events] [--catalog] [--objects DIR] [--telemetry]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -528,6 +533,7 @@ Options:
       --pipeline-events     Hash one Pipeline stage bitmask per living agent per tick (overlay [pipeline] hash_events)
       --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
       --objects DIR         Object definition TOML directory (default: configs/objects if present)
+      --telemetry           Hash-neutral tick aggregates + RSS (overlay [telemetry] enabled)
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)

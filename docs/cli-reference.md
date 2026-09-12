@@ -60,7 +60,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. Off / unused ⇒ idle mock hash unchanged (`cd1e0853…` at 2 ticks).
+These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `5f231378…` (M46 recipes).
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -75,6 +75,7 @@ These are **or** with the same-named overlay table. Off / unused ⇒ idle mock h
 | `--pipeline-events` | `[pipeline] hash_events` | One hashed `Pipeline { stages }` per living agent per tick (complete mock = `31`). Does **not** hash wall-clock ns. |
 | `--catalog` | `[catalog] enabled` | Hash `[sim]` catalog items loaded from `--objects`. Does not imply `--sheet`. Empty catalog ≡ off for hash. |
 | `--objects DIR` | default `configs/objects` if present | Object-definition TOML directory (visuals + hashed `[sim]` when catalog on). |
+| `--telemetry` | `[telemetry] enabled` | In-process tick aggregates + RSS. Hash-neutral. OTLP only if `otlp_endpoint` is set. |
 
 ### Incentives / compare
 
@@ -87,11 +88,14 @@ These are **or** with the same-named overlay table. Off / unused ⇒ idle mock h
 
 ### Typical recipes
 
-Idle hash (must stay `cd1e0853…`):
+Idle hash with shipped objects (M46 catalog includes plank/charcoal/knife/net):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
+# final_hash=5f231378…
 ```
+
+Without loading `configs/objects`, 2-tick hash is `70e5204d…`. Overlay-off telemetry does not change hashes.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -169,7 +173,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ idle 2-tick hash `cd1e0853…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `5f231378…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

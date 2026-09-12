@@ -139,6 +139,14 @@ pub struct Simulation {
     pub ckpt_catalog_slugs: Vec<String>,
     /// Overlay `[pipeline] hash_events`. Not hashed.
     pub pipeline_hash_events: bool,
+    /// Overlay `[telemetry] enabled`. Not hashed.
+    pub telemetry_enabled: bool,
+    /// Overlay `[telemetry] otlp_endpoint`. Empty ⇒ in-process only. Not hashed.
+    pub telemetry_otlp_endpoint: String,
+    /// Sim-tick wall_ns samples. Hash-neutral.
+    pub telemetry_ticks: crate::timing::DurationStats,
+    pub telemetry_rss_last: Option<u64>,
+    pub telemetry_rss_peak: Option<u64>,
 }
 
 impl Simulation {
@@ -233,6 +241,11 @@ impl Simulation {
             catalog: Vec::new(),
             ckpt_catalog_slugs: Vec::new(),
             pipeline_hash_events: false,
+            telemetry_enabled: false,
+            telemetry_otlp_endpoint: String::new(),
+            telemetry_ticks: crate::timing::DurationStats::default(),
+            telemetry_rss_last: None,
+            telemetry_rss_peak: None,
         })
     }
 
@@ -797,7 +810,11 @@ impl Simulation {
         if !Self::every_n_fires(self.llm_plan_every_n, self.tick) {
             return;
         }
-        let max_len = self.llm_plan_length as usize;
+        let max_len = self
+            .agents
+            .get(&id)
+            .map(|a| a.sheet.plan_length(self.llm_plan_length))
+            .unwrap_or(self.llm_plan_length) as usize;
         let llm_base = self.rngs.derived_seeds.get("llm").copied().unwrap_or(0);
         let seed = derive_seed(
             llm_base,
@@ -1029,15 +1046,23 @@ impl Simulation {
         for a in self.agents.values_mut() {
             a.gathers_this_tick = 0;
         }
+        let wall_ns = timing::ns_since(wall0);
         self.last_tick_timing = Some(TickTiming {
             tick: self.tick,
-            wall_ns: timing::ns_since(wall0),
+            wall_ns,
             world_ns,
             board_ns,
             incentive_ns,
             agents_ns,
             agents: agent_times,
         });
+        if self.telemetry_enabled {
+            self.telemetry_ticks.record(wall_ns);
+            if let Some(rss) = timing::process_rss_bytes() {
+                self.telemetry_rss_last = Some(rss);
+                self.telemetry_rss_peak = Some(self.telemetry_rss_peak.unwrap_or(0).max(rss));
+            }
+        }
         true
     }
 
