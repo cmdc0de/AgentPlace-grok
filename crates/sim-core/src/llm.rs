@@ -181,6 +181,17 @@ pub trait ActionChooser: Send + Sync {
         let _ = (seed, retrieved);
         Err(ChooseError::Malformed)
     }
+
+    /// Flavor sentence after a successful Invent. Default: mock `invented {kind}`.
+    fn invent_flavor(
+        &self,
+        seed: u64,
+        kind_slug: &str,
+        obs: &Observation,
+    ) -> Result<String, ChooseError> {
+        let _ = (seed, obs);
+        Ok(format!("invented {}", kind_slug.replace('_', " ")))
+    }
 }
 
 #[derive(Clone)]

@@ -1,0 +1,15 @@
+id = "dried_fish"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/lowpoly_fish.glb"
+[visual.lod]
+near = "assets/models/optimized/lowpoly_fish.glb"
+mid  = "assets/models/optimized/fish_animated.glb"
+far  = "assets/models/optimized/fish_animated.glb"
+
+[sim]
+weight_milli = 80
+[sim.craft]
+inputs = [["food", 1]]
+output_qty = 1

@@ -74,6 +74,8 @@ pub struct InspectorInvention {
     pub kind: String,
     pub shared: bool,
     pub tick: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub flavor: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -191,6 +193,7 @@ impl InspectorView {
                 kind: i.kind.slug().to_string(),
                 shared: i.shared,
                 tick: i.tick,
+                flavor: i.flavor.clone(),
             })
             .collect();
         Self {

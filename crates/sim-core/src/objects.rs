@@ -58,6 +58,9 @@ pub struct VisualDef {
     pub glb: Option<String>,
     #[serde(default)]
     pub lod: LodDef,
+    /// Uniform XYZ. `None` / non-finite / `<= 0` ⇒ omitted (not hashed).
+    #[serde(default)]
+    pub scale: Option<f32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -115,6 +118,7 @@ pub fn builtin_item(slug: &str) -> Option<ItemId> {
         "wood" => Some(ItemId::Wood),
         "fiber" => Some(ItemId::Fiber),
         "stone" => Some(ItemId::Stone),
+        "food" => Some(ItemId::Food(1)),
         "basket" => Some(ItemId::Basket),
         "spear" => Some(ItemId::Spear),
         "fishing_rod" => Some(ItemId::FishingRod),
@@ -398,6 +402,18 @@ pub fn pick_visual_path(visual: &VisualDef, dist_cells: u32) -> Option<PathBuf> 
         }
     }
     None
+}
+
+/// Finite `scale > 0` from `[visual]`. `None` means omit (agent auto-fit / others 1.0).
+pub fn visual_effective_scale(visual: &VisualDef) -> Option<f32> {
+    match visual.scale {
+        Some(s) if s.is_finite() && s > 0.0 => Some(s),
+        _ => None,
+    }
+}
+
+pub fn visual_scale_for(defs: &[ObjectDef], id: &str) -> Option<f32> {
+    visual_for_id(defs, id).and_then(visual_effective_scale)
 }
 
 pub fn visual_for_id<'a>(defs: &'a [ObjectDef], id: &str) -> Option<&'a VisualDef> {

@@ -24,7 +24,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-10 | Missing-asset sentinel | Done (M47) | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
 | PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
-| PG-13 | Object visual scale | Open | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
+| PG-13 | Object visual scale | Done (M49) | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 

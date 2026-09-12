@@ -33,6 +33,8 @@ struct AgentVisual {
     id: AgentId,
     /// Set once the authored glb AABB is known so height matches the capsule.
     fit: Option<AgentFit>,
+    /// Explicit `[visual] scale`. When set, skip capsule auto-fit.
+    toml_scale: Option<f32>,
 }
 
 #[derive(Component)]
@@ -531,6 +533,7 @@ fn setup_scene(
             AgentVisual {
                 id: agent.id,
                 fit: None,
+                toml_scale: sim_core::visual_scale_for(&visuals.defs, "agent"),
             },
         ) {
             commands.spawn((
@@ -544,6 +547,7 @@ fn setup_scene(
                 AgentVisual {
                     id: agent.id,
                     fit: None,
+                    toml_scale: None,
                 },
                 Visibility::default(),
             ));
@@ -839,13 +843,17 @@ fn try_spawn_model(
             let meta = std::fs::metadata(&path).ok();
             let file_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
             let mtime = meta.and_then(|m| m.modified().ok());
+            let mut tf = transform;
+            if let Some(s) = sim_core::visual_scale_for(&visuals.defs, stem) {
+                tf.scale = Vec3::splat(s);
+            }
             let handle = assets
                 .load_builder()
                 .override_unapproved()
                 .load(GltfAssetLabel::Scene(0).from_asset(path.clone()));
             commands.spawn((
                 WorldAssetRoot(handle),
-                transform,
+                tf,
                 extra,
                 ModelLabel {
                     id: stem.to_string(),
@@ -1024,7 +1032,7 @@ fn fit_agent_meshes(
     assets: Res<Assets<Mesh>>,
 ) {
     for (entity, label, root_tf, mut visual) in &mut agents {
-        if visual.fit.is_some() || label.id != "agent" {
+        if visual.fit.is_some() || label.id != "agent" || visual.toml_scale.is_some() {
             continue;
         }
         let Some((min, max)) = model_aabb_local(entity, root_tf, &children, &meshes, &assets)
@@ -1467,6 +1475,9 @@ fn sync_agent_transforms(
             if let Some(fit) = visual.fit {
                 transform.translation = pos + fit.offset;
                 transform.scale = Vec3::splat(fit.scale);
+            } else if let Some(s) = visual.toml_scale {
+                transform.translation = pos;
+                transform.scale = Vec3::splat(s);
             } else {
                 transform.translation = pos;
                 transform.scale = Vec3::ONE;

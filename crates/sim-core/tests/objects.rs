@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
-/// (includes M46 plank/charcoal/knife/net catalog `[sim]`).
-const IDLE_2: &str = "5f2313783257960c08253b6717514019459533da6923884a981b1ab2c8068fc2";
+/// (includes M49 hammer/hoe/waterskin/dried_fish catalog `[sim]`).
+const IDLE_2: &str = "133ea72ed5004dcca5321348d14d3d1aa281c7188d30906e76b08f597ef7709b";
 const IDLE_2_NO_CATALOG: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 
 fn shipped_objects() -> PathBuf {
@@ -179,6 +179,7 @@ fn lod_picks_near_mid_far_and_missing_mid() {
             mid: Some(mid.to_string_lossy().into()),
             far: Some(far.to_string_lossy().into()),
         },
+        scale: None,
     };
     assert_eq!(
         pick_visual_path(&visual, 0).as_deref(),
@@ -1013,4 +1014,77 @@ fn catalog_on_craft_plank() {
         }
     }
     panic!("plank craft never succeeded");
+}
+
+#[test]
+fn catalog_off_hammer_not_legal_same_hash() {
+    let cfg = tiny(0x49_10);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let a = AgentId(0);
+    if let Some(ag) = off.agents.get_mut(&a) {
+        ag.try_add_item(ItemId::Stone, 4);
+        ag.try_add_item(ItemId::Wood, 4);
+        ag.try_add_item(ItemId::Fiber, 4);
+        ag.try_add_item(ItemId::Food(1), 2);
+    }
+    let legal = legal_actions(&off, off.agents.get(&a).unwrap());
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: Recipe::Catalog(_)
+        }
+    )));
+}
+
+fn craft_catalog_slug(sim: &mut Simulation, slug: &str, stock: &[(ItemId, u32)]) {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug} missing"))
+        .item;
+    let ItemId::Catalog(n) = item else {
+        panic!("{slug} should be catalog");
+    };
+    let a = AgentId(0);
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.abilities.craft = 100;
+        for (it, q) in stock {
+            ag.try_add_item(*it, *q);
+        }
+    }
+    for _ in 0..64 {
+        sim_core::execute::execute_primary(
+            sim,
+            a,
+            &PrimaryAction::Craft {
+                recipe: Recipe::Catalog(n),
+            },
+        );
+        if sim
+            .agents
+            .get(&a)
+            .and_then(|ag| ag.inventory.get(&item).copied())
+            .unwrap_or(0)
+            >= 1
+        {
+            return;
+        }
+    }
+    panic!("{slug} craft never succeeded");
+}
+
+#[test]
+fn catalog_on_craft_hammer() {
+    let mut sim = Simulation::new(tiny(0x49_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "hammer", &[(ItemId::Stone, 4), (ItemId::Wood, 4)]);
+}
+
+#[test]
+fn catalog_on_craft_dried_fish() {
+    let mut sim = Simulation::new(tiny(0x49_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "dried_fish", &[(ItemId::Food(1), 4)]);
 }

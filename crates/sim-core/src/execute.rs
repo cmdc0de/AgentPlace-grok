@@ -568,6 +568,21 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    let mock_flavor = kind.memory_text();
+    let flavor_seed = crate::seeding::derive_seed(
+        sim.config.master_seed,
+        &format!("tick_{}_agent_{}_invent_flavor_0", sim.tick, id.0),
+    );
+    let flavor = match &sim.chooser {
+        crate::llm::Chooser::Custom(ch) => {
+            let obs = crate::observation::build(sim, id);
+            ch.invent_flavor(flavor_seed, kind.slug(), &obs)
+                .ok()
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| mock_flavor.clone())
+        }
+        _ => mock_flavor,
+    };
     let iid = sim.next_invention_id;
     sim.next_invention_id = sim.next_invention_id.saturating_add(1);
     let inv = crate::inventions::Invention {
@@ -576,6 +591,7 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         tick: sim.tick,
         kind,
         shared: false,
+        flavor,
     };
     sim.inventions.insert(iid, inv);
     let gain = crate::inventions::inventor_influence(intel);

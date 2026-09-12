@@ -182,12 +182,7 @@ impl ActionChooser for OpenAiCompatClient {
     }
 
     fn insight(&self, seed: u64, obs: &Observation) -> Result<String, ChooseError> {
-        let memos: Vec<String> = obs
-            .goals
-            .iter()
-            .map(|g| g.text.clone())
-            .take(8)
-            .collect();
+        let memos: Vec<String> = obs.goals.iter().map(|g| g.text.clone()).take(8).collect();
         let prompt = format!(
             "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nGoals: {}\nWrite one short insight about recent experience.\nReply JSON only: {{\"reflection\":\"...\"}}",
             obs.agent_id.0,
@@ -209,6 +204,27 @@ impl ActionChooser for OpenAiCompatClient {
             .ok_or(ChooseError::Malformed)
     }
 
+    fn invent_flavor(
+        &self,
+        seed: u64,
+        kind_slug: &str,
+        obs: &Observation,
+    ) -> Result<String, ChooseError> {
+        let prompt = format!(
+            "Agent {} invented {kind_slug} at ({}, {}). Write one short flavor sentence.\nReply JSON only: {{\"flavor\":\"...\"}}",
+            obs.agent_id.0, obs.x, obs.y,
+        );
+        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let payload = extract_json_payload(&text);
+        let v: serde_json::Value =
+            serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
+        v.get("flavor")
+            .and_then(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .ok_or(ChooseError::Malformed)
+    }
+
     fn plan(
         &self,
         seed: u64,
@@ -223,12 +239,7 @@ impl ActionChooser for OpenAiCompatClient {
         };
         let prompt = format!(
             "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nCurrent plan: {current}\nPropose up to {n} next actions as JSON objects (executed if legal).\nReply JSON only: {{\"plan\":[{{\"action\":\"Wait\"}}]}}",
-            obs.agent_id.0,
-            obs.x,
-            obs.y,
-            obs.hunger,
-            obs.thirst,
-            obs.energy,
+            obs.agent_id.0, obs.x, obs.y, obs.hunger, obs.thirst, obs.energy,
         );
         let text = self.post_once(seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);

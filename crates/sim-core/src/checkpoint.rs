@@ -1056,6 +1056,7 @@ mod m45_blob_tests {
                 tick: 3,
                 kind: InventionKind::GatherBonus,
                 shared: true,
+                flavor: String::new(),
             },
         );
         let v2 = BoardBlobV2 {

@@ -219,6 +219,34 @@ mod tests {
     }
 
     #[test]
+    fn visual_scale_omit_invalid_and_explicit() {
+        assert_eq!(
+            sim_core::objects::visual_effective_scale(&Default::default()),
+            None
+        );
+        let mut v = sim_core::VisualDef {
+            scale: Some(2.0),
+            ..Default::default()
+        };
+        assert_eq!(sim_core::objects::visual_effective_scale(&v), Some(2.0));
+        v.scale = Some(0.0);
+        assert_eq!(sim_core::objects::visual_effective_scale(&v), None);
+        v.scale = Some(f32::NAN);
+        assert_eq!(sim_core::objects::visual_effective_scale(&v), None);
+        let agent = sim_core::ObjectDef {
+            id: "agent".into(),
+            kind: "agent".into(),
+            visual: Some(sim_core::VisualDef {
+                scale: Some(2.0),
+                ..Default::default()
+            }),
+            sim: None,
+        };
+        assert_eq!(sim_core::visual_scale_for(&[agent], "agent"), Some(2.0));
+        assert_eq!(sim_core::visual_scale_for(&[], "berry_bush"), None);
+    }
+
+    #[test]
     fn should_reload_newer_only() {
         let t0 = SystemTime::UNIX_EPOCH;
         let t1 = t0 + std::time::Duration::from_secs(1);
@@ -238,6 +266,7 @@ mod tests {
             visual: Some(sim_core::VisualDef {
                 glb: Some(String::new()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -269,6 +298,7 @@ mod tests {
             visual: Some(sim_core::VisualDef {
                 glb: Some("/nope/agentplace-missing-agent.glb".into()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -276,6 +306,50 @@ mod tests {
             resolve_visual_kind(&[def], "agent", 0),
             VisualKind::Sentinel
         );
+    }
+
+    #[test]
+    fn visual_scale_not_hashed() {
+        let cfg = ExperimentConfig::from_toml_str(
+            r#"
+master_seed = 1
+[simulation]
+max_ticks = 10
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 2
+"#,
+        )
+        .unwrap();
+        let dir = std::env::temp_dir().join("agentplace-m49-scale");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("bush.toml"),
+            r#"
+id = "berry_bush"
+kind = "vegetation"
+[visual]
+glb = "assets/models/optimized/big_low_poly_berry_bush.glb"
+scale = 2.0
+"#,
+        )
+        .unwrap();
+        let mut a = Simulation::new(cfg.clone()).unwrap();
+        a.run_ticks(2);
+        let hash = a.state_hash();
+        let mut b = Simulation::new(cfg).unwrap();
+        b.apply_objects_dir(&dir).unwrap();
+        b.run_ticks(2);
+        assert_eq!(
+            b.state_hash(),
+            hash,
+            "visual scale must not enter state_hash"
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -385,6 +459,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some(glb.to_string_lossy().into_owned()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -408,6 +483,7 @@ count = 2
                     mid: Some(dir.join("missing-mid.glb").to_string_lossy().into_owned()),
                     far: Some(far.to_string_lossy().into_owned()),
                 },
+                scale: None,
             }),
             sim: None,
         };
@@ -513,6 +589,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some(basket.to_string_lossy().into_owned()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -522,6 +599,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some(bush.to_string_lossy().into_owned()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -547,6 +625,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some(String::new()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -575,6 +654,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some("/nope/agentplace-missing-glb.glb".into()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -590,6 +670,7 @@ count = 2
                     visual: Some(sim_core::VisualDef {
                         glb: Some("/nope/agentplace-missing-glb.glb".into()),
                         lod: Default::default(),
+                        scale: None,
                     }),
                     sim: None,
                 }],
@@ -613,6 +694,7 @@ count = 2
             visual: Some(sim_core::VisualDef {
                 glb: Some(glb.to_string_lossy().into_owned()),
                 lod: Default::default(),
+                scale: None,
             }),
             sim: None,
         };
@@ -634,6 +716,7 @@ count = 2
                     mid: Some("/nope/missing-mid.glb".into()),
                     far: Some("/nope/missing-far.glb".into()),
                 },
+                scale: None,
             }),
             sim: None,
         };

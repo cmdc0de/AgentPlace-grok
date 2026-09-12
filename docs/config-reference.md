@@ -335,13 +335,14 @@ Common header:
 | Key | Meaning |
 |---|---|
 | `id` | Slug (`berry_bush`, `basket`, …). Catalog items sort by this string. |
-| `kind` | `vegetation` \| `animal` \| `fish` \| `item` \| `crate` \| `crop`. Agent mesh is still code (later). |
+| `kind` | `vegetation` \| `animal` \| `fish` \| `item` \| `crate` \| `crop` \| `agent`. |
 
 ### `[visual]` / `[visual.lod]`
 
 | Key | Meaning |
 |---|---|
-| `glb` | Authored glTF/glb path (repo-relative). Missing file ⇒ primitive today (PG-10 sentinel is later). |
+| `glb` | Authored glTF/glb path (repo-relative). Missing configured file ⇒ sentinel; empty path ⇒ primitive. |
+| `scale` | Optional uniform XYZ multiplier. Omit / `<= 0` / non-finite ⇒ omitted (agent auto-fits to capsule; others 1.0). Explicit `> 0` skips agent auto-fit. **Not hashed.** |
 | `lod.near` / `mid` / `far` | Optional cheaper meshes by camera Chebyshev distance (near ≤ 8 cells, mid ≤ 24, else far). Missing step ⇒ next coarser, then `glb`. |
 
 ### `[sim]` by kind
@@ -389,6 +390,14 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `fishing_rod.toml` | item | Craft wood+fiber. Fish tool. |
 | `backpack.toml` | item | Craft 4 fiber. Worn pack 12/40. |
 | `cord.toml` | item | Catalog craft 2 fiber → 1. Extra file; catalog-on only. |
+| `plank.toml` | item | Catalog craft 2 wood → 1. |
+| `charcoal.toml` | item | Catalog craft 1 wood → 1. |
+| `knife.toml` | item | Catalog craft stone+fiber → 1. |
+| `net.toml` | item | Catalog craft 3 fiber → 1. |
+| `hammer.toml` | item | Catalog craft 2 stone + 1 wood → 1. |
+| `hoe.toml` | item | Catalog craft stone+wood → 1. |
+| `waterskin.toml` | item | Catalog craft 2 fiber → 1. |
+| `dried_fish.toml` | item | Catalog craft 1 food (`ItemId::Food(1)`) → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

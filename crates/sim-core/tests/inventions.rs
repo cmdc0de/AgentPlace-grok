@@ -177,6 +177,37 @@ fn inventions_load_does_not_regrant_influence() {
 }
 
 #[test]
+fn invent_flavor_mock_is_memory_text() {
+    let mut sim = Simulation::new(tiny(0x49_01)).unwrap();
+    sim.enable_inventions(8);
+    force_invent(&mut sim, AgentId(0));
+    let inv = sim.inventions.values().next().expect("invented");
+    assert_eq!(inv.flavor, "invented gather bonus");
+    let h1 = sim.state_hash();
+    let mut other = Simulation::new(tiny(0x49_01)).unwrap();
+    other.enable_inventions(8);
+    force_invent(&mut other, AgentId(0));
+    assert_eq!(other.state_hash(), h1);
+}
+
+#[test]
+fn invent_flavor_load_keeps_text() {
+    let mut sim = Simulation::new(tiny(0x49_02)).unwrap();
+    sim.enable_inventions(8);
+    force_invent(&mut sim, AgentId(0));
+    let flavor = sim.inventions.values().next().unwrap().flavor.clone();
+    assert_eq!(flavor, "invented gather bonus");
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.enable_inventions(8);
+    assert_eq!(
+        loaded.inventions.values().next().unwrap().flavor,
+        flavor,
+        "must not re-call invent_flavor on --load"
+    );
+}
+
+#[test]
 fn invent_chance_int_18_higher_than_unused() {
     assert_eq!(invent_chance(0), 400);
     assert_eq!(invent_chance(18), 400 + 4 * 50);

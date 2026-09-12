@@ -66,7 +66,7 @@ pub use llm::{
 };
 pub use objects::{
     CatalogEntry, CatalogParams, ObjectDef, VisualDef, apply_species_defs, catalog_entries,
-    load_object_defs, pick_visual_path, visual_for_id,
+    load_object_defs, pick_visual_path, visual_for_id, visual_scale_for,
 };
 pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};

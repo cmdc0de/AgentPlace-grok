@@ -47,6 +47,8 @@ pub struct Invention {
     pub tick: u64,
     pub kind: InventionKind,
     pub shared: bool,
+    #[serde(default)]
+    pub flavor: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,5 +197,6 @@ pub fn hash_table(table: &BTreeMap<u64, Invention>, hasher: &mut impl sha2::Dige
         hasher.update(inv.tick.to_le_bytes());
         hasher.update([inv.kind as u8]);
         hasher.update([u8::from(inv.shared)]);
+        hasher.update(inv.flavor.as_bytes());
     }
 }

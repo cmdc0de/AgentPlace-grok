@@ -1,8 +1,8 @@
 # M49 — Object visual scale, extra recipes, invention flavor text
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M48 complete (`docs/M48-plan.md`, git tag `M48`, commit `b2b751a`)  
-**Walkthrough:** written on implement (`docs/M49-test-plan.md`)  
+**Walkthrough:** [`docs/M49-test-plan.md`](M49-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-13 scale, PG-9 recipes, PG-5 LLM invention text)
 
 ## Context
@@ -20,7 +20,7 @@ A researcher can:
 3. On successful Invent, get a **flavor string** (mock: `kind.memory_text()`; live: extra `Chooser` call). Timeout / error ⇒ mock text. Overlay off ⇒ no Invent, **same idle hashes**.
 4. CI stays `provider = mock`. **`PROTOCOL_VERSION = 5`**.
 
-No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects **changes** (lock the new value on implement).
+No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects is **`133ea72e…`**.
 
 ## In scope
 
@@ -91,7 +91,7 @@ On **successful** Invent only:
 | Test | Asserts |
 |---|---|
 | no-objects 2 ticks | hash `70e5204d…` |
-| default CLI 2 ticks | new shipped-objects hash (lock on implement) ≠ `5f231378…` |
+| default CLI 2 ticks | shipped objects hash `133ea72e…`; no-objects `70e5204d…` |
 | scale omit | agent auto-fit path still used; other id scale 1.0 |
 | scale 2.0 | uniform 2.0; agent skips auto-fit |
 | scale 0 / NaN | treated as omit |
@@ -134,7 +134,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough written on implement: [`docs/M49-test-plan.md`](M49-test-plan.md).
+Walkthrough: [`docs/M49-test-plan.md`](M49-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -143,7 +143,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: no-objects hash `70e5204d…`; new shipped-objects idle hash documented; Hello v5; format_version 3 write.
+Expect: no-objects hash `70e5204d…`; shipped-objects idle hash `133ea72e…`; Hello v5; format_version 3 write.
 
 ## Risks
 

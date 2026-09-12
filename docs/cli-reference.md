@@ -60,7 +60,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `5f231378…` (M46 recipes).
+These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `133ea72e…` (M49 recipes).
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -92,7 +92,7 @@ Idle hash with shipped objects (M46 catalog includes plank/charcoal/knife/net):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=5f231378…
+# final_hash=133ea72e…
 ```
 
 Without loading `configs/objects`, 2-tick hash is `70e5204d…`. Overlay-off telemetry does not change hashes.
@@ -182,7 +182,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `5f231378…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `133ea72e…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.
