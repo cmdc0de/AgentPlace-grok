@@ -130,8 +130,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M45** | Done — [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
 | **M46** | Done — [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
 | **M47** | Done — [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
-| **M48** | [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
-| After M48 | Protobuf/TLS |
+| **M48** | Done — [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
+| **M49** | [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
+| After M49 | Protobuf/TLS |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

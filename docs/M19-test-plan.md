@@ -1,6 +1,6 @@
 # M19 test plan — see each new feature
 
-Walkthrough for [`M19-plan.md`](M19-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (SetCouncilTally, `/set respect`, Backpack, crate scale). Next slice: [`M48-plan.md`](M48-plan.md).
+Walkthrough for [`M19-plan.md`](M19-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (SetCouncilTally, `/set respect`, Backpack, crate scale). Next slice: [`M49-plan.md`](M49-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

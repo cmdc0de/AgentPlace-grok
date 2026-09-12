@@ -75,8 +75,9 @@ Series (lock): **wall_ms**, **living**, **hungry**, **thirsty**, **mean hunger**
 
 | Later | What |
 |---|---|
-| **M48** | [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
-| After M48 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; LLM invention text; Food/Wood as strings |
+| **M48** | Done — [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
+| **M49** | [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
+| After M49 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings |
 | Not M47 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; mouse-drag orbit; scroll zoom; hashing visuals or chart samples; recipe durability / workstations; DEX defense; INT invent chance |
 
 ## Key decisions
