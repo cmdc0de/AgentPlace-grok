@@ -2,8 +2,9 @@
 //! Item `[sim]` (including built-in recipes) is hashed when the catalog is loaded.
 
 use crate::action::Recipe;
-use crate::agent::ItemId;
+use crate::agent::{Agent, AgentId, ItemId};
 use crate::error::SimError;
+use crate::event_log::SimEvent;
 use crate::species::{FaunaSpecies, SpeciesTables, Toxicity, VegYield, VegetationSpecies};
 use serde::Deserialize;
 use sha2::Digest;
@@ -133,11 +134,15 @@ pub fn builtin_recipe(slug: &str) -> Option<Recipe> {
 }
 
 pub fn default_objects_dir() -> Option<PathBuf> {
-    let candidates = [
+    let mut candidates = vec![
         PathBuf::from("configs/objects"),
         PathBuf::from("../configs/objects"),
         PathBuf::from("../../configs/objects"),
     ];
+    // cargo run -p viewer from a non-repo cwd still finds shipped TOML.
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    candidates.push(manifest.join("../../configs/objects"));
+    candidates.push(manifest.join("../configs/objects"));
     candidates.into_iter().find(|p| p.is_dir())
 }
 
@@ -399,6 +404,83 @@ pub fn visual_for_id<'a>(defs: &'a [ObjectDef], id: &str) -> Option<&'a VisualDe
     defs.iter()
         .find(|d| d.id == id)
         .and_then(|d| d.visual.as_ref())
+}
+
+pub fn catalog_slug_vec(entries: &[CatalogEntry]) -> Vec<String> {
+    let mut v = Vec::new();
+    for e in entries {
+        if let ItemId::Catalog(n) = e.item {
+            let i = n as usize;
+            if v.len() <= i {
+                v.resize(i + 1, String::new());
+            }
+            v[i] = e.slug.clone();
+        }
+    }
+    v
+}
+
+pub fn remap_catalog_item(item: ItemId, old_slugs: &[String], entries: &[CatalogEntry]) -> ItemId {
+    let ItemId::Catalog(n) = item else {
+        return item;
+    };
+    let Some(slug) = old_slugs.get(n as usize).filter(|s| !s.is_empty()) else {
+        return item;
+    };
+    entries
+        .iter()
+        .find(|e| e.slug == *slug)
+        .map(|e| e.item)
+        .unwrap_or(item)
+}
+
+fn remap_recipe(recipe: Recipe, old_slugs: &[String], entries: &[CatalogEntry]) -> Recipe {
+    let Recipe::Catalog(n) = recipe else {
+        return recipe;
+    };
+    match remap_catalog_item(ItemId::Catalog(n), old_slugs, entries) {
+        ItemId::Catalog(m) => Recipe::Catalog(m),
+        _ => recipe,
+    }
+}
+
+pub fn remap_catalog_holdings(
+    agents: &mut std::collections::BTreeMap<AgentId, Agent>,
+    events: &mut [SimEvent],
+    old_slugs: &[String],
+    entries: &[CatalogEntry],
+) {
+    use crate::event_log::SimEventKind;
+    for a in agents.values_mut() {
+        a.inventory = a
+            .inventory
+            .iter()
+            .map(|(item, qty)| (remap_catalog_item(*item, old_slugs, entries), *qty))
+            .collect();
+        a.pack = a
+            .pack
+            .iter()
+            .map(|(item, qty)| (remap_catalog_item(*item, old_slugs, entries), *qty))
+            .collect();
+    }
+    for e in events.iter_mut() {
+        match &mut e.kind {
+            SimEventKind::Gather { item, .. }
+            | SimEventKind::Eat { item, .. }
+            | SimEventKind::Transfer { item, .. }
+            | SimEventKind::Store { item, .. }
+            | SimEventKind::Retrieve { item, .. }
+            | SimEventKind::Give { item, .. }
+            | SimEventKind::Pack { item, .. }
+            | SimEventKind::Unpack { item, .. } => {
+                *item = remap_catalog_item(*item, old_slugs, entries);
+            }
+            SimEventKind::Craft { recipe, .. } => {
+                *recipe = remap_recipe(*recipe, old_slugs, entries);
+            }
+            _ => {}
+        }
+    }
 }
 
 pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {

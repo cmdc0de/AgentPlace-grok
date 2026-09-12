@@ -4,7 +4,7 @@ Researcher-facing features **after** the current GA line (M1–M28 shipped: worl
 
 When a theme is scheduled, `/spec` picks 1–3 items into `docs/M{N}-plan.md`. Until then this file is the backlog. Milestone plans still win on timing vs this list and vs long-term specs.
 
-Standing unless a later plan picks a bump: CI `provider = mock`; `format_version = 2`; `PROTOCOL_VERSION = 5`; shipping `configs/default.toml` / `coop.toml` unchanged; overlay TOML is not `ExperimentConfig` postcard.
+Standing unless a later plan picks a bump: CI `provider = mock`; `format_version` writes **3** / reads v2+v3; `PROTOCOL_VERSION = 5`; shipping `configs/default.toml` / `coop.toml` unchanged; overlay TOML is not `ExperimentConfig` postcard.
 
 ---
 
@@ -20,6 +20,9 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models. M38: stem-named `.glb`. Later: per-object config (path + LOD). |
 | PG-7 | Browser researcher UI | Done (M36) | Attach page lists every agent, board posts, and metrics — no 3D required. |
 | PG-8 | Object / item definition files | Open | One config file per sim object: visuals (glb + LOD) and sim fields so new items/crafts are a file, not a Rust enum. |
+| PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. |
+| PG-10 | Missing-asset sentinel | Open | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
+| PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -173,7 +176,7 @@ Out of this theme until picked: full tech trees, stealing recipes, patents as go
 |---|---|
 | `mesh` / `glb` | Path to the authored glTF/glb (absolute under `assets/` or relative to the definition file). |
 | `lod` | Optional extra meshes by distance (e.g. `near`, `mid`, `far`) so a far berry bush is a cheaper mesh. Missing LOD step ⇒ next coarser, then primitive. |
-| Fallback | File missing or path empty ⇒ today’s primitive. |
+| Fallback | File missing or path empty ⇒ today’s primitive. **PG-10** replaces “configured path missing” with a dedicated sentinel mesh. |
 
 Constraints for a later `/spec`:
 
@@ -182,7 +185,7 @@ Constraints for a later `/spec`:
 - `cargo test -p viewer` must not download `.glb` and must not require a GPU window.
 - Do not block CI on GPU art.
 
-Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture, household-home / invention / downed poses.
+Out of this theme until picked: skeletal animation cycles, photogrammetry, per-agent clothing from culture, household-home / invention / downed poses. Missing-path sentinel is **PG-10**.
 
 ---
 
@@ -250,7 +253,99 @@ Constraints for a later `/spec`:
 - Mock + catalog-off ⇒ idle hash `70e5204d…`. `cargo test` never needs the network. Missing glb never fails CI.
 - Postcard enums stay **append only** if ids stay numeric; a string-id catalog is a `/spec` lock (and may be a PROTOCOL/ckpt bump — do not sneak it).
 
-Out of this theme until picked: full tech tree (PG-5), procedural mesh generation, runtime hot-reload of glb from disk while the window is open.
+Out of this theme until picked: full tech tree (PG-5), procedural mesh generation, runtime hot-reload of glb from disk while the window is open. Growing the **number** of crafts is **PG-9** (content milestone). Missing configured glb is **PG-10**.
+
+---
+
+## PG-9 — Crafting recipe catalog
+
+**Shipped today:** Craft is real. Built-ins are Basket, Spear, FishingRod, Backpack. PG-8 / M39–M40 let a researcher add a catalog item with `[sim.craft]` in object TOML (`configs/objects/cord.toml` is the extra). The **count** of useful recipes is still tiny. Mock does not pick Craft unless a goal / overlay drives it.
+
+**Wanted:** **one dedicated milestone** whose in-scope is **more recipes**, not a new Craft verb or a new `ItemId` enum. Drop object TOML + visuals + (optional) catalog overlay so agents can Gather/Craft/Store a broader kit.
+
+Sketch (lock the batch in `/spec`):
+
+| Kind of recipe | Why |
+|---|---|
+| Intermediate | Cord, plank, charcoal — inputs for later crafts. |
+| Tools | Knife, hammer, net, hoe — change gather/hunt/fish/farm odds or energy. |
+| Containers / wear | Extra pack, waterskin, satchel — haul/slots like Basket/Backpack. |
+| Food processing | Dried fish, cooked veg — hunger vs raw; optional toxin change. |
+
+Constraints for a later `/spec`:
+
+- Use **PG-8 files**, not new Rust recipe arms, unless a leftover builtin must stay an enum tag.
+- Overlay / `--catalog` / objects dir. Catalog-off / empty catalog ⇒ idle mock hash **unchanged**.
+- New held items **do** change catalog-on hashes (inventory keys, recipes). Document it.
+- Each new craft needs a visual path (PG-6/PG-8). Missing file is **PG-10**, not a CI fail.
+- Mock still does not have to pick the new crafts unless that slice says so.
+- Do not flip shipping `default.toml` / `coop.toml` unless that is the slice.
+
+Out of this theme until picked: durability, workstations, multi-agent crafts, LLM-written recipes, PG-5 invention-unlock of these recipes.
+
+---
+
+## PG-10 — Missing-asset sentinel
+
+**Shipped today (M38/M40):** if the configured `glb` / LOD path is missing, the viewer falls back to a **primitive** (capsule/box/etc.). That looks like “no art on purpose.” A researcher cannot tell a **broken path** from an object that was never given a mesh.
+
+**Wanted:** when a visual **is configured** and the file cannot be found (or fails to load), spawn **one fixed sentinel asset** so the problem is obvious in the 3D view.
+
+| Case | Mesh |
+|---|---|
+| No `[visual]` / empty path | Today’s primitive (intentional “no art”). |
+| Path set, file missing, or glb fails to load | **Sentinel** — one checked-in mesh (e.g. `assets/models/missing.glb`) or a generated magenta/error marker. Same mesh for every broken id. |
+| Path set, file exists | Authored glb as today. LOD miss ⇒ next coarser, then sentinel if a path was configured, not primitive. |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** Visuals are never in `state_hash`. Do not add hashed events for “asset missing.”
+- One sentinel, shared. Do not invent a per-kind missing mesh.
+- `cargo test -p viewer` must not require a GPU window. Unit-test: configured-but-missing path resolves to the sentinel, not `None`/primitive.
+- Missing authored glb never fails CI. Sentinel file is in-repo (or generated in code) so CI can see the fallback without downloading.
+- Log / HUD line optional (hash-neutral). The 3D mesh is the required tell.
+
+Out of this theme until picked: skeletal animation, hot-reload glb, Bevy in the browser, photogrammetry.
+
+---
+
+## PG-11 — OpenTelemetry / performance metrics
+
+**Shipped today (M8 + TickTiming):** each sim tick can record **hash-neutral** wall-clock ns (`wall_ns`, `world_ns`, `board_ns`, `incentive_ns`, `agents_ns`, per-agent `perceive_ns` / `retrieve_ns` / `select_ns` / `execute_ns` / `remember_ns`). Written to timing JSONL when `--out-dir` is set; optional JSON on `Tick.metrics`. Inspector / page show sim needs and last-tick timing. **Not** in `state_hash`. No OpenTelemetry. No process CPU / RSS / disk. No viewer **render** frame times. No run-level aggregates (count, mean, median, min, max).
+
+**Wanted:** opt-in **OpenTelemetry** (OTLP) so a researcher can scrape or push the same numbers Grafana / Prometheus / an OTel collector already know, plus **technical** process stats and **frame** stats.
+
+### What to emit
+
+| Group | Series (lock names in `/spec`) |
+|---|---|
+| **Sim tick** | Duration of each simulation tick (`wall_ns` and the pipeline stages). |
+| **Sim aggregates** | Over the run (or a sliding window): **count** of ticks, **total** time, **average**, **median**, **min**, **max** (and optional p95/p99). |
+| **Viewer render** | Time to draw one Bevy/imgui frame. Same aggregates: count, total, avg, median, min, max. Distinct from sim tick time (a paused server still renders). |
+| **Process** | CPU (user/system or percent), **memory** (RSS / peak), **disk** (bytes read/written or out-dir size). Host, not sim-hash. |
+
+Pipeline-stage histograms (perceive vs execute) can reuse today’s `TickTiming` fields. Do **not** replace JSONL; OTel is an extra sink.
+
+### Overlay (sketch)
+
+```toml
+[telemetry]
+enabled = false          # omit = false; CI stays off
+# later: otlp_endpoint, protocol = "http" | "grpc", service_name, …
+```
+
+CLI: `--telemetry` (does not imply `--llm` or `--catalog`). Overlay **off** ⇒ no exporter, no extra threads required, **same hashes**.
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** CPU, RSS, disk, render ms, and wall-clock ns never enter `state_hash` or AGTN. Same rule as M8 timing / M45 pipeline events (bitmask hashed; ns not).
+- Overlay / CLI, not `ExperimentConfig`. Shipping `default.toml` unchanged.
+- `cargo test` never needs the network. Default exporter **off**; no OTLP in CI. Unit-test in-process meters (or a mock exporter), not a live collector.
+- Viewer render metrics are **native window only** unless a later slice puts Bevy in the browser.
+- Time-series **charts** in imgui / the attach page can consume these series later (already parked as charts). OTel export can ship without a new GUI.
+- Do not add hashed `SimEventKind` rows for “tick took 7 ms.”
+
+Out of this theme until picked: protobuf/TLS on the **sim wire** (different from OTLP); distributed tracing of every LLM HTTP call unless that `/spec` wants spans; eBPF.
 
 ---
 
@@ -266,7 +361,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on.
 
 ---
 
@@ -282,4 +377,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, and object definition files are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, and OpenTelemetry performance metrics are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11**, not parking-lot one-liners.

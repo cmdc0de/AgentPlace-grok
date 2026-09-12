@@ -861,7 +861,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     if sim.inventions_enabled
         && !agent.incapacitated
         && !sim.is_child(agent)
-        && crate::inventions::next_kind(&sim.inventions).is_some()
+        && crate::inventions::next_kind(&sim.inventions, sim.invention_tree).is_some()
     {
         legal.push(PrimaryAction::Invent);
     }

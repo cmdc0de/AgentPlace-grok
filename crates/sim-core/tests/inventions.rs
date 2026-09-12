@@ -1,5 +1,6 @@
 //! M35 inventions overlay.
 
+use sim_core::PipelineParams;
 use sim_core::action::PrimaryAction;
 use sim_core::agent::ItemId;
 use sim_core::event_log::SimEventKind;
@@ -45,9 +46,18 @@ fn overlay_parses_inventions() {
         InventionsParams::from_config_toml("[inventions]\nenabled = true\nshare_delay_ticks = 3\n");
     assert!(p.enabled);
     assert_eq!(p.share_delay_ticks, 3);
+    assert!(!p.tree);
+    assert_eq!(p.patent_ticks, 0);
     let d = InventionsParams::from_config_toml("[llm]\nprovider = \"mock\"\n");
     assert!(!d.enabled);
     assert_eq!(d.share_delay_ticks, 8);
+    let t = InventionsParams::from_config_toml(
+        "[inventions]\nenabled = true\ntree = true\npatent_ticks = 4\n",
+    );
+    assert!(t.tree);
+    assert_eq!(t.patent_ticks, 4);
+    assert!(!PipelineParams::from_config_toml("[llm]\nprovider = \"mock\"\n").hash_events);
+    assert!(PipelineParams::from_config_toml("[pipeline]\nhash_events = true\n").hash_events);
 }
 
 #[test]
@@ -289,4 +299,131 @@ fn fourth_invent_waits_all_kinds_present() {
     );
     let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
     assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+}
+
+#[test]
+fn tree_blocks_move_until_gather_shared() {
+    let mut sim = Simulation::new(tiny(0x45_01)).unwrap();
+    sim.enable_inventions(1);
+    sim.invention_tree = true;
+    let a = AgentId(0);
+    force_invent(&mut sim, a);
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::GatherBonus && !i.shared)
+    );
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Invent);
+    assert_eq!(sim.inventions.len(), 1);
+    let invented = sim
+        .inventions
+        .values()
+        .find(|i| i.kind == InventionKind::GatherBonus)
+        .unwrap()
+        .tick;
+    while sim.tick < invented.saturating_add(1) {
+        sim.tick();
+    }
+    assert!(
+        sim.inventions
+            .values()
+            .find(|i| i.kind == InventionKind::GatherBonus)
+            .unwrap()
+            .shared
+    );
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+    force_invent_kind(&mut sim, a, InventionKind::MoveBonus);
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::MoveBonus)
+    );
+}
+
+#[test]
+fn patent_ticks_delay_society_share() {
+    let mut sim = Simulation::new(tiny(0x45_02)).unwrap();
+    sim.enable_inventions(1);
+    sim.invention_patent_ticks = 4;
+    let a = AgentId(0);
+    let b = AgentId(1);
+    force_invent(&mut sim, a);
+    let invented = sim
+        .inventions
+        .values()
+        .find(|i| i.kind == InventionKind::GatherBonus)
+        .unwrap()
+        .tick;
+    while sim.tick < invented.saturating_add(1) {
+        sim.tick();
+    }
+    assert!(
+        !sim.inventions
+            .values()
+            .find(|i| i.kind == InventionKind::GatherBonus)
+            .unwrap()
+            .shared,
+        "still patented after share_delay"
+    );
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, b, "food"),
+        1000
+    );
+    while sim.tick < invented.saturating_add(5) {
+        sim.tick();
+    }
+    assert!(
+        sim.inventions
+            .values()
+            .find(|i| i.kind == InventionKind::GatherBonus)
+            .unwrap()
+            .shared
+    );
+    assert_eq!(
+        sim_core::incentive::resource_mult_milli(&sim, b, "food"),
+        1200
+    );
+}
+
+#[test]
+fn pipeline_overlay_off_same_hash() {
+    let cfg = tiny(0x45_03);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut flagged = Simulation::new(cfg).unwrap();
+    flagged.pipeline_hash_events = false;
+    off.run_ticks(3);
+    flagged.run_ticks(3);
+    assert_eq!(off.state_hash(), flagged.state_hash());
+    assert!(
+        !off.events
+            .events
+            .iter()
+            .any(|e| matches!(e.kind, SimEventKind::Pipeline { .. }))
+    );
+}
+
+#[test]
+fn pipeline_on_emits_complete_and_changes_hash() {
+    let cfg = tiny(0x45_04);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.pipeline_hash_events = true;
+    off.run_ticks(2);
+    on.run_ticks(2);
+    assert_ne!(off.state_hash(), on.state_hash());
+    let pipes: Vec<_> = on
+        .events
+        .events
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::Pipeline { .. }))
+        .collect();
+    assert_eq!(pipes.len(), 4, "2 ticks × 2 living agents");
+    assert!(
+        pipes
+            .iter()
+            .all(|e| matches!(e.kind, SimEventKind::Pipeline { stages: 31 }))
+    );
 }

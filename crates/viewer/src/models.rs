@@ -34,20 +34,68 @@ pub fn resolve_model(stem: &str) -> Option<PathBuf> {
     None
 }
 
-/// Resolve a TOML path against cwd and the workspace root; return a canonical file.
-pub fn existing_file(path: &Path) -> Option<PathBuf> {
+fn path_candidates(path: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![path.to_path_buf()];
     if path.is_relative() {
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         candidates.push(manifest.join("../..").join(path));
         candidates.push(manifest.join(path));
+        if let Ok(cwd) = std::env::current_dir() {
+            candidates.push(cwd.join(path));
+        }
     }
-    for c in candidates {
+    candidates
+}
+
+/// Resolve a TOML path against cwd and the workspace root; return a canonical file.
+pub fn existing_file(path: &Path) -> Option<PathBuf> {
+    for c in path_candidates(path) {
         if c.is_file() {
             return c.canonicalize().ok().or(Some(c));
         }
     }
     None
+}
+
+/// Same search as [`existing_file`], for `--objects` / `configs/objects`.
+pub fn existing_dir(path: &Path) -> Option<PathBuf> {
+    for c in path_candidates(path) {
+        if c.is_dir() {
+            return c.canonicalize().ok().or(Some(c));
+        }
+    }
+    None
+}
+
+pub fn resolve_objects_dir(explicit: Option<&Path>) -> Option<PathBuf> {
+    if let Some(p) = explicit {
+        if let Some(found) = existing_dir(p) {
+            return Some(found);
+        }
+        eprintln!(
+            "objects: --objects {} is not a directory (cwd={})",
+            p.display(),
+            std::env::current_dir()
+                .ok()
+                .map(|c| c.display().to_string())
+                .unwrap_or_else(|| "?".into())
+        );
+    }
+    sim_core::objects::default_objects_dir().and_then(|p| existing_dir(&p).or(Some(p)))
+}
+
+/// Load object TOML the same way the viewer does (`--objects` or shipped default).
+/// A relative `--objects` path is resolved against cwd **and** the workspace root so
+/// `cargo run -p viewer -- --connect … --objects configs/objects` still works when
+/// cwd is not the repo. Missing explicit dir falls back to shipped `configs/objects`.
+pub fn load_viewer_objects(explicit: Option<&Path>) -> (Option<PathBuf>, Vec<sim_core::ObjectDef>) {
+    match resolve_objects_dir(explicit) {
+        None => (None, Vec::new()),
+        Some(d) => {
+            let defs = sim_core::load_object_defs(&d).unwrap_or_default();
+            (Some(d), defs)
+        }
+    }
 }
 
 /// Definition `id` visual/LOD if the file exists, else agent stem, else primitive.
@@ -186,6 +234,76 @@ count = 2
             resolve_visual(&[], "berry_bush", 0).is_none(),
             "no stem fallback except agent"
         );
+    }
+
+    /// Regression: cwd ≠ repo used to make `--objects configs/objects` (and omit)
+    /// load **zero** defs, so `--connect` spawned primitives and no `loaded glb`.
+    #[test]
+    fn connect_wrong_cwd_still_loads_shipped_glb() {
+        struct CwdGuard(PathBuf);
+        impl Drop for CwdGuard {
+            fn drop(&mut self) {
+                let _ = std::env::set_current_dir(&self.0);
+            }
+        }
+        let _guard = CwdGuard(std::env::current_dir().unwrap());
+        std::env::set_current_dir(std::env::temp_dir()).unwrap();
+
+        let bogus = PathBuf::from(format!(
+            "/nope/agentplace-objects-regression-{}",
+            std::process::id()
+        ));
+        let cases: [(&str, Option<&Path>); 3] = [
+            ("omit --objects", None),
+            ("relative --objects", Some(Path::new("configs/objects"))),
+            ("missing --objects path", Some(bogus.as_path())),
+        ];
+        for (label, arg) in cases {
+            let (dir, defs) = load_viewer_objects(arg);
+            let dir = dir.unwrap_or_else(|| panic!("{label}: expected shipped objects dir"));
+            assert!(
+                dir.is_dir(),
+                "{label}: {} is not a directory",
+                dir.display()
+            );
+            assert!(
+                !defs.is_empty(),
+                "{label}: zero defs from {} (the silent primitive fallback)",
+                dir.display()
+            );
+            assert!(
+                defs.iter().any(|d| d.id == "berry_bush"),
+                "{label}: berry_bush missing in {}",
+                dir.display()
+            );
+            for id in ["berry_bush", "hare", "crate", "tree", "basket"] {
+                let path = resolve_visual(&defs, id, 0)
+                    .unwrap_or_else(|| panic!("{label}: {id} did not resolve a glb"));
+                assert!(
+                    path.is_file(),
+                    "{label}: {id} -> {} is not a file",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn shipped_object_toml_resolves_glb() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects");
+        let defs = sim_core::load_object_defs(&dir).expect("load shipped objects");
+        assert!(
+            !defs.is_empty(),
+            "expected shipped object TOML in {}",
+            dir.display()
+        );
+        for id in ["berry_bush", "hare", "crate", "tree", "basket"] {
+            let path = resolve_visual(&defs, id, 0);
+            assert!(
+                path.is_some(),
+                "{id} should resolve a glb from shipped TOML, got {path:?}"
+            );
+        }
     }
 
     #[test]

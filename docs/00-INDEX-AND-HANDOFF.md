@@ -60,7 +60,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M42** | Done (tag `M42`) | [`M42-plan.md`](M42-plan.md), walkthrough [`M42-test-plan.md`](M42-test-plan.md) | CON illness/energy, INT memory, browser /ckpt /events |
 | **M43** | Done (tag `M43`) | [`M43-plan.md`](M43-plan.md), walkthrough [`M43-test-plan.md`](M43-test-plan.md) | WIS toxin detect, CHA speech, DEX flee |
 | **M44** | Done (tag `M44`) | [`M44-plan.md`](M44-plan.md), walkthrough [`M44-test-plan.md`](M44-test-plan.md) | WIS board range, CHA support/pair-bond, STR pocket weight |
-| **M45** | Planned — next | [`M45-plan.md`](M45-plan.md) | Tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| **M45** | Done (tag `M45`) | [`M45-plan.md`](M45-plan.md), walkthrough [`M45-test-plan.md`](M45-test-plan.md) | Tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
 | After M45 | Not started | listed at the bottom of `M45-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -77,10 +77,12 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 4 | `memory-goals-incentives-spec.md` | Hybrid memory + eviction, relationship summaries, public goals & rule proposal lifecycle, incentive schedule format (long-term) |
 | 4b | `incentive-schedule-format.md` | **M8 file format:** one TOML schedule, many `[[incentives]]`, closed effect fields |
 | 4c | `needs-and-survival.md` | Hunger / thirst / energy: millipoints, decay, mock “hungry” cutoffs, refill actions |
+| 4d | `cli-reference.md` | Every `sim-cli` / viewer flag and slash command (M45) |
+| 4e | `config-reference.md` | Every file under `configs/` and every key (M45) |
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
 | 6b | `missing-features.md` | Open researcher gaps found in use (not After-M later-table) |
-| 6c | `post-ga-feature-list.md` | Post-GA backlog (kinship, reproduction, D&D-like sheet). Not a milestone plan. |
+| 6c | `post-ga-feature-list.md` | Post-GA backlog (sheet leftovers, inventions, 3D, catalog, extra recipes, missing-asset sentinel, OpenTelemetry metrics). Not a milestone plan. |
 | 6d | `art-scale.md` | Viewer world units for authored glb (agent capsule = reference) |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
@@ -159,7 +161,10 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 48b | `M43-test-plan.md` | M43 walkthrough (WIS toxin detect, CHA speech, DEX flee) |
 | 49 | `M44-plan.md` | Milestone 44 (done, tag `M44`): WIS board range, CHA support/pair-bond, STR pocket weight |
 | 49b | `M44-test-plan.md` | M44 walkthrough (WIS board range, CHA Support/PairBond, STR pocket weight) |
-| 50 | `M45-plan.md` | Milestone 45 (planned): tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| 50 | `M45-plan.md` | Milestone 45 (done, tag `M45`): tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| 50b | `M45-test-plan.md` | M45 walkthrough (tech tree/patents, pipeline events, format_version 3) |
+| 50c | `cli-reference.md` | Researcher CLI (sim-cli, viewer, slash commands) |
+| 50d | `config-reference.md` | Researcher config directory (`default.toml`, incentives, objects) |
 
 ---
 
@@ -168,7 +173,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M45-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M45 is next (`M45-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M45 is implemented (`M45-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -196,11 +201,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M44 are done. Next is [`M45-plan.md`](M45-plan.md) (tech tree/patents, hashed pipeline events, string ItemId ckpt bump). Later work is at the bottom of that file.
+M1–M45 are done. M45 is implemented ([`M45-plan.md`](M45-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M45-plan.md.
-M45 is planned (tech tree/patents, hashed pipeline events, string ItemId ckpt bump;
+M45 is implemented (tech tree/patents, hashed pipeline events, string ItemId ckpt bump;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, or Bevy in the browser.

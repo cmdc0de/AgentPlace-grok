@@ -1,8 +1,10 @@
 # M45 — Tech tree/patents, hashed pipeline events, string ItemId ckpt bump
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M44 complete (`docs/M44-plan.md`, git tag `M44`, commit `23611b8`)  
-**Specs:** `docs/post-ga-feature-list.md` (PG-5 tree/patents, PG-8 string ItemId), later-tables (hashed pipeline events)
+**Walkthrough:** [`docs/M45-test-plan.md`](M45-test-plan.md)  
+**Specs:** `docs/post-ga-feature-list.md` (PG-5 tree/patents, PG-8 string ItemId), later-tables (hashed pipeline events)  
+**Researcher docs:** [`cli-reference.md`](cli-reference.md), [`config-reference.md`](config-reference.md)
 
 ## Context
 
@@ -18,6 +20,7 @@ A researcher can:
 2. Turn on `[pipeline] hash_events` / `--pipeline-events` and see **one hashed pipeline event per living agent per tick** (stage bitmask). Wall-clock ns stay unhashed. Overlay off ⇒ no extra events, **same hashes**.
 3. Save checkpoints as **format_version 3** with catalog items as **slugs**, not shuffled `u16`. Load v2 (u16 catalog) and v3 (slug). Built-in Food/Wood/… encoding and hashes **unchanged**.
 4. `--load` restores inventions, pipeline events, and catalog slugs without double-grant. CI stays `provider = mock`. **`PROTOCOL_VERSION = 5`**.
+5. Open [`cli-reference.md`](cli-reference.md) and [`config-reference.md`](config-reference.md) for every `sim-cli` / viewer flag and every file under `configs/`.
 
 Idle mock 2-tick hash **stays `cd1e0853…`**.
 
@@ -80,11 +83,18 @@ When **on**: after remember, append **one** `SimEventKind::Pipeline { stages: u8
 - Overlay catalog off / no catalog items ⇒ Catalog never appears ⇒ idle hash **unchanged**.
 - PROTOCOL stays 5. Wire does not carry ItemId.
 
+### D. Researcher CLI / config reference
+
+Docs only (no hash / protocol change):
+
+- [`docs/cli-reference.md`](cli-reference.md) — every `sim-cli` and viewer flag, slash commands, hash/overlay rules.
+- [`docs/config-reference.md`](config-reference.md) — every file under `configs/`, every hashed experiment key, every overlay table, incentive files, object TOML fields.
+
 ## Out of scope (later)
 
 | Later | What |
 |---|---|
-| After M45 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; STR gather/hunt payoff; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings |
+| After M45 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; STR gather/hunt payoff; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings; **PG-9** more crafting recipes; **PG-10** missing-asset sentinel mesh; **PG-11** OpenTelemetry / CPU / disk / memory / frame times |
 | Not M45 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; hashing wall-clock ns |
 
 ## Key decisions
@@ -110,6 +120,7 @@ When **on**: after remember, append **one** `SimEventKind::Pipeline { stages: u8
 | load v2 | Catalog(u16) still decodes; builtins restore |
 | load v3 catalog slug | slug restores; extra catalog file does not reshuffle |
 | Hello v5 | unchanged |
+| CLI / config docs | `docs/cli-reference.md` and `docs/config-reference.md` list flags and `configs/` files |
 
 ## PR Plan
 
@@ -125,6 +136,10 @@ When **on**: after remember, append **one** `SimEventKind::Pipeline { stages: u8
 
 - **Files:** write v3; read v2+v3; catalog slug in file; builtin hash identity
 
+### PR 4: Researcher CLI / config docs
+
+- **Files:** `docs/cli-reference.md`, `docs/config-reference.md`; INDEX / README / walkthrough links
+
 ## Config / CLI
 
 No shipping experiment TOML change. Overlay is not postcard. No PROTOCOL bump.
@@ -137,7 +152,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
 
 ## Verification
 
-Walkthrough: write `docs/M45-test-plan.md` on implement.
+Walkthrough: [`docs/M45-test-plan.md`](M45-test-plan.md).
 
 ```bash
 cargo test -p sim-core

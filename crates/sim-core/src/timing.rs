@@ -8,6 +8,37 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
+/// Overlay `[pipeline]`. Not on `ExperimentConfig` (not hashed).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PipelineParams {
+    pub hash_events: bool,
+}
+
+impl PipelineParams {
+    pub fn from_config_toml(s: &str) -> Self {
+        #[derive(Default, Deserialize)]
+        struct Slice {
+            #[serde(default)]
+            pipeline: Table,
+        }
+        #[derive(Default, Deserialize)]
+        struct Table {
+            hash_events: Option<bool>,
+        }
+        let slice: Slice = toml::from_str(s).unwrap_or_default();
+        Self {
+            hash_events: slice.pipeline.hash_events.unwrap_or(false),
+        }
+    }
+}
+
+pub const PIPE_PERCEIVE: u8 = 1;
+pub const PIPE_RETRIEVE: u8 = 2;
+pub const PIPE_SELECT: u8 = 4;
+pub const PIPE_EXECUTE: u8 = 8;
+pub const PIPE_REMEMBER: u8 = 16;
+pub const PIPE_COMPLETE: u8 = 31;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AgentTiming {
     pub agent: u64,

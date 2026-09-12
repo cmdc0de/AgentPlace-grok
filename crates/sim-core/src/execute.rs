@@ -545,7 +545,7 @@ fn invent(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    let Some(kind) = crate::inventions::next_kind(&sim.inventions) else {
+    let Some(kind) = crate::inventions::next_kind(&sim.inventions, sim.invention_tree) else {
         push(sim, id, SimEventKind::Wait);
         return;
     };

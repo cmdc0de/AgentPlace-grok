@@ -176,8 +176,8 @@ fn overlong_speech_is_truncated() {
 }
 
 #[test]
-fn format_version_is_v2() {
-    assert_eq!(CHECKPOINT_FORMAT_VERSION, 2);
+fn format_version_is_v3() {
+    assert_eq!(CHECKPOINT_FORMAT_VERSION, 3);
     let bytes = Simulation::new(tiny_config(1))
         .unwrap()
         .encode_checkpoint()

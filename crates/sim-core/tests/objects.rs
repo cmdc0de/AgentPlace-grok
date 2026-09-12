@@ -3,7 +3,8 @@
 use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
-    CatalogParams, ObjectDef, catalog_entries, load_object_defs, lod_band, pick_visual_path,
+    CatalogParams, ObjectDef, catalog_entries, default_objects_dir, load_object_defs, lod_band,
+    pick_visual_path,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
@@ -80,6 +81,21 @@ fn force_craft_catalog(sim: &mut Simulation, id: AgentId, n: u16) {
         }
     }
     panic!("catalog craft never succeeded");
+}
+
+#[test]
+fn default_objects_dir_finds_shipping_from_other_cwd() {
+    let prev = std::env::current_dir().unwrap();
+    std::env::set_current_dir(std::env::temp_dir()).unwrap();
+    let dir = default_objects_dir();
+    let _ = std::env::set_current_dir(prev);
+    let dir = dir.expect("shipping configs/objects via crate path");
+    let defs = load_object_defs(&dir).unwrap();
+    assert!(
+        defs.iter().any(|d| d.id == "berry_bush"),
+        "expected berry_bush in {}",
+        dir.display()
+    );
 }
 
 #[test]
@@ -752,5 +768,156 @@ fn force_gather_eat(sim: &mut Simulation, tag: u8) {
         &PrimaryAction::Eat {
             item: ItemId::Food(tag),
         },
+    );
+}
+
+#[test]
+fn write_ckpt_is_format_version_3() {
+    use sim_core::CHECKPOINT_FORMAT_VERSION;
+    assert_eq!(CHECKPOINT_FORMAT_VERSION, 3);
+    let bytes = Simulation::new(tiny(0x45_10))
+        .unwrap()
+        .encode_checkpoint()
+        .unwrap();
+    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 3);
+}
+
+#[test]
+fn load_v2_catalog_u16_still_decodes() {
+    let mut sim = Simulation::new(tiny(0x45_11)).unwrap();
+    let a = AgentId(0);
+    sim.agents
+        .get_mut(&a)
+        .unwrap()
+        .try_add_item(ItemId::Stone, 3);
+    let mut bytes = sim.encode_checkpoint().unwrap();
+    bytes[4..8].copy_from_slice(&2u32.to_le_bytes());
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    assert_eq!(
+        loaded
+            .agents
+            .get(&a)
+            .unwrap()
+            .inventory
+            .get(&ItemId::Stone)
+            .copied(),
+        Some(3)
+    );
+}
+
+#[test]
+fn load_v3_catalog_slug_survives_extra_file() {
+    let dir_a = std::env::temp_dir().join("agentplace-m45-slug-a");
+    let dir_b = std::env::temp_dir().join("agentplace-m45-slug-b");
+    let _ = fs::remove_dir_all(&dir_a);
+    let _ = fs::remove_dir_all(&dir_b);
+    write_toml(
+        &dir_a,
+        "alpha.toml",
+        r#"
+id = "alpha"
+kind = "item"
+[sim]
+weight_milli = 100
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
+"#,
+    );
+    write_toml(
+        &dir_a,
+        "zeta.toml",
+        r#"
+id = "zeta"
+kind = "item"
+[sim]
+weight_milli = 400
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
+"#,
+    );
+    let mut sim = Simulation::new(tiny(0x45_12)).unwrap();
+    sim.apply_objects_dir(&dir_a).unwrap();
+    let zeta = sim.catalog.iter().find(|e| e.slug == "zeta").unwrap().item;
+    let ItemId::Catalog(zeta_n) = zeta else {
+        panic!("zeta should be catalog");
+    };
+    sim.agents
+        .get_mut(&AgentId(0))
+        .unwrap()
+        .try_add_item(zeta, 1);
+    let bytes = sim.encode_checkpoint().unwrap();
+    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 3);
+
+    write_toml(
+        &dir_b,
+        "alpha.toml",
+        r#"
+id = "alpha"
+kind = "item"
+[sim]
+weight_milli = 100
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
+"#,
+    );
+    write_toml(
+        &dir_b,
+        "mid.toml",
+        r#"
+id = "mid"
+kind = "item"
+[sim]
+weight_milli = 200
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
+"#,
+    );
+    write_toml(
+        &dir_b,
+        "zeta.toml",
+        r#"
+id = "zeta"
+kind = "item"
+[sim]
+weight_milli = 400
+[sim.craft]
+inputs = [["fiber", 2]]
+output_qty = 1
+"#,
+    );
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.apply_objects_dir(&dir_b).unwrap();
+    let new_zeta = loaded
+        .catalog
+        .iter()
+        .find(|e| e.slug == "zeta")
+        .unwrap()
+        .item;
+    assert_ne!(new_zeta, ItemId::Catalog(zeta_n), "rank shuffled");
+    assert_eq!(
+        loaded
+            .agents
+            .get(&AgentId(0))
+            .unwrap()
+            .inventory
+            .get(&new_zeta)
+            .copied(),
+        Some(1),
+        "slug remap keeps zeta"
+    );
+    assert_eq!(
+        loaded
+            .agents
+            .get(&AgentId(0))
+            .unwrap()
+            .inventory
+            .get(&ItemId::Catalog(zeta_n))
+            .copied()
+            .unwrap_or(0),
+        0
     );
 }

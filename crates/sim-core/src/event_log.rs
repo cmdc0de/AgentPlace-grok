@@ -118,6 +118,9 @@ pub enum SimEventKind {
         inventor: AgentId,
         kind: crate::inventions::InventionKind,
     },
+    Pipeline {
+        stages: u8,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,6 +142,10 @@ impl EventLog {
 }
 
 pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
+    hash_kind_slugs(kind, hasher, &[]);
+}
+
+pub fn hash_kind_slugs(kind: &SimEventKind, hasher: &mut impl sha2::Digest, slugs: &[String]) {
     match kind {
         SimEventKind::Wait => hasher.update([0u8]),
         SimEventKind::Rest => hasher.update([1u8]),
@@ -187,7 +194,11 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update([recipe_disc(*recipe)]);
             hasher.update([u8::from(*success)]);
             if let Recipe::Catalog(n) = recipe {
-                hasher.update(n.to_le_bytes());
+                if let Some(s) = slugs.get(*n as usize).filter(|s| !s.is_empty()) {
+                    hasher.update(s.as_bytes());
+                } else {
+                    hasher.update(n.to_le_bytes());
+                }
             }
         }
         SimEventKind::Speak {
@@ -238,33 +249,33 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
         }
         SimEventKind::Transfer { item, qty, to } => {
             hasher.update([19u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
             hasher.update(to.0.to_le_bytes());
         }
         SimEventKind::Store { item, qty } => {
             hasher.update([20u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
         }
         SimEventKind::Retrieve { item, qty } => {
             hasher.update([21u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
         }
         SimEventKind::Give { item, qty } => {
             hasher.update([22u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
         }
         SimEventKind::Pack { item, qty } => {
             hasher.update([23u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
         }
         SimEventKind::Unpack { item, qty } => {
             hasher.update([24u8]);
-            hash_item(hasher, *item);
+            hash_item_slugs(hasher, *item, slugs);
             hasher.update(qty.to_le_bytes());
         }
         SimEventKind::Attack { target, damage } => {
@@ -295,10 +306,18 @@ pub fn hash_kind(kind: &SimEventKind, hasher: &mut impl sha2::Digest) {
             hasher.update(inventor.0.to_le_bytes());
             hasher.update([*kind as u8]);
         }
+        SimEventKind::Pipeline { stages } => {
+            hasher.update([32u8]);
+            hasher.update([*stages]);
+        }
     }
 }
 
 pub(crate) fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
+    hash_item_slugs(hasher, item, &[]);
+}
+
+pub(crate) fn hash_item_slugs(hasher: &mut impl sha2::Digest, item: ItemId, slugs: &[String]) {
     match item {
         ItemId::Food(tag) => {
             hasher.update([0u8, tag]);
@@ -312,7 +331,11 @@ pub(crate) fn hash_item(hasher: &mut impl sha2::Digest, item: ItemId) {
         ItemId::Backpack => hasher.update([7u8]),
         ItemId::Catalog(n) => {
             hasher.update([8u8]);
-            hasher.update(n.to_le_bytes());
+            if let Some(s) = slugs.get(n as usize).filter(|s| !s.is_empty()) {
+                hasher.update(s.as_bytes());
+            } else {
+                hasher.update(n.to_le_bytes());
+            }
         }
     }
 }
@@ -361,6 +384,7 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::PairBonded { .. } => "PairBonded",
         SimEventKind::Born { .. } => "Born",
         SimEventKind::Invented { .. } => "Invented",
+        SimEventKind::Pipeline { .. } => "Pipeline",
     }
 }
 
@@ -398,6 +422,7 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::PairBonded { .. } => "pair_bonded",
         SimEventKind::Born { .. } => "born",
         SimEventKind::Invented { .. } => "invented",
+        SimEventKind::Pipeline { .. } => "pipeline",
     }
 }
 
@@ -455,5 +480,6 @@ pub fn is_primary_kind(kind: &SimEventKind) -> bool {
             | SimEventKind::CombatDeath { .. }
             | SimEventKind::Born { .. }
             | SimEventKind::Invented { .. }
+            | SimEventKind::Pipeline { .. }
     )
 }

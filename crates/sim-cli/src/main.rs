@@ -59,6 +59,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut culture = false;
     let mut llm_reflect_importance = false;
     let mut inventions = false;
+    let mut pipeline_events = false;
     let mut catalog = false;
     let mut objects_path: Option<PathBuf> = None;
     let mut i = 0;
@@ -159,6 +160,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--household-crates" => household_crates = true,
             "--culture" => culture = true,
             "--inventions" => inventions = true,
+            "--pipeline-events" => pipeline_events = true,
             "--catalog" => catalog = true,
             "--objects" => {
                 i += 1;
@@ -297,7 +299,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let inv = sim_core::InventionsParams::from_config_toml(&text);
         if inventions || inv.enabled {
             sim.enable_inventions(inv.share_delay_ticks);
+            sim.invention_tree = inv.tree;
+            sim.invention_patent_ticks = inv.patent_ticks;
         }
+        let pipe = sim_core::PipelineParams::from_config_toml(&text);
+        sim.pipeline_hash_events = pipeline_events || pipe.hash_events;
         let cat = sim_core::CatalogParams::from_config_toml(&text);
         if let Some(dir) = &objects_dir {
             let _ = sim.apply_objects_dir(dir)?;
@@ -487,7 +493,7 @@ Usage:
           [--conflict] [--conflict-death]
           [--sheet] [--reproduction] [--aging]
           [--household-crates] [--culture] [--inventions]
-          [--catalog] [--objects DIR]
+          [--pipeline-events] [--catalog] [--objects DIR]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -519,6 +525,7 @@ Options:
       --household-crates    Members Store/Retrieve at household home (Chebyshev ≤ 1)
       --culture             Assign founder culture ids; children copy a parent
       --inventions          Invent GatherBonus/MoveBonus/SenseBonus; inventor then society after share_delay_ticks
+      --pipeline-events     Hash one Pipeline stage bitmask per living agent per tick (overlay [pipeline] hash_events)
       --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
       --objects DIR         Object definition TOML directory (default: configs/objects if present)
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance

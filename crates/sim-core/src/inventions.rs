@@ -53,6 +53,8 @@ pub struct Invention {
 pub struct InventionsParams {
     pub enabled: bool,
     pub share_delay_ticks: u64,
+    pub tree: bool,
+    pub patent_ticks: u64,
 }
 
 impl Default for InventionsParams {
@@ -60,6 +62,8 @@ impl Default for InventionsParams {
         Self {
             enabled: false,
             share_delay_ticks: 8,
+            tree: false,
+            patent_ticks: 0,
         }
     }
 }
@@ -75,11 +79,15 @@ impl InventionsParams {
         struct Table {
             enabled: Option<bool>,
             share_delay_ticks: Option<u64>,
+            tree: Option<bool>,
+            patent_ticks: Option<u64>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         Self {
             enabled: slice.inventions.enabled.unwrap_or(false),
             share_delay_ticks: slice.inventions.share_delay_ticks.unwrap_or(8),
+            tree: slice.inventions.tree.unwrap_or(false),
+            patent_ticks: slice.inventions.patent_ticks.unwrap_or(0),
         }
     }
 }
@@ -89,10 +97,20 @@ pub fn invent_chance(intelligence: u8) -> i32 {
         .clamp(1, 1000)
 }
 
-pub fn next_kind(table: &BTreeMap<u64, Invention>) -> Option<InventionKind> {
-    InventionKind::ALL
-        .into_iter()
-        .find(|k| !table.values().any(|i| i.kind == *k))
+pub fn next_kind(table: &BTreeMap<u64, Invention>, tree: bool) -> Option<InventionKind> {
+    for (i, k) in InventionKind::ALL.into_iter().enumerate() {
+        if table.values().any(|inv| inv.kind == k) {
+            continue;
+        }
+        if tree && i > 0 {
+            let prev = InventionKind::ALL[i - 1];
+            if !table.values().any(|inv| inv.kind == prev && inv.shared) {
+                return None;
+            }
+        }
+        return Some(k);
+    }
+    None
 }
 
 pub fn entitled(table: &BTreeMap<u64, Invention>, id: AgentId, kind: InventionKind) -> bool {

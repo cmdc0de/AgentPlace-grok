@@ -4,7 +4,7 @@ use crate::board::{Goal, PublicBoard};
 use crate::config::{ExperimentConfig, SpawnMode};
 use crate::decision_log::{self, DecisionRecord};
 use crate::error::SimError;
-use crate::event_log::{EventLog, SimEvent, SimEventKind, hash_kind};
+use crate::event_log::{EventLog, SimEvent, SimEventKind};
 use crate::execute::{apply_heard_memories, execute_primary};
 use crate::haul::StorageParams;
 use crate::incentive::{self, IncentiveSchedule};
@@ -124,6 +124,10 @@ pub struct Simulation {
     pub inventions_enabled: bool,
     /// Overlay `[inventions] share_delay_ticks`. Default 8. Not hashed.
     pub invention_share_delay: u64,
+    /// Overlay `[inventions] tree`. Not hashed.
+    pub invention_tree: bool,
+    /// Overlay `[inventions] patent_ticks`. Not hashed.
+    pub invention_patent_ticks: u64,
     /// Invention table. Checkpointed. Hashed when non-empty.
     pub inventions: BTreeMap<u64, crate::inventions::Invention>,
     pub next_invention_id: u64,
@@ -131,6 +135,10 @@ pub struct Simulation {
     pub catalog_enabled: bool,
     /// Catalog item definitions. Hashed when overlay on and non-empty.
     pub catalog: Vec<crate::objects::CatalogEntry>,
+    /// Slugs saved in a v3 checkpoint (`Catalog(u16)` index). Empty on v2.
+    pub ckpt_catalog_slugs: Vec<String>,
+    /// Overlay `[pipeline] hash_events`. Not hashed.
+    pub pipeline_hash_events: bool,
 }
 
 impl Simulation {
@@ -217,10 +225,14 @@ impl Simulation {
             culture_count: 4,
             inventions_enabled: false,
             invention_share_delay: 8,
+            invention_tree: false,
+            invention_patent_ticks: 0,
             inventions: BTreeMap::new(),
             next_invention_id: 1,
             catalog_enabled: false,
             catalog: Vec::new(),
+            ckpt_catalog_slugs: Vec::new(),
+            pipeline_hash_events: false,
         })
     }
 
@@ -311,8 +323,20 @@ impl Simulation {
 
     /// Load object defs and hash item `[sim]` when non-empty. Empty catalog ≡ off for hash.
     pub fn enable_catalog(&mut self, entries: Vec<crate::objects::CatalogEntry>) {
+        if !self.ckpt_catalog_slugs.is_empty() {
+            crate::objects::remap_catalog_holdings(
+                &mut self.agents,
+                &mut self.events.events,
+                &self.ckpt_catalog_slugs,
+                &entries,
+            );
+        }
         self.catalog_enabled = true;
         self.catalog = entries;
+    }
+
+    pub fn catalog_slugs(&self) -> Vec<String> {
+        crate::objects::catalog_slug_vec(&self.catalog)
     }
 
     pub fn apply_objects_dir(
@@ -326,7 +350,9 @@ impl Simulation {
     }
 
     pub fn share_due_inventions(&mut self) {
-        let delay = self.invention_share_delay;
+        let delay = self
+            .invention_share_delay
+            .saturating_add(self.invention_patent_ticks);
         let tick = self.tick;
         for inv in self.inventions.values_mut() {
             if !inv.shared && tick >= inv.tick.saturating_add(delay) {
@@ -1095,6 +1121,7 @@ impl Simulation {
         }
         if self.agents.get(&id).is_some_and(|a| a.incapacitated) {
             execute_primary(self, id, &crate::action::PrimaryAction::Wait);
+            self.emit_pipeline(id, timing::PIPE_EXECUTE);
             return timing;
         }
         let p0 = Instant::now();
@@ -1300,7 +1327,19 @@ impl Simulation {
             }
         }
         timing.remember_ns = timing::ns_since(m0);
+        self.emit_pipeline(id, timing::PIPE_COMPLETE);
         timing
+    }
+
+    fn emit_pipeline(&mut self, id: AgentId, stages: u8) {
+        if !self.pipeline_hash_events {
+            return;
+        }
+        self.events.push(SimEvent {
+            tick: self.tick,
+            agent: id,
+            kind: SimEventKind::Pipeline { stages },
+        });
     }
 
     fn choose_custom(
@@ -1483,8 +1522,9 @@ impl Simulation {
         hasher.update(self.config.master_seed.to_le_bytes());
         hasher.update(self.world.hash_bytes());
         self.board.hash_into(&mut hasher);
+        let slugs = self.catalog_slugs();
         for agent in self.agents.values() {
-            agent.hash_bytes(&mut hasher);
+            agent.hash_bytes(&mut hasher, &slugs);
         }
         if !self.household_home.is_empty() {
             for (hid, (x, y)) in &self.household_home {
@@ -1506,7 +1546,7 @@ impl Simulation {
         for event in &self.events.events {
             hasher.update(event.tick.to_le_bytes());
             hasher.update(event.agent.0.to_le_bytes());
-            hash_kind(&event.kind, &mut hasher);
+            crate::event_log::hash_kind_slugs(&event.kind, &mut hasher, &slugs);
         }
         StateHash(hasher.finalize().into())
     }

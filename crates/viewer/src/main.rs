@@ -72,10 +72,14 @@ struct ObjectVisuals {
 struct ModelLabel {
     id: String,
     path: PathBuf,
+    file_bytes: u64,
 }
 
 #[derive(Resource, Default)]
-struct ReportedModels(std::collections::HashSet<PathBuf>);
+struct ReportedModels {
+    files: std::collections::HashSet<PathBuf>,
+    sizes: std::collections::HashSet<PathBuf>,
+}
 
 fn apply_viewer_objects(
     sim: &mut Simulation,
@@ -83,13 +87,36 @@ fn apply_viewer_objects(
     _catalog_flag: bool,
     _config_text: Option<&str>,
 ) -> Vec<sim_core::ObjectDef> {
-    let dir = objects
-        .map(Path::to_path_buf)
-        .or_else(sim_core::objects::default_objects_dir);
-    let defs = dir
-        .as_ref()
-        .and_then(|d| sim_core::load_object_defs(d).ok())
-        .unwrap_or_default();
+    let (dir, defs) = models::load_viewer_objects(objects);
+    match &dir {
+        None => {
+            eprintln!(
+                "objects: no configs/objects dir (cwd or --objects); using primitives"
+            );
+        }
+        Some(d) if defs.is_empty() => {
+            eprintln!(
+                "objects: 0 defs from {} (check TOML); using primitives",
+                d.display()
+            );
+        }
+        Some(d) => {
+            eprintln!("objects: {} defs from {}", defs.len(), d.display());
+            for id in [
+                "berry_bush",
+                "tree",
+                "hare",
+                "crate",
+                "basket",
+                "agent",
+            ] {
+                match models::resolve_visual(&defs, id, 0) {
+                    Some(p) => eprintln!("  glb {id} -> {}", p.display()),
+                    None => eprintln!("  glb {id} -> (primitive)"),
+                }
+            }
+        }
+    }
     sim.enable_catalog(sim_core::catalog_entries(&defs));
     defs
 }
@@ -155,7 +182,11 @@ fn main() {
             let inv = sim_core::InventionsParams::from_config_toml(&text);
             if inv.enabled {
                 sim.enable_inventions(inv.share_delay_ticks);
+                sim.invention_tree = inv.tree;
+                sim.invention_patent_ticks = inv.patent_ticks;
             }
+            sim.pipeline_hash_events =
+                sim_core::PipelineParams::from_config_toml(&text).hash_events;
             let defs = apply_viewer_objects(
                 &mut sim,
                 parsed.objects.as_deref(),
@@ -345,6 +376,16 @@ fn setup_scene(
     visuals: Res<ObjectVisuals>,
 ) {
     let world = &state.sim.world;
+    eprintln!(
+        "setup_scene: {}×{} veg={} animals={} fish={} agents={} object_defs={}",
+        world.width,
+        world.height,
+        world.vegetation_count(),
+        world.animal_total(),
+        world.fish_total(),
+        state.sim.agents.len(),
+        visuals.defs.len()
+    );
     let terrain = meshes.add(heightmap_mesh(world));
     commands.spawn((
         Mesh3d(terrain),
@@ -758,8 +799,17 @@ fn try_spawn_model(
     extra: impl Bundle,
 ) -> bool {
     let Some(path) = models::resolve_visual(&visuals.defs, stem, dist_cells) else {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static MISS: AtomicBool = AtomicBool::new(false);
+        if !MISS.swap(true, Ordering::Relaxed) {
+            eprintln!(
+                "glb miss: stem={stem} defs={} (further misses omitted)",
+                visuals.defs.len()
+            );
+        }
         return false;
     };
+    let file_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     let handle = assets
         .load_builder()
         .override_unapproved()
@@ -771,10 +821,21 @@ fn try_spawn_model(
         ModelLabel {
             id: stem.to_string(),
             path,
+            file_bytes,
         },
         Visibility::default(),
     ));
     true
+}
+
+fn format_file_bytes(n: u64) -> String {
+    if n >= 1024 * 1024 {
+        format!("{n} bytes ({:.1} MiB)", n as f64 / (1024.0 * 1024.0))
+    } else if n >= 1024 {
+        format!("{n} bytes ({:.1} KiB)", n as f64 / 1024.0)
+    } else {
+        format!("{n} bytes")
+    }
 }
 
 fn report_model_sizes(
@@ -783,17 +844,28 @@ fn report_model_sizes(
     meshes: Query<(&GlobalTransform, &Mesh3d)>,
     assets: Res<Assets<Mesh>>,
     mut reported: ResMut<ReportedModels>,
+    mut ui: ResMut<UiState>,
 ) {
     for (entity, label, root_tf) in &roots {
-        if reported.0.contains(&label.path) {
+        if reported.files.insert(label.path.clone()) {
+            let line = format!(
+                "loaded glb {} {}  {}",
+                label.id,
+                label.path.display(),
+                format_file_bytes(label.file_bytes)
+            );
+            eprintln!("{line}");
+            ui.scrollback.push(line);
+        }
+        if reported.sizes.contains(&label.path) {
             continue;
         }
         let Some((w, h, d)) = model_size_meters(entity, root_tf, &children, &meshes, &assets)
         else {
             continue;
         };
-        reported.0.insert(label.path.clone());
-        println!(
+        reported.sizes.insert(label.path.clone());
+        let line = format!(
             "model {} {} size={:.3}×{:.3}×{:.3} m (x×y×z)",
             label.id,
             label.path.display(),
@@ -801,6 +873,8 @@ fn report_model_sizes(
             h,
             d
         );
+        eprintln!("{line}");
+        ui.scrollback.push(line);
     }
 }
 

@@ -18,7 +18,8 @@ use std::io::Write;
 use std::path::Path;
 
 pub const CHECKPOINT_MAGIC: [u8; 4] = *b"AGTN";
-pub const CHECKPOINT_FORMAT_VERSION: u32 = 2;
+pub const CHECKPOINT_FORMAT_VERSION: u32 = 3;
+pub const CHECKPOINT_FORMAT_VERSION_V2: u32 = 2;
 
 /// Wire type kept binary-compatible with M3 (`entries: Vec<String>`).
 /// M4 stores a hex postcard blob of board + goals in `entries[0]`.
@@ -66,6 +67,8 @@ struct BoardBlob {
     inventions: BTreeMap<u64, crate::inventions::Invention>,
     #[serde(default)]
     next_invention_id: u64,
+    #[serde(default)]
+    catalog_slugs: Vec<String>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -144,6 +147,7 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
         cultures: sim.agents.iter().map(|(id, a)| (id.0, a.culture)).collect(),
         inventions: sim.inventions.clone(),
         next_invention_id: sim.next_invention_id,
+        catalog_slugs: sim.catalog_slugs(),
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -163,6 +167,7 @@ fn board_from_wire(
     BTreeMap<u64, (u32, u32)>,
     BTreeMap<u64, crate::inventions::Invention>,
     u64,
+    Vec<String>,
 ) {
     let Some(hex_str) = wire.entries.first() else {
         return (
@@ -172,6 +177,7 @@ fn board_from_wire(
             BTreeMap::new(),
             BTreeMap::new(),
             0,
+            Vec::new(),
         );
     };
     let Ok(bytes) = hex::decode(hex_str) else {
@@ -182,37 +188,10 @@ fn board_from_wire(
             BTreeMap::new(),
             BTreeMap::new(),
             0,
+            Vec::new(),
         );
     };
-    let blob = match postcard::from_bytes::<BoardBlob>(&bytes) {
-        Ok(b) => b,
-        Err(_) => {
-            #[derive(Deserialize)]
-            struct BoardBlobM4 {
-                #[serde(default)]
-                board: RichBoard,
-                #[serde(default)]
-                goals: BTreeMap<u64, Vec<Goal>>,
-            }
-            match postcard::from_bytes::<BoardBlobM4>(&bytes) {
-                Ok(old) => BoardBlob {
-                    board: old.board,
-                    goals: old.goals,
-                    ..BoardBlob::default()
-                },
-                Err(_) => {
-                    return (
-                        RichBoard::default(),
-                        0,
-                        0,
-                        BTreeMap::new(),
-                        BTreeMap::new(),
-                        0,
-                    );
-                }
-            }
-        }
-    };
+    let blob = blob_from_bytes(&bytes);
     for (id, goals) in blob.goals {
         if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
             agent.goals = goals;
@@ -287,7 +266,93 @@ fn board_from_wire(
         blob.household_home,
         blob.inventions,
         blob.next_invention_id,
+        blob.catalog_slugs,
     )
+}
+
+/// v3 BoardBlob has trailing `catalog_slugs`. M44 / format_version 2 blobs stop at
+/// `next_invention_id`. Older M4 blobs only had board+goals.
+fn blob_from_bytes(bytes: &[u8]) -> BoardBlob {
+    if let Ok(b) = postcard::from_bytes::<BoardBlob>(bytes) {
+        return b;
+    }
+    #[derive(Deserialize)]
+    struct BoardBlobV2 {
+        #[serde(default)]
+        board: RichBoard,
+        #[serde(default)]
+        goals: BTreeMap<u64, Vec<Goal>>,
+        #[serde(default)]
+        relationships: BTreeMap<u64, BTreeMap<u64, RelationshipSummary>>,
+        #[serde(default)]
+        memory_meta: BTreeMap<u64, Vec<MemoryMeta>>,
+        #[serde(default)]
+        next_memory_id: BTreeMap<u64, u64>,
+        #[serde(default)]
+        influence: BTreeMap<u64, u32>,
+        #[serde(default)]
+        plans: BTreeMap<u64, Vec<String>>,
+        #[serde(default)]
+        health: BTreeMap<u64, u32>,
+        #[serde(default)]
+        incapacitated: BTreeMap<u64, bool>,
+        #[serde(default)]
+        sheets: BTreeMap<u64, crate::sheet::AbilitySheet>,
+        #[serde(default)]
+        kinship: BTreeMap<u64, crate::kinship::Kinship>,
+        #[serde(default)]
+        next_agent_id: u64,
+        #[serde(default)]
+        next_household_id: u64,
+        #[serde(default)]
+        ages: BTreeMap<u64, u64>,
+        #[serde(default)]
+        household_home: BTreeMap<u64, (u32, u32)>,
+        #[serde(default)]
+        cultures: BTreeMap<u64, u8>,
+        #[serde(default)]
+        inventions: BTreeMap<u64, crate::inventions::Invention>,
+        #[serde(default)]
+        next_invention_id: u64,
+    }
+    if let Ok(old) = postcard::from_bytes::<BoardBlobV2>(bytes) {
+        return BoardBlob {
+            board: old.board,
+            goals: old.goals,
+            relationships: old.relationships,
+            memory_meta: old.memory_meta,
+            next_memory_id: old.next_memory_id,
+            influence: old.influence,
+            plans: old.plans,
+            health: old.health,
+            incapacitated: old.incapacitated,
+            sheets: old.sheets,
+            kinship: old.kinship,
+            next_agent_id: old.next_agent_id,
+            next_household_id: old.next_household_id,
+            ages: old.ages,
+            household_home: old.household_home,
+            cultures: old.cultures,
+            inventions: old.inventions,
+            next_invention_id: old.next_invention_id,
+            catalog_slugs: Vec::new(),
+        };
+    }
+    #[derive(Deserialize)]
+    struct BoardBlobM4 {
+        #[serde(default)]
+        board: RichBoard,
+        #[serde(default)]
+        goals: BTreeMap<u64, Vec<Goal>>,
+    }
+    match postcard::from_bytes::<BoardBlobM4>(bytes) {
+        Ok(old) => BoardBlob {
+            board: old.board,
+            goals: old.goals,
+            ..BoardBlob::default()
+        },
+        Err(_) => BoardBlob::default(),
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -386,8 +451,15 @@ impl Simulation {
         }
         let replay = crate::simulation::replay_or_record(&config).0;
         let mut agents = body.agents;
-        let (board, blob_next_id, blob_house_id, blob_homes, blob_inventions, blob_next_inv) =
-            board_from_wire(&body.public_board, &mut agents);
+        let (
+            board,
+            blob_next_id,
+            blob_house_id,
+            blob_homes,
+            blob_inventions,
+            blob_next_inv,
+            blob_slugs,
+        ) = board_from_wire(&body.public_board, &mut agents);
         let inf = config.influence_milli();
         for a in agents.values_mut() {
             if a.influence_factor == 0 {
@@ -459,10 +531,14 @@ impl Simulation {
             culture_count: 4,
             inventions_enabled: false,
             invention_share_delay: 8,
+            invention_tree: false,
+            invention_patent_ticks: 0,
             inventions: blob_inventions,
             next_invention_id: blob_next_inv,
             catalog_enabled: false,
             catalog: Vec::new(),
+            ckpt_catalog_slugs: blob_slugs,
+            pipeline_hash_events: false,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;
@@ -547,9 +623,9 @@ pub fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointBody, SimError> {
         )));
     }
     let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-    if version != CHECKPOINT_FORMAT_VERSION {
+    if version != CHECKPOINT_FORMAT_VERSION && version != CHECKPOINT_FORMAT_VERSION_V2 {
         return Err(SimError::Checkpoint(format!(
-            "unsupported checkpoint format_version {version} (this binary supports {CHECKPOINT_FORMAT_VERSION})"
+            "unsupported checkpoint format_version {version} (this binary supports {CHECKPOINT_FORMAT_VERSION} and {CHECKPOINT_FORMAT_VERSION_V2})"
         )));
     }
     postcard::from_bytes(&bytes[8..])
@@ -798,6 +874,9 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
                 inventor.0, *kind as u8
             )
         }
+        SimEventKind::Pipeline { stages } => {
+            format!("{{\"type\":\"pipeline\",\"stages\":{stages}}}")
+        }
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",
@@ -932,4 +1011,76 @@ pub fn write_run_checkpoint(
     }
     prune_old_checkpoints(dir, sim.config.checkpoint.keep_last_n)?;
     Ok(ckpt_path)
+}
+
+#[cfg(test)]
+mod m45_blob_tests {
+    use super::*;
+    use crate::agent::AgentId;
+    use crate::inventions::{Invention, InventionKind};
+
+    #[test]
+    fn v2_board_blob_without_slugs_keeps_inventions() {
+        #[derive(Serialize)]
+        struct BoardBlobV2 {
+            board: RichBoard,
+            goals: BTreeMap<u64, Vec<Goal>>,
+            relationships: BTreeMap<u64, BTreeMap<u64, RelationshipSummary>>,
+            memory_meta: BTreeMap<u64, Vec<MemoryMeta>>,
+            next_memory_id: BTreeMap<u64, u64>,
+            influence: BTreeMap<u64, u32>,
+            plans: BTreeMap<u64, Vec<String>>,
+            health: BTreeMap<u64, u32>,
+            incapacitated: BTreeMap<u64, bool>,
+            sheets: BTreeMap<u64, crate::sheet::AbilitySheet>,
+            kinship: BTreeMap<u64, crate::kinship::Kinship>,
+            next_agent_id: u64,
+            next_household_id: u64,
+            ages: BTreeMap<u64, u64>,
+            household_home: BTreeMap<u64, (u32, u32)>,
+            cultures: BTreeMap<u64, u8>,
+            inventions: BTreeMap<u64, Invention>,
+            next_invention_id: u64,
+        }
+        let mut inventions = BTreeMap::new();
+        inventions.insert(
+            1,
+            Invention {
+                id: 1,
+                inventor: AgentId(0),
+                tick: 3,
+                kind: InventionKind::GatherBonus,
+                shared: true,
+            },
+        );
+        let v2 = BoardBlobV2 {
+            board: RichBoard::default(),
+            goals: BTreeMap::new(),
+            relationships: BTreeMap::new(),
+            memory_meta: BTreeMap::new(),
+            next_memory_id: BTreeMap::new(),
+            influence: BTreeMap::new(),
+            plans: BTreeMap::new(),
+            health: BTreeMap::new(),
+            incapacitated: BTreeMap::new(),
+            sheets: BTreeMap::new(),
+            kinship: BTreeMap::new(),
+            next_agent_id: 2,
+            next_household_id: 1,
+            ages: BTreeMap::new(),
+            household_home: BTreeMap::new(),
+            cultures: BTreeMap::new(),
+            inventions,
+            next_invention_id: 2,
+        };
+        let bytes = postcard::to_allocvec(&v2).expect("encode v2 blob");
+        let blob = blob_from_bytes(&bytes);
+        assert_eq!(blob.next_invention_id, 2);
+        assert_eq!(blob.inventions.len(), 1);
+        assert!(blob.catalog_slugs.is_empty());
+        assert_eq!(
+            blob.inventions.get(&1).map(|i| i.kind),
+            Some(InventionKind::GatherBonus)
+        );
+    }
 }

@@ -474,7 +474,7 @@ impl Agent {
         0.5 + f64::from(self.personality.perceptiveness) / 100.0
     }
 
-    pub fn hash_bytes(&self, hasher: &mut impl sha2::Digest) {
+    pub fn hash_bytes(&self, hasher: &mut impl sha2::Digest, catalog_slugs: &[String]) {
         hasher.update(self.id.0.to_le_bytes());
         hasher.update(self.x.to_le_bytes());
         hasher.update(self.y.to_le_bytes());
@@ -503,11 +503,11 @@ impl Agent {
         hasher.update(self.illness_ticks.to_le_bytes());
         hasher.update(self.inventory_cap.to_le_bytes());
         for (item, qty) in &self.inventory {
-            hash_item_id(hasher, *item);
+            hash_item_id(hasher, *item, catalog_slugs);
             hasher.update(qty.to_le_bytes());
         }
         for (item, qty) in &self.pack {
-            hash_item_id(hasher, *item);
+            hash_item_id(hasher, *item, catalog_slugs);
             hasher.update(qty.to_le_bytes());
         }
         hasher.update(self.consumption.vegetation.to_le_bytes());
@@ -557,10 +557,14 @@ fn adj_str_cap(base: u32, delta: i32) -> u32 {
     }
 }
 
-fn hash_item_id(hasher: &mut impl sha2::Digest, item: ItemId) {
+fn hash_item_id(hasher: &mut impl sha2::Digest, item: ItemId, slugs: &[String]) {
     hasher.update(item_tag(item));
     if let ItemId::Catalog(n) = item {
-        hasher.update(n.to_le_bytes());
+        if let Some(s) = slugs.get(n as usize).filter(|s| !s.is_empty()) {
+            hasher.update(s.as_bytes());
+        } else {
+            hasher.update(n.to_le_bytes());
+        }
     }
 }
 
