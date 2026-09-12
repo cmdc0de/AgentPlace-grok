@@ -1,6 +1,6 @@
 # AgentPlace-grok
 
-Deterministic multi-agent simulation. Current slice: **M46** (`docs/M46-plan.md`). Walkthrough: [`docs/M46-test-plan.md`](docs/M46-test-plan.md).
+Deterministic multi-agent simulation. Current slice: **M47** (`docs/M47-plan.md`). Walkthrough: [`docs/M47-test-plan.md`](docs/M47-test-plan.md).
 
 Needs (when an agent is hungry/thirsty/tired): [`docs/needs-and-survival.md`](docs/needs-and-survival.md). CLI flags: [`docs/cli-reference.md`](docs/cli-reference.md). Config files: [`docs/config-reference.md`](docs/config-reference.md). Incentive TOML: [`docs/incentive-schedule-format.md`](docs/incentive-schedule-format.md). Post-GA backlog: [`docs/post-ga-feature-list.md`](docs/post-ga-feature-list.md).
 

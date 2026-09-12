@@ -166,6 +166,7 @@ pub enum UiCommand {
     ToggleInspector,
     ToggleBoard,
     ToggleLog,
+    ToggleCharts,
     Tick,
     Inject {
         path: Option<String>,
@@ -202,6 +203,12 @@ pub struct WindowFlags {
     pub status: bool,
     pub agents: bool,
     pub world: bool,
+    #[serde(default = "default_on")]
+    pub charts: bool,
+}
+
+fn default_on() -> bool {
+    true
 }
 
 impl Default for WindowFlags {
@@ -216,6 +223,7 @@ impl Default for WindowFlags {
             status: true,
             agents: true,
             world: true,
+            charts: true,
         }
     }
 }
@@ -224,7 +232,8 @@ pub fn help_text() -> &'static str {
     "\
 keys:
   Space pause/play   . step   F follow toggle   0-9 follow agent
-  L legend   H help   I inspector   B board   O fog   / console
+  arrows pan (constant height)   u raise camera   d lower camera
+  L legend   C charts   H help   I inspector   B board   O fog   / console
   Esc quit (saves window layout)
 commands:
   /help
@@ -234,7 +243,7 @@ commands:
   /follow N|off
   /pause  /play  /step [n]
   /fog on|off
-  /legend  /inspector  /board  /log
+  /legend  /inspector  /board  /log  /charts
   /tick
   /inject PATH     load incentive TOML (needs --allow-control when remote)
   /give ID ITEM QTY   pockets; hash-sensitive (in-process or remote --allow-control)
@@ -317,6 +326,7 @@ pub fn parse_command(line: &str) -> Result<UiCommand, String> {
         "inspector" => Ok(UiCommand::ToggleInspector),
         "board" => Ok(UiCommand::ToggleBoard),
         "log" => Ok(UiCommand::ToggleLog),
+        "charts" | "chart" => Ok(UiCommand::ToggleCharts),
         "tick" => Ok(UiCommand::Tick),
         "inject" => Ok(UiCommand::Inject {
             path: arg.map(|s| s.to_string()),
@@ -514,6 +524,10 @@ pub fn run_command(
             windows.log = !windows.log;
             vec![format!("log={}", windows.log)]
         }
+        UiCommand::ToggleCharts => {
+            windows.charts = !windows.charts;
+            vec![format!("charts={}", windows.charts)]
+        }
         UiCommand::Tick => {
             let hash = state.sim.state_hash().to_string();
             let short = if hash.len() >= 12 { &hash[..12] } else { &hash };
@@ -675,6 +689,16 @@ mod tests {
         assert!(text.contains("/events"));
         assert!(text.contains("/scrub"));
         assert!(text.contains("/ckpt"));
+        assert!(text.contains("/charts"));
+        assert!(text.contains("arrows pan"));
+        assert!(text.contains("d lower camera"));
+        assert!(text.contains("L legend"));
+    }
+
+    #[test]
+    fn parse_charts() {
+        assert_eq!(parse_command("/charts").unwrap(), UiCommand::ToggleCharts);
+        assert_eq!(parse_command("chart").unwrap(), UiCommand::ToggleCharts);
     }
 
     #[test]

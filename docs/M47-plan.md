@@ -1,8 +1,8 @@
 # M47 — Viewer camera pan, missing-asset sentinel, time-series charts
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M46 complete (`docs/M46-plan.md`, git tag `M46`, commit `8cf39b8`)  
-**Walkthrough:** written on implement (`docs/M47-test-plan.md`)  
+**Walkthrough:** [`docs/M47-test-plan.md`](M47-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-12 camera, PG-10 sentinel); charts parked since M6/M8 / PG-7 attach page
 
 ## Context
@@ -136,7 +136,7 @@ cargo run -p viewer -- --connect 127.0.0.1:7000 --objects configs/objects
 
 ## Verification
 
-Walkthrough written on implement: [`docs/M47-test-plan.md`](M47-test-plan.md).
+Walkthrough: [`docs/M47-test-plan.md`](M47-test-plan.md).
 
 ```bash
 cargo test -p sim-core

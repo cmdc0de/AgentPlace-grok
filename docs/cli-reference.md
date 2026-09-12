@@ -135,7 +135,16 @@ There is no viewer `--listen`, `--start-paused`, or `--pipeline-events`. Put tho
 
 `--lockstep` on the **server** is what makes the attached viewer paint every tick.
 
-On startup the viewer prints each unique authored glb to stderr (and the Log pane): path, **file bytes**, then in-game AABB meters once the mesh is ready (`loaded glb …` / `model … size=… m`). Primitives (missing file) are not logged.
+On startup the viewer prints each unique authored glb to stderr (and the Log pane): path, **file bytes**, then in-game AABB meters once the mesh is ready (`loaded glb …` / `model … size=… m`). A **configured** path that is missing logs `glb miss {id} -> sentinel` and uses a magenta cuboid. Empty / omitted `[visual]` still uses the primitive (not logged).
+
+| Key | What it does |
+|---|---|
+| Arrow keys | Pan the 3D camera on XZ at the current height (native window). First pan cancels `/follow`. |
+| `u` | Raise camera (+Y). |
+| `d` | Lower camera (−Y), clamped above terrain. **Not** `L` (legend). |
+| `L` | Toggle legend. |
+| `C` | Toggle Charts (last 256 ticks: wall_ms, living, hungry, thirsty, mean hunger). |
+| `F` / `0`–`9` | Follow / follow agent id. |
 
 ---
 
@@ -153,7 +162,7 @@ Prefix `/` is optional in the viewer parser.
 | `/step` / `/step N` | Advance N ticks (default 1) | Step |
 | `/follow ID` / `/follow off` | Camera follow | — |
 | `/fog` / `/fog on\|off` | Agent-POV fog | — |
-| `/legend` `/inspector` `/board` `/log` | Toggle imgui panes | — |
+| `/legend` `/inspector` `/board` `/log` `/charts` | Toggle imgui panes | — |
 | `/tick` | Show tick / hash | — |
 | `/summarize` | World Markdown | Summarize |
 | `/report [DIR]` | Food report | Report |

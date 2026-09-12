@@ -12,6 +12,7 @@
     th { background: #f4f4f4; }
     h2 { margin-top: 1.25rem; }
     .muted { color: #666; }
+    #charts canvas { display: block; background: #fafafa; border: 1px solid #ccc; margin: 0.2rem 0 0.6rem; }
   </style>
 </head>
 <body>
@@ -54,8 +55,64 @@
   <div id="inventions"></div>
   <h2>Metrics</h2>
   <div id="metrics"></div>
+  <h3>Session charts (last 256 ticks)</h3>
+  <div id="charts">
+    <div>wall_ms <canvas id="spark-wall" width="280" height="48"></canvas></div>
+    <div>living <canvas id="spark-living" width="280" height="48"></canvas></div>
+    <div>hungry <canvas id="spark-hungry" width="280" height="48"></canvas></div>
+    <div>thirsty <canvas id="spark-thirsty" width="280" height="48"></canvas></div>
+    <div>mean hunger <canvas id="spark-mean" width="280" height="48"></canvas></div>
+  </div>
   <script>
     const PROTOCOL_VERSION = 5;
+    const CHART_CAP = 256;
+    const chartBuf = { wall_ms: [], living: [], hungry: [], thirsty: [], mean_hunger: [] };
+    function chartPush(arr, v) {
+      arr.push(v);
+      while (arr.length > CHART_CAP) arr.shift();
+    }
+    function pushChart(ins) {
+      const m = ins.metrics || {};
+      const t = m.timing || {};
+      const agents = ins.agents || [];
+      const wall_ms = t.wall_ns != null ? t.wall_ns / 1e6 : 0;
+      let mean = 0;
+      if (agents.length) {
+        mean = agents.reduce((s, a) => s + (Number(a.hunger) || 0), 0) / agents.length;
+      }
+      chartPush(chartBuf.wall_ms, wall_ms);
+      chartPush(chartBuf.living, agents.length);
+      chartPush(chartBuf.hungry, Number(m.hungry) || 0);
+      chartPush(chartBuf.thirsty, Number(m.thirsty) || 0);
+      chartPush(chartBuf.mean_hunger, mean);
+    }
+    function sparkline(id, data) {
+      const canvas = document.getElementById(id);
+      if (!canvas || !data.length) return;
+      const w = canvas.width, h = canvas.height;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = "#ccc";
+      ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+      let min = Math.min.apply(null, data);
+      let max = Math.max.apply(null, data);
+      if (min === max) { min -= 1; max += 1; }
+      ctx.beginPath();
+      ctx.strokeStyle = "#246";
+      for (let i = 0; i < data.length; i++) {
+        const x = (i / Math.max(data.length - 1, 1)) * (w - 4) + 2;
+        const y = h - 2 - ((data[i] - min) / (max - min)) * (h - 4);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    function drawCharts() {
+      sparkline("spark-wall", chartBuf.wall_ms);
+      sparkline("spark-living", chartBuf.living);
+      sparkline("spark-hungry", chartBuf.hungry);
+      sparkline("spark-thirsty", chartBuf.thirsty);
+      sparkline("spark-mean", chartBuf.mean_hunger);
+    }
     function log(s) {
       const el = document.getElementById("log");
       el.textContent += s + "\n";
@@ -269,6 +326,8 @@
         "<tr><th>agents_ns</th><td>" + esc(t.agents_ns != null ? t.agents_ns : "") + "</td></tr>" +
         "</tbody></table>";
       document.getElementById("metrics").innerHTML = mhtml;
+      pushChart(ins);
+      drawCharts();
 
       const invs = ins.inventions || [];
       let ihtml = "<table><thead><tr><th>id</th><th>inventor</th><th>kind</th><th>shared</th><th>tick</th></tr></thead><tbody>";

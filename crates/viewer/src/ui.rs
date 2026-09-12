@@ -1,5 +1,6 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
+use crate::charts::{ChartRing, ChartSample};
 use crate::commands::{
     CkptScrubber, WindowFlags, help_text, parse_command, remote_control, run_command,
 };
@@ -71,7 +72,7 @@ pub struct UiState {
     pub decision_ring: VecDeque<(u64, Vec<sim_core::DecisionRecord>)>,
     pub event_filter_agent: String,
     pub event_filter_kind: String,
-    pub timing_ring: VecDeque<u64>,
+    pub chart_ring: ChartRing,
 }
 
 impl Default for UiState {
@@ -113,7 +114,7 @@ impl UiState {
             decision_ring: VecDeque::new(),
             event_filter_agent: String::new(),
             event_filter_kind: String::new(),
-            timing_ring: VecDeque::new(),
+            chart_ring: ChartRing::default(),
         };
         if let Ok(text) = fs::read_to_string(ui_persist_path()) {
             if let Ok(p) = serde_json::from_str::<UiPersist>(&text) {
@@ -180,6 +181,9 @@ pub fn imgui_ui(
     if ui.windows.world {
         draw_world(imgui_ui, &state, &mut ui.windows.world);
     }
+    if ui.windows.charts {
+        draw_charts(imgui_ui, &mut ui);
+    }
     if ui.windows.console {
         draw_console(imgui_ui, &mut state, &mut ui, net, &mut scrub);
     }
@@ -196,12 +200,28 @@ fn record_decisions(state: &mut SimState, ui: &mut UiState) {
                 ui.decision_ring.pop_front();
             }
         }
-        if let Some(t) = &state.sim.last_tick_timing {
-            ui.timing_ring.push_back(t.wall_ns);
-            while ui.timing_ring.len() > 64 {
-                ui.timing_ring.pop_front();
-            }
-        }
+        let view = sim_core::InspectorView::from_sim(&state.sim);
+        let n = state.sim.agents.len().max(1) as f32;
+        let mean_hunger = state
+            .sim
+            .agents
+            .values()
+            .map(|a| a.needs.hunger as f32 / 100.0)
+            .sum::<f32>()
+            / n;
+        let wall_ns = state
+            .sim
+            .last_tick_timing
+            .as_ref()
+            .map(|t| t.wall_ns)
+            .unwrap_or(0);
+        ui.chart_ring.push(ChartSample::from_parts(
+            wall_ns,
+            state.sim.agents.len() as u32,
+            view.metrics.hungry,
+            view.metrics.thirsty,
+            mean_hunger,
+        ));
     }
 }
 
@@ -254,14 +274,16 @@ fn draw_status(
             ));
             if let Some(t) = &state.sim.last_tick_timing {
                 let last_ms = t.wall_ns as f64 / 1_000_000.0;
-                let (mean_ms, max_ms) = if us.timing_ring.is_empty() {
-                    (last_ms, last_ms)
-                } else {
-                    let n = us.timing_ring.len() as f64;
-                    let sum: u64 = us.timing_ring.iter().copied().sum();
-                    let max = us.timing_ring.iter().copied().max().unwrap_or(t.wall_ns);
-                    (sum as f64 / n / 1_000_000.0, max as f64 / 1_000_000.0)
-                };
+                let mean_ms = us
+                    .chart_ring
+                    .wall_ms_mean()
+                    .map(|v| v as f64)
+                    .unwrap_or(last_ms);
+                let max_ms = us
+                    .chart_ring
+                    .wall_ms_max()
+                    .map(|v| v as f64)
+                    .unwrap_or(last_ms);
                 ui.text(format!(
                     "tick {last_ms:.2} ms  mean {mean_ms:.2}  max {max_ms:.2}"
                 ));
@@ -805,6 +827,39 @@ fn draw_world(ui: &Ui, state: &SimState, open: &mut bool) {
                 ));
             }
         });
+}
+
+fn plot_series(ui: &Ui, label: &str, values: &[f32]) {
+    if values.is_empty() {
+        ui.text(format!("{label}: (no samples yet)"));
+        return;
+    }
+    ui.plot_lines(label, values)
+        .graph_size([280.0, 56.0])
+        .build();
+}
+
+fn draw_charts(ui: &Ui, us: &mut UiState) {
+    let mut open = us.windows.charts;
+    let wall = us.chart_ring.col_wall_ms();
+    let living = us.chart_ring.col_living();
+    let hungry = us.chart_ring.col_hungry();
+    let thirsty = us.chart_ring.col_thirsty();
+    let mean = us.chart_ring.col_mean_hunger();
+    let n = us.chart_ring.len();
+    ui.window("Charts")
+        .opened(&mut open)
+        .size([320.0, 420.0], Condition::FirstUseEver)
+        .position([640.0, 12.0], Condition::FirstUseEver)
+        .build(|| {
+            ui.text(format!("last {n} ticks (cap 256)"));
+            plot_series(ui, "wall_ms", &wall);
+            plot_series(ui, "living", &living);
+            plot_series(ui, "hungry", &hungry);
+            plot_series(ui, "thirsty", &thirsty);
+            plot_series(ui, "mean hunger", &mean);
+        });
+    us.windows.charts = open;
 }
 
 fn draw_console(

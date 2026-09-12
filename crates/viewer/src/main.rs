@@ -1,3 +1,5 @@
+mod camera;
+mod charts;
 mod commands;
 mod models;
 mod net;
@@ -66,6 +68,8 @@ const BACKPACK_OFFSET: Vec3 = Vec3::new(-0.18, 0.22, -0.12);
 #[derive(Resource, Default, Clone)]
 struct ObjectVisuals {
     defs: Vec<sim_core::ObjectDef>,
+    sentinel_mesh: Option<Handle<Mesh>>,
+    sentinel_mat: Option<Handle<StandardMaterial>>,
 }
 
 #[derive(Component, Clone)]
@@ -90,9 +94,7 @@ fn apply_viewer_objects(
     let (dir, defs) = models::load_viewer_objects(objects);
     match &dir {
         None => {
-            eprintln!(
-                "objects: no configs/objects dir (cwd or --objects); using primitives"
-            );
+            eprintln!("objects: no configs/objects dir (cwd or --objects); using primitives");
         }
         Some(d) if defs.is_empty() => {
             eprintln!(
@@ -102,14 +104,7 @@ fn apply_viewer_objects(
         }
         Some(d) => {
             eprintln!("objects: {} defs from {}", defs.len(), d.display());
-            for id in [
-                "berry_bush",
-                "tree",
-                "hare",
-                "crate",
-                "basket",
-                "agent",
-            ] {
+            for id in ["berry_bush", "tree", "hare", "crate", "basket", "agent"] {
                 match models::resolve_visual(&defs, id, 0) {
                     Some(p) => eprintln!("  glb {id} -> {}", p.display()),
                     None => eprintln!("  glb {id} -> (primitive)"),
@@ -247,7 +242,10 @@ fn main() {
     .init_resource::<UiState>()
     .init_resource::<ui::ClickThroughGuard>()
     .init_resource::<ReportedModels>()
-    .insert_resource(ObjectVisuals { defs: object_defs })
+    .insert_resource(ObjectVisuals {
+        defs: object_defs,
+        ..Default::default()
+    })
     .insert_resource(scrub);
     if let Some(link) = net_link {
         app.insert_resource(link);
@@ -376,8 +374,14 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Res<AssetServer>,
     state: Res<SimState>,
-    visuals: Res<ObjectVisuals>,
+    mut visuals: ResMut<ObjectVisuals>,
 ) {
+    visuals.sentinel_mesh = Some(meshes.add(Cuboid::new(0.4, 0.4, 0.4)));
+    visuals.sentinel_mat = Some(materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 0.0, 1.0),
+        perceptual_roughness: 0.4,
+        ..default()
+    }));
     let world = &state.sim.world;
     eprintln!(
         "setup_scene: {}×{} veg={} animals={} fish={} agents={} object_defs={}",
@@ -792,6 +796,18 @@ fn sync_satchel_markers(
     }
 }
 
+fn log_sentinel_once(id: &str) {
+    use std::sync::{Mutex, OnceLock};
+    static SEEN: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+    let mut seen = SEEN
+        .get_or_init(|| Mutex::new(std::collections::HashSet::new()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if seen.insert(id.to_string()) {
+        eprintln!("glb miss {id} -> sentinel");
+    }
+}
+
 fn try_spawn_model(
     commands: &mut Commands,
     assets: &AssetServer,
@@ -801,34 +817,44 @@ fn try_spawn_model(
     transform: Transform,
     extra: impl Bundle,
 ) -> bool {
-    let Some(path) = models::resolve_visual(&visuals.defs, stem, dist_cells) else {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        static MISS: AtomicBool = AtomicBool::new(false);
-        if !MISS.swap(true, Ordering::Relaxed) {
-            eprintln!(
-                "glb miss: stem={stem} defs={} (further misses omitted)",
-                visuals.defs.len()
-            );
+    match models::resolve_visual_kind(&visuals.defs, stem, dist_cells) {
+        models::VisualKind::Authored(path) => {
+            let file_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let handle = assets
+                .load_builder()
+                .override_unapproved()
+                .load(GltfAssetLabel::Scene(0).from_asset(path.clone()));
+            commands.spawn((
+                WorldAssetRoot(handle),
+                transform,
+                extra,
+                ModelLabel {
+                    id: stem.to_string(),
+                    path,
+                    file_bytes,
+                },
+                Visibility::default(),
+            ));
+            true
         }
-        return false;
-    };
-    let file_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-    let handle = assets
-        .load_builder()
-        .override_unapproved()
-        .load(GltfAssetLabel::Scene(0).from_asset(path.clone()));
-    commands.spawn((
-        WorldAssetRoot(handle),
-        transform,
-        extra,
-        ModelLabel {
-            id: stem.to_string(),
-            path,
-            file_bytes,
-        },
-        Visibility::default(),
-    ));
-    true
+        models::VisualKind::Sentinel => {
+            let (Some(mesh), Some(mat)) =
+                (visuals.sentinel_mesh.clone(), visuals.sentinel_mat.clone())
+            else {
+                return false;
+            };
+            log_sentinel_once(stem);
+            commands.spawn((
+                Mesh3d(mesh),
+                MeshMaterial3d(mat),
+                transform,
+                extra,
+                Visibility::default(),
+            ));
+            true
+        }
+        models::VisualKind::Primitive => false,
+    }
 }
 
 fn format_file_bytes(n: u64) -> String {
@@ -997,14 +1023,25 @@ fn mesh_for_shape(shape: MarkerShape) -> Mesh {
     }
 }
 
+fn xz_ground(v: Vec3) -> [f32; 2] {
+    let len = (v.x * v.x + v.z * v.z).sqrt();
+    if len < 1e-5 {
+        [0.0, 1.0]
+    } else {
+        [v.x / len, v.z / len]
+    }
+}
+
 fn handle_input(
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     mouse: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut guard: ResMut<ui::ClickThroughGuard>,
     mut state: ResMut<SimState>,
     mut ui: ResMut<UiState>,
     mut scrub: ResMut<CkptScrubber>,
+    mut cameras: Query<&mut Transform, With<FollowCamera>>,
     net: Option<Res<net::NetLink>>,
     mut exit: MessageWriter<AppExit>,
 ) {
@@ -1065,6 +1102,9 @@ fn handle_input(
     if keys.just_pressed(KeyCode::KeyL) {
         ui.windows.legend = !ui.windows.legend;
     }
+    if keys.just_pressed(KeyCode::KeyC) {
+        ui.windows.charts = !ui.windows.charts;
+    }
     if keys.just_pressed(KeyCode::KeyH) {
         ui.windows.help = !ui.windows.help;
     }
@@ -1112,6 +1152,56 @@ fn handle_input(
         if keys.just_pressed(digit) {
             state.follow = Some(AgentId(id));
         }
+    }
+
+    let dt = time.delta_secs();
+    let left = camera::pan_step(
+        keys.just_pressed(KeyCode::ArrowLeft),
+        keys.pressed(KeyCode::ArrowLeft),
+        dt,
+    );
+    let right = camera::pan_step(
+        keys.just_pressed(KeyCode::ArrowRight),
+        keys.pressed(KeyCode::ArrowRight),
+        dt,
+    );
+    let forward = camera::pan_step(
+        keys.just_pressed(KeyCode::ArrowUp),
+        keys.pressed(KeyCode::ArrowUp),
+        dt,
+    );
+    let back = camera::pan_step(
+        keys.just_pressed(KeyCode::ArrowDown),
+        keys.pressed(KeyCode::ArrowDown),
+        dt,
+    );
+    let up = camera::pan_step(
+        keys.just_pressed(KeyCode::KeyU),
+        keys.pressed(KeyCode::KeyU),
+        dt,
+    );
+    let down = camera::pan_step(
+        keys.just_pressed(KeyCode::KeyD),
+        keys.pressed(KeyCode::KeyD),
+        dt,
+    );
+    if left == 0.0 && right == 0.0 && forward == 0.0 && back == 0.0 && up == 0.0 && down == 0.0 {
+        return;
+    }
+    state.follow = camera::follow_after_pan(state.follow, true);
+    for mut transform in &mut cameras {
+        let fwd = xz_ground(*transform.forward());
+        let rgt = xz_ground(*transform.right());
+        let [dx, dz] = camera::pan_xz(fwd, rgt, left, right, forward, back);
+        let w = &state.sim.world;
+        let max_x = w.width.saturating_sub(1) as f32;
+        let max_z = w.height.saturating_sub(1) as f32;
+        let cx = transform.translation.x.floor().clamp(0.0, max_x) as u32;
+        let cz = transform.translation.z.floor().clamp(0.0, max_z) as u32;
+        let min_y = w.height_at(cx, cz) as f32 + camera::HEIGHT_CLEARANCE;
+        transform.translation.x += dx;
+        transform.translation.z += dz;
+        transform.translation.y = camera::height_step(up, down, transform.translation.y, min_y);
     }
 }
 

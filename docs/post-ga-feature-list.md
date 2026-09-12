@@ -21,9 +21,9 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-7 | Browser researcher UI | Done (M36) | Attach page lists every agent, board posts, and metrics — no 3D required. |
 | PG-8 | Object / item definition files | Open | One config file per sim object: visuals (glb + LOD) and sim fields so new items/crafts are a file, not a Rust enum. |
 | PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. |
-| PG-10 | Missing-asset sentinel | Open | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
+| PG-10 | Missing-asset sentinel | Done (M47) | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
-| PG-12 | Viewer camera pan (keys) | Open | Arrow keys pan at constant height; `u` up, `l` down. Hash-neutral. Native window only. |
+| PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 

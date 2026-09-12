@@ -1,6 +1,23 @@
-//! Hash-neutral authored glTF/glb paths. Missing file ⇒ primitive mesh.
+//! Hash-neutral authored glTF/glb paths.
+//! Configured path missing ⇒ sentinel; no/empty visual ⇒ primitive.
 
 use std::path::{Path, PathBuf};
+
+/// How to draw an object id in the native viewer. Visuals are never hashed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisualKind {
+    Authored(PathBuf),
+    Primitive,
+    Sentinel,
+}
+
+fn visual_configured(visual: &sim_core::VisualDef) -> bool {
+    let nonempty = |s: &Option<String>| s.as_deref().is_some_and(|x| !x.is_empty());
+    nonempty(&visual.glb)
+        || nonempty(&visual.lod.near)
+        || nonempty(&visual.lod.mid)
+        || nonempty(&visual.lod.far)
+}
 
 /// Stem fallback is **only** `agent` (M40). Other ids come from object TOML.
 pub const STEMS: &[&str] = &["agent"];
@@ -98,19 +115,35 @@ pub fn load_viewer_objects(explicit: Option<&Path>) -> (Option<PathBuf>, Vec<sim
     }
 }
 
-/// Definition `id` visual/LOD if the file exists, else agent stem, else primitive.
+/// Authored path if the file exists; `None` for primitive **or** sentinel.
 pub fn resolve_visual(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u32) -> Option<PathBuf> {
+    match resolve_visual_kind(defs, id, dist_cells) {
+        VisualKind::Authored(p) => Some(p),
+        VisualKind::Primitive | VisualKind::Sentinel => None,
+    }
+}
+
+/// Configured missing glb ⇒ [`VisualKind::Sentinel`]; empty/`None` visual ⇒ Primitive.
+pub fn resolve_visual_kind(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u32) -> VisualKind {
     if let Some(visual) = sim_core::visual_for_id(defs, id) {
-        for raw in sim_core::objects::visual_path_candidates(visual, dist_cells) {
-            if let Some(p) = existing_file(Path::new(raw)) {
-                return Some(p);
+        if visual_configured(visual) {
+            for raw in sim_core::objects::visual_path_candidates(visual, dist_cells) {
+                if raw.is_empty() {
+                    continue;
+                }
+                if let Some(p) = existing_file(Path::new(raw)) {
+                    return VisualKind::Authored(p);
+                }
             }
+            return VisualKind::Sentinel;
         }
     }
     if id == "agent" {
-        return resolve_model(id).and_then(|p| existing_file(&p).or(Some(p)));
+        if let Some(p) = resolve_model(id).and_then(|p| existing_file(&p).or(Some(p))) {
+            return VisualKind::Authored(p);
+        }
     }
-    None
+    VisualKind::Primitive
 }
 
 /// Chebyshev cell distance from the default setup camera xz to `(x, y)`.
@@ -341,6 +374,115 @@ count = 2
         assert_eq!(
             resolve_visual(&[bush_def], "berry_bush", 0).as_deref(),
             Some(bush.as_path())
+        );
+    }
+
+    #[test]
+    fn empty_visual_is_primitive() {
+        assert_eq!(
+            resolve_visual_kind(&[], "berry_bush", 0),
+            VisualKind::Primitive
+        );
+        let empty = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some(String::new()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[empty], "berry_bush", 0),
+            VisualKind::Primitive,
+            "empty path stays primitive"
+        );
+        let omitted = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: None,
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[omitted], "berry_bush", 0),
+            VisualKind::Primitive
+        );
+    }
+
+    #[test]
+    fn configured_missing_path_is_sentinel() {
+        let def = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some("/nope/agentplace-missing-glb.glb".into()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "berry_bush", 0),
+            VisualKind::Sentinel
+        );
+        assert!(
+            resolve_visual(
+                &[sim_core::ObjectDef {
+                    id: "berry_bush".into(),
+                    kind: "vegetation".into(),
+                    visual: Some(sim_core::VisualDef {
+                        glb: Some("/nope/agentplace-missing-glb.glb".into()),
+                        lod: Default::default(),
+                    }),
+                    sim: None,
+                }],
+                "berry_bush",
+                0
+            )
+            .is_none(),
+            "sentinel is not an authored path"
+        );
+    }
+
+    #[test]
+    fn authored_exists_is_authored() {
+        let dir = std::env::temp_dir().join("agentplace-m47-authored");
+        let _ = fs::create_dir_all(&dir);
+        let glb = dir.join("ok.glb");
+        fs::write(&glb, b"not-a-real-glb").unwrap();
+        let def = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some(glb.to_string_lossy().into_owned()),
+                lod: Default::default(),
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "berry_bush", 0),
+            VisualKind::Authored(glb)
+        );
+    }
+
+    #[test]
+    fn lod_exhausted_is_sentinel() {
+        let def = sim_core::ObjectDef {
+            id: "berry_bush".into(),
+            kind: "vegetation".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some("/nope/missing-glb.glb".into()),
+                lod: sim_core::objects::LodDef {
+                    near: Some("/nope/missing-near.glb".into()),
+                    mid: Some("/nope/missing-mid.glb".into()),
+                    far: Some("/nope/missing-far.glb".into()),
+                },
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "berry_bush", 0),
+            VisualKind::Sentinel,
+            "LOD miss then missing ⇒ sentinel if any path was set"
         );
     }
 

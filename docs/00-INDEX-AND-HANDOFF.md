@@ -62,7 +62,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M44** | Done (tag `M44`) | [`M44-plan.md`](M44-plan.md), walkthrough [`M44-test-plan.md`](M44-test-plan.md) | WIS board range, CHA support/pair-bond, STR pocket weight |
 | **M45** | Done (tag `M45`) | [`M45-plan.md`](M45-plan.md), walkthrough [`M45-test-plan.md`](M45-test-plan.md) | Tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
 | **M46** | Done (tag `M46`) | [`M46-plan.md`](M46-plan.md), walkthrough [`M46-test-plan.md`](M46-test-plan.md) | CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
-| **M47** | Planned — next | [`M47-plan.md`](M47-plan.md) | Viewer camera pan, missing-asset sentinel, time-series charts |
+| **M47** | Done (tag `M47`) | [`M47-plan.md`](M47-plan.md), walkthrough [`M47-test-plan.md`](M47-test-plan.md) | Viewer camera pan, missing-asset sentinel, time-series charts |
 | After M47 | Not started | listed at the bottom of `M47-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -169,7 +169,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 50d | `config-reference.md` | Researcher config directory (`default.toml`, incentives, objects) |
 | 51 | `M46-plan.md` | Milestone 46 (done, tag `M46`): CON/INT/STR leftovers, extra recipes, OpenTelemetry |
 | 51b | `M46-test-plan.md` | M46 walkthrough (illness chance, plan length, gather qty, recipes, telemetry) |
-| 52 | `M47-plan.md` | Milestone 47 (planned): viewer camera pan, missing-asset sentinel, time-series charts |
+| 52 | `M47-plan.md` | Milestone 47 (done, tag `M47`): viewer camera pan, missing-asset sentinel, time-series charts |
+| 52b | `M47-test-plan.md` | M47 walkthrough (camera pan, missing-asset sentinel, time-series charts) |
 
 ---
 
@@ -178,7 +179,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M47-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M47 is planned (`M47-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M47 is implemented (`M47-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, agent meshes, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -206,11 +207,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M46 are done. M47 is planned ([`M47-plan.md`](M47-plan.md)); later work is at the bottom of that file.
+M1–M47 are done. M47 is implemented ([`M47-plan.md`](M47-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M47-plan.md.
-M47 is planned (viewer camera pan, missing-asset sentinel, time-series charts;
+M47 is implemented (viewer camera pan, missing-asset sentinel, time-series charts;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, agent meshes, or Bevy in the browser.
