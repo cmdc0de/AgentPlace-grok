@@ -1,6 +1,6 @@
 # M30 test plan — see each new feature
 
-Walkthrough for [`M30-plan.md`](M30-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (combat particles / meshes). Next slice: [`M47-plan.md`](M47-plan.md).
+Walkthrough for [`M30-plan.md`](M30-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (combat particles / meshes). Next slice: [`M48-plan.md`](M48-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

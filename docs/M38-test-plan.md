@@ -1,6 +1,6 @@
 # M38 test plan — see each new feature
 
-Walkthrough for [`M38-plan.md`](M38-plan.md). Automated tests prove the slice; the `sim-cli` / viewer / browser steps below are what you **read** (authored models with primitive fallback, page `/inject` `/scrub`, Ubuntu wasm32). Next slice: [`M47-plan.md`](M47-plan.md).
+Walkthrough for [`M38-plan.md`](M38-plan.md). Automated tests prove the slice; the `sim-cli` / viewer / browser steps below are what you **read** (authored models with primitive fallback, page `/inject` `/scrub`, Ubuntu wasm32). Next slice: [`M48-plan.md`](M48-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network (except optional `rustup target add wasm32-unknown-unknown` once).
 

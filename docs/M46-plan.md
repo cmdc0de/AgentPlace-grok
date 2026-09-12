@@ -81,8 +81,9 @@ Overlay **off**: no exporter, no extra required threads, **same hashes**. `--loa
 
 | Later | What |
 |---|---|
-| **M47** | [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
-| After M47 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; wasm32 on Win/mac; LLM invention text; Food/Wood as strings |
+| **M47** | Done — [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
+| **M48** | [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
+| After M48 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; LLM invention text; Food/Wood as strings |
 | Not M46 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; hashing wall-clock ns; recipe durability / workstations |
 
 ## Key decisions

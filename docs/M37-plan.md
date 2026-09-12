@@ -67,8 +67,9 @@ Existing `ControlVerb::Give` / `ControlVerb::Set`. **No PROTOCOL bump.** Postcar
 | **M44** | Done — [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
 | **M45** | Done — [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
 | **M46** | Done — [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
-| **M47** | [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
-| After M47 | protobuf/TLS/`wss`; Unix sockets |
+| **M47** | Done — [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
+| **M48** | [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
+| After M48 | protobuf/TLS/`wss`; Unix sockets |
 | Not M37 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions
