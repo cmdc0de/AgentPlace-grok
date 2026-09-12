@@ -94,7 +94,8 @@ Docs only (no hash / protocol change):
 
 | Later | What |
 |---|---|
-| After M45 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; CON illness **chance**; INT plan length; STR gather/hunt payoff; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings; **PG-9** more crafting recipes; **PG-10** missing-asset sentinel mesh; **PG-11** OpenTelemetry / CPU / disk / memory / frame times |
+| **M46** | [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
+| After M46 | protobuf/TLS/`wss`; Unix sockets; agent meshes; skeletal animation; hot-reload glb; time-series charts; wasm32 on Win/mac; LLM invention text; Food/Wood as strings; **PG-10** missing-asset sentinel |
 | Not M45 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; hashing wall-clock ns |
 
 ## Key decisions

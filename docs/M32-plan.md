@@ -83,8 +83,9 @@ CLI: `--aging` (does **not** imply `--sheet` / `--reproduction`).
 | **M42** | Done — [`M42-plan.md`](M42-plan.md) — CON illness/energy, INT memory, browser /ckpt /events |
 | **M43** | Done — [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
 | **M44** | Done — [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
-| **M45** | [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
-| After M45 | protobuf/TLS; Unix sockets; hashed pipeline events |
+| **M45** | Done — [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
+| **M46** | [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
+| After M46 | protobuf/TLS; Unix sockets |
 | Not M32 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions
