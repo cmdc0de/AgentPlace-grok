@@ -128,8 +128,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M43** | Done — [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
 | **M44** | Done — [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
 | **M45** | Done — [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
-| **M46** | [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
-| After M46 | Protobuf/TLS |
+| **M46** | Done — [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
+| **M47** | [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
+| After M47 | Protobuf/TLS |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

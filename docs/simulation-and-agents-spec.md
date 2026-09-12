@@ -1,6 +1,6 @@
 # Simulation Parameters & Agent Model Specification
 
-> **Current slice:** [`M46-plan.md`](M46-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+> **Current slice:** [`M47-plan.md`](M47-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
 
 **Purpose**: Define the configurable surface of the simulation and the internal structure of agents so that experiments (baseline governance emergence vs. incentive interventions) are fully controllable, reproducible, and inspectable.
 

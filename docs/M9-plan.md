@@ -123,8 +123,9 @@ Hash-sensitive tweak so `death_enabled = true` default runs are not “zero Drin
 | **M43** | Done — [`M43-plan.md`](M43-plan.md) — WIS toxin detect, CHA speech, DEX flee |
 | **M44** | Done — [`M44-plan.md`](M44-plan.md) — WIS board range, CHA support/pair-bond, STR pocket weight |
 | **M45** | Done — [`M45-plan.md`](M45-plan.md) — tech tree/patents, hashed pipeline events, string ItemId ckpt bump |
-| **M46** | [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
-| After M46 | Protobuf / JSON envelope; TLS/`wss` |
+| **M46** | Done — [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
+| **M47** | [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
+| After M47 | Protobuf / JSON envelope; TLS/`wss` |
 | Not M9 | Browser client; physical combat; CI Win/mac matrix; extra LLM reflection calls |
 
 ## Key decisions
