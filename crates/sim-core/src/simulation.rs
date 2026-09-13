@@ -147,6 +147,10 @@ pub struct Simulation {
     pub telemetry_ticks: crate::timing::DurationStats,
     pub telemetry_rss_last: Option<u64>,
     pub telemetry_rss_peak: Option<u64>,
+    /// Overlay `[time] enabled`. Default **on**. Hashed when true.
+    pub time_enabled: bool,
+    /// Overlay `[time] ticks_per_day`. Default 240. Hashed when time is on.
+    pub ticks_per_day: u64,
 }
 
 impl Simulation {
@@ -246,6 +250,8 @@ impl Simulation {
             telemetry_ticks: crate::timing::DurationStats::default(),
             telemetry_rss_last: None,
             telemetry_rss_peak: None,
+            time_enabled: true,
+            ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         })
     }
 
@@ -956,6 +962,7 @@ impl Simulation {
         }
         let wall0 = Instant::now();
         self.tick += 1;
+        self.apply_dawn_if_due();
         self.share_due_inventions();
         self.last_tick_decisions.clear();
         let aging = self.aging_enabled;
@@ -1071,6 +1078,23 @@ impl Simulation {
             if !self.tick() {
                 break;
             }
+        }
+    }
+
+    fn apply_dawn_if_due(&mut self) {
+        if !self.time_enabled {
+            return;
+        }
+        if !crate::clock::is_dawn(self.tick, self.ticks_per_day) {
+            return;
+        }
+        let base = self.config.energy_max_milli();
+        for a in self.agents.values_mut() {
+            if a.health == 0 {
+                continue;
+            }
+            let max = a.sheet.energy_max(base);
+            a.needs.energy = crate::clock::dawn_refill(a.needs.energy, max);
         }
     }
 
@@ -1561,6 +1585,10 @@ impl Simulation {
         crate::inventions::hash_table(&self.inventions, &mut hasher);
         if self.catalog_enabled {
             crate::objects::hash_catalog(&self.catalog, &mut hasher);
+        }
+        if self.time_enabled {
+            hasher.update([1u8]);
+            hasher.update(self.ticks_per_day.to_le_bytes());
         }
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());

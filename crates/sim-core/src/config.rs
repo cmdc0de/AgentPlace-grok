@@ -5,6 +5,7 @@ use std::fmt;
 use std::path::Path;
 
 pub const MIN_MAP_SIZE: u32 = 32;
+pub const MAX_MAP_SIZE: u32 = 256;
 pub const MIN_MAX_HEIGHT: u32 = 8;
 pub const MIN_AGENT_COUNT: u32 = 2;
 pub const MIN_MEMORY_CAPACITY: u32 = 8;

@@ -11,10 +11,16 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
-/// (includes M51 tent/millstone/stew/ladder and weapon attack_bonus).
-const IDLE_2: &str = "0406960048c1ada1c4910f7bd81bba89ed61a75ec85c2f43abc0d5491dfdff44";
-const IDLE_2_NO_CATALOG: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
+/// `--no-time` shipped-objects 2-tick (M51 identity).
+const IDLE_2_NO_TIME: &str = "0406960048c1ada1c4910f7bd81bba89ed61a75ec85c2f43abc0d5491dfdff44";
+/// `--no-time` no-catalog 2-tick (M51 identity).
+const IDLE_2_NO_CATALOG_NO_TIME: &str =
+    "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
+/// Default (time on) shipped-objects 2-tick.
+const IDLE_2: &str = "fed653be7d5f4b778994fa48df38c34f81bb049461f2a1553f95ec92015382a1";
+/// Default (time on) no-catalog 2-tick.
+const IDLE_2_NO_CATALOG: &str =
+    "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
 
 fn shipped_objects() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
@@ -106,12 +112,34 @@ fn default_mock_two_ticks_idle_hash() {
     let cfg = ExperimentConfig::load_path(&path).unwrap();
     let mut sim = Simulation::new(cfg).unwrap();
     apply_shipped(&mut sim);
+    assert!(sim.time_enabled);
     sim.run_ticks(2);
     assert_eq!(sim.state_hash().to_string(), IDLE_2);
 }
 
 #[test]
+fn no_time_shipped_objects_idle_hash() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/default.toml");
+    let cfg = ExperimentConfig::load_path(&path).unwrap();
+    let mut sim = Simulation::new(cfg).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.run_ticks(2);
+    assert_eq!(sim.state_hash().to_string(), IDLE_2_NO_TIME);
+}
+
+#[test]
 fn catalog_off_two_ticks_hash_ignores_new_recipes() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/default.toml");
+    let cfg = ExperimentConfig::load_path(&path).unwrap();
+    let mut off = Simulation::new(cfg).unwrap();
+    off.time_enabled = false;
+    off.run_ticks(2);
+    assert_eq!(off.state_hash().to_string(), IDLE_2_NO_CATALOG_NO_TIME);
+}
+
+#[test]
+fn catalog_off_time_on_two_ticks_idle_hash() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/default.toml");
     let cfg = ExperimentConfig::load_path(&path).unwrap();
     let mut off = Simulation::new(cfg).unwrap();

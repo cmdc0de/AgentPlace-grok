@@ -138,6 +138,7 @@ impl Hub {
                 let _ = write_run_checkpoint(&self.sim, dir);
             }
         }
+        crate::otlp::post_tick_metrics(&self.sim);
         self.broadcast_tick();
         self.refresh_attach();
         true

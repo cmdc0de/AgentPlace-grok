@@ -2,6 +2,7 @@ mod camera;
 mod charts;
 mod commands;
 mod fps;
+mod light;
 mod models;
 mod net;
 mod render;
@@ -137,6 +138,14 @@ fn main() {
             let mut config = ExperimentConfig::from_toml_str(&text).unwrap_or_else(|e| {
                 panic!("failed to load {}: {e}", path.display());
             });
+            if let Some(w) = parsed.width {
+                assert_size("width", w);
+                config.world.width = w;
+            }
+            if let Some(h) = parsed.height {
+                assert_size("height", h);
+                config.world.height = h;
+            }
             let dir = parsed
                 .objects
                 .clone()
@@ -194,6 +203,7 @@ fn main() {
             let tel = sim_core::TelemetryParams::from_config_toml(&text);
             sim.telemetry_enabled = tel.enabled;
             sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
+            apply_viewer_time(&mut sim, &text, parsed.time_on, parsed.no_time);
             let defs = apply_viewer_objects(
                 &mut sim,
                 parsed.objects.as_deref(),
@@ -211,6 +221,7 @@ fn main() {
             });
             let defs =
                 apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
+            apply_viewer_time(&mut sim, "", parsed.time_on, parsed.no_time);
             scrub = CkptScrubber::discover(&path);
             (SimPlugin::from_simulation(sim), defs)
         }
@@ -220,6 +231,7 @@ fn main() {
             });
             let defs =
                 apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
+            apply_viewer_time(&mut sim, "", parsed.time_on, parsed.no_time);
             net_link = Some(link);
             (SimPlugin::from_remote(sim), defs)
         }
@@ -270,6 +282,7 @@ fn main() {
                 sync_stockpile_markers,
                 sync_satchel_markers,
                 reload_changed_glbs,
+                update_day_night_light,
                 report_model_sizes,
                 fit_agent_meshes,
                 sync_agent_transforms,
@@ -294,7 +307,14 @@ struct ViewerArgs {
     source: ViewerSource,
     objects: Option<PathBuf>,
     catalog: bool,
+    time_on: bool,
+    no_time: bool,
+    width: Option<u32>,
+    height: Option<u32>,
 }
+
+#[derive(Component)]
+struct DayNightLight;
 
 fn parse_args() -> ViewerArgs {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -305,6 +325,10 @@ fn parse_args() -> ViewerArgs {
     let mut token = None;
     let mut objects = None;
     let mut catalog = false;
+    let mut time_on = false;
+    let mut no_time = false;
+    let mut width = None;
+    let mut height = None;
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
@@ -347,6 +371,30 @@ fn parse_args() -> ViewerArgs {
                 i += 1;
                 continue;
             }
+            "--time" => {
+                time_on = true;
+                i += 1;
+                continue;
+            }
+            "--no-time" => {
+                no_time = true;
+                i += 1;
+                continue;
+            }
+            "--width" => {
+                if let Some(v) = args.get(i + 1) {
+                    width = v.parse().ok();
+                    i += 2;
+                    continue;
+                }
+            }
+            "--height" => {
+                if let Some(v) = args.get(i + 1) {
+                    height = v.parse().ok();
+                    i += 2;
+                    continue;
+                }
+            }
             _ => {}
         }
         i += 1;
@@ -362,6 +410,10 @@ fn parse_args() -> ViewerArgs {
         source,
         objects,
         catalog,
+        time_on,
+        no_time,
+        width,
+        height,
     }
 }
 
@@ -601,7 +653,45 @@ fn setup_scene(
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::ZYX, 0.0, 0.7, -0.9)),
+        DayNightLight,
     ));
+}
+
+fn apply_viewer_time(sim: &mut Simulation, text: &str, time_on: bool, no_time: bool) {
+    let tp = sim_core::TimeParams::from_config_toml(text);
+    sim.time_enabled = if no_time {
+        false
+    } else if time_on {
+        true
+    } else {
+        tp.enabled
+    };
+    sim.ticks_per_day = tp.ticks_per_day;
+}
+
+fn assert_size(label: &str, n: u32) {
+    if n < sim_core::MIN_MAP_SIZE || n > sim_core::MAX_MAP_SIZE {
+        panic!(
+            "--{label} must be {}..={}",
+            sim_core::MIN_MAP_SIZE,
+            sim_core::MAX_MAP_SIZE
+        );
+    }
+}
+
+fn update_day_night_light(
+    state: Res<SimState>,
+    mut q: Query<&mut DirectionalLight, With<DayNightLight>>,
+) {
+    let Some(mut light) = q.iter_mut().next() else {
+        return;
+    };
+    if !state.sim.time_enabled {
+        light.illuminance = 12_000.0;
+        return;
+    }
+    let (_, tod) = sim_core::day_tod(state.sim.tick, state.sim.ticks_per_day);
+    light.illuminance = 12_000.0 * sim_core::light_for_tod(tod, state.sim.ticks_per_day);
 }
 
 fn spawn_stockpile(

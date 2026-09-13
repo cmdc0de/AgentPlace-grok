@@ -1,13 +1,15 @@
 mod client;
 mod network;
+mod otlp;
 mod overlay;
 mod server;
 mod sqlite;
 
 use sim_core::{
-    ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
-    compare_csv, compare_markdown, compare_runs, experiment_id, load_compare_pair, report_markdown,
-    summary_markdown, write_report, write_run_checkpoint,
+    ExperimentConfig, MAX_MAP_SIZE, MIN_MAP_SIZE, Simulation, append_decisions_jsonl,
+    append_events_jsonl, append_timing_jsonl, compare_csv, compare_markdown, compare_runs,
+    experiment_id, load_compare_pair, report_markdown, summary_markdown, write_report,
+    write_run_checkpoint,
 };
 use std::env;
 use std::path::{Path, PathBuf};
@@ -63,6 +65,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut pipeline_events = false;
     let mut catalog = false;
     let mut telemetry = false;
+    let mut time_on = false;
+    let mut no_time = false;
+    let mut width: Option<u32> = None;
+    let mut height: Option<u32> = None;
+    let mut otlp_endpoint: Option<String> = None;
     let mut objects_path: Option<PathBuf> = None;
     let mut sqlite_path: Option<PathBuf> = None;
     let mut sqlite_http: Option<String> = None;
@@ -181,6 +188,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--pipeline-events" => pipeline_events = true,
             "--catalog" => catalog = true,
             "--telemetry" => telemetry = true,
+            "--time" => time_on = true,
+            "--no-time" => no_time = true,
+            "--width" => {
+                i += 1;
+                width = Some(args.get(i).ok_or("--width requires a number")?.parse()?);
+            }
+            "--height" => {
+                i += 1;
+                height = Some(args.get(i).ok_or("--height requires a number")?.parse()?);
+            }
+            "--otlp-endpoint" => {
+                i += 1;
+                otlp_endpoint = Some(
+                    args.get(i)
+                        .ok_or("--otlp-endpoint requires a URL")?
+                        .clone(),
+                );
+            }
             "--objects" => {
                 i += 1;
                 objects_path = Some(PathBuf::from(
@@ -241,6 +266,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return client::log_tail(url, token, quiet, allow_control);
     }
 
+    if let Some(w) = width {
+        if w < MIN_MAP_SIZE || w > MAX_MAP_SIZE {
+            return Err(format!("--width must be {MIN_MAP_SIZE}..={MAX_MAP_SIZE}").into());
+        }
+    }
+    if let Some(h) = height {
+        if h < MIN_MAP_SIZE || h > MAX_MAP_SIZE {
+            return Err(format!("--height must be {MIN_MAP_SIZE}..={MAX_MAP_SIZE}").into());
+        }
+    }
+
     let objects_dir = objects_path
         .clone()
         .or_else(sim_core::objects::default_objects_dir);
@@ -248,6 +284,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Simulation::load_checkpoint(path)?
     } else {
         let mut config = ExperimentConfig::load_path(&config_path)?;
+        if let Some(w) = width {
+            config.world.width = w;
+        }
+        if let Some(h) = height {
+            config.world.height = h;
+        }
+        config.validate()?;
         if let Some(dir) = &objects_dir {
             let defs = sim_core::load_object_defs(dir)?;
             sim_core::apply_species_defs(&mut config.world.species, &defs);
@@ -330,8 +373,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             sim.enable_catalog(Vec::new());
         }
         let tel = sim_core::TelemetryParams::from_config_toml(&text);
-        sim.telemetry_enabled = telemetry || tel.enabled;
-        sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
+        if let Some(url) = &otlp_endpoint {
+            sim.telemetry_enabled = true;
+            sim.telemetry_otlp_endpoint = url.clone();
+        } else {
+            sim.telemetry_enabled = telemetry || tel.enabled;
+            sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
+        }
+        let tp = sim_core::TimeParams::from_config_toml(&text);
+        sim.time_enabled = if no_time {
+            false
+        } else if time_on {
+            true
+        } else {
+            tp.enabled
+        };
+        sim.ticks_per_day = tp.ticks_per_day;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -491,6 +548,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 write_run_checkpoint(&sim, dir)?;
             }
         }
+        otlp::post_tick_metrics(&sim);
         if !quiet {
             println!("tick={} hash={}", sim.tick, sim.state_hash());
         }
@@ -551,6 +609,7 @@ Usage:
           [--sheet] [--reproduction] [--aging]
           [--household-crates] [--culture] [--inventions]
           [--pipeline-events] [--catalog] [--objects DIR] [--telemetry]
+          [--time] [--no-time] [--width N] [--height N] [--otlp-endpoint URL]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -588,6 +647,11 @@ Options:
       --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
       --objects DIR         Object definition TOML directory (default: configs/objects if present)
       --telemetry           Hash-neutral tick aggregates + RSS (overlay [telemetry] enabled)
+      --time                Day/night clock (default on; overlay [time] enabled)
+      --no-time             Disable the clock; Rest only; M51 hashes
+      --width N             Override [world] width for a new sim (32..=256; ignored with --load)
+      --height N            Override [world] height for a new sim (32..=256; ignored with --load)
+      --otlp-endpoint URL   POST OTLP/JSON metrics (implies --telemetry; hash-neutral)
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)

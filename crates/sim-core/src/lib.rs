@@ -4,6 +4,7 @@ pub mod action;
 pub mod agent;
 pub mod board;
 pub mod checkpoint;
+pub mod clock;
 pub mod combat_fx;
 pub mod compare;
 pub mod config;
@@ -46,7 +47,11 @@ pub use combat_fx::{
     CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role,
 };
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
-pub use config::{CheckpointParams, EvictionPolicy, ExperimentConfig, SeedSpec, SpawnMode};
+pub use clock::{TimeParams, dawn_refill, day_tod, is_dawn, is_night, light_for_tod};
+pub use config::{
+    CheckpointParams, EvictionPolicy, ExperimentConfig, MAX_MAP_SIZE, MIN_MAP_SIZE, SeedSpec,
+    SpawnMode,
+};
 pub use conflict::ConflictParams;
 pub use decision_log::{DecisionRecord, append_decisions_jsonl};
 pub use error::SimError;

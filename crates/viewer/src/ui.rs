@@ -264,6 +264,13 @@ fn draw_status(
                 "{tick_line}  {}  follow {follow}  hash {short}",
                 if state.paused { "paused" } else { "running" }
             ));
+            if state.sim.time_enabled {
+                let (day, tod) = sim_core::day_tod(state.sim.tick, state.sim.ticks_per_day);
+                ui.text(format!(
+                    "day {day}  tod {tod}/{}",
+                    state.sim.ticks_per_day
+                ));
+            }
             for line in
                 sim_core::combat_fx::combat_hud_lines(&state.sim.events.events, state.sim.tick)
             {

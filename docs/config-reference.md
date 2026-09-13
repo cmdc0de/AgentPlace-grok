@@ -4,7 +4,7 @@ Every file under `configs/`, what it is for, and every key the sim reads. Overla
 
 CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md). Incentive effect vocabulary: [`incentive-schedule-format.md`](incentive-schedule-format.md). Needs millipoints: [`needs-and-survival.md`](needs-and-survival.md).
 
-**Hashed vs overlay:** tables on `ExperimentConfig` (`[simulation]`, `[world]`, `[agents]`, `[checkpoint]`, `[observation]`, `[needs]`, `[communication]`, `[llm]` provider/url/model, `[proposals]`, `[metrics]`) are hashed. `[network]`, `[incentives]`, `[voting]`, `[storage]`, `[conflict]`, `[agents.sheet]`, `[population]`, `[inventions]`, `[pipeline]`, `[catalog]`, and extra `[llm] barrier*` keys are overlay.
+**Hashed vs overlay:** tables on `ExperimentConfig` (`[simulation]`, `[world]`, `[agents]`, `[checkpoint]`, `[observation]`, `[needs]`, `[communication]`, `[llm]` provider/url/model, `[proposals]`, `[metrics]`) are hashed. `[network]`, `[incentives]`, `[voting]`, `[storage]`, `[conflict]`, `[agents.sheet]`, `[population]`, `[inventions]`, `[pipeline]`, `[catalog]`, `[telemetry]`, `[time]`, and extra `[llm] barrier*` keys are overlay. `[time]` **is hashed when enabled** (the default). `[telemetry]` is never hashed.
 
 ---
 
@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick hash `cd1e0853…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `fed653be…`; `--no-time` `04069600…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -44,7 +44,7 @@ Display floats (needs, influence, ranges) are stored as **millipoints** (×100) 
 | Key | Shipping | Meaning |
 |---|---|---|
 | `seed` | `"auto"` | `"auto"` (from master), `"random"`, or an integer. World layers. |
-| `width` / `height` | `64` / `64` | Map cells. Minimum 32. |
+| `width` / `height` | `64` / `64` | Map cells. Minimum 32. CLI `--width` / `--height` override for a new sim (32..=256). |
 | `max_height` | `16` | Heightmap amplitude. Minimum 8. |
 
 ### `[world.terrain]`
@@ -290,6 +290,24 @@ Crate on a land cell (not pockets). Display floats → milli.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
+
+### `[time]` (M52)
+
+Not in shipping `default.toml`. **Omit = enabled.** `--no-time` turns it off.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` (omit) | Day/night clock. Hashed with `ticks_per_day` when on. |
+| `ticks_per_day` | `240` | `day = tick / N`, `tod = tick % N`. Night is `tod >= N*3/4`. Dawn at `tick > 0 && tod == 0`. |
+
+Dawn refill (millipoints): `refill = max * (200 + remaining_milli * 4 / 10) / 1000` then clamp. Rest `+energy_regen` still applies. Viewer light is hash-neutral.
+
+### `[telemetry]` (M46 / M52)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | `--telemetry`. In-process tick aggregates + RSS. **Not hashed.** |
+| `otlp_endpoint` | empty | `--otlp-endpoint URL`. sim-cli POSTs OTLP/JSON to `{url}/v1/metrics`. Empty ⇒ no POST. |
 
 ### `[llm]` overlay extras (not on ExperimentConfig)
 

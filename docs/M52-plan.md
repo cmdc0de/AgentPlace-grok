@@ -1,7 +1,8 @@
 # M52 — Day/night clock, world-size CLI, OTLP export
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M51 complete (`docs/M51-plan.md`, git tag `M51`, commit `9ef0b42`)  
+**Walkthrough:** [`docs/M52-test-plan.md`](M52-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-16 day/night, PG-18 world-size CLI, PG-11 OTLP leftover)
 
 ## Context
@@ -19,7 +20,7 @@ A researcher can:
 3. Pass **`--telemetry`** with **`otlp_endpoint`** (or **`--otlp-endpoint URL`**) and have sim-cli **POST OTLP/JSON** tick `wall_ns` + RSS to that URL. Empty endpoint ⇒ today’s in-process aggregates only (M46). CI never dials. Hash-neutral.
 4. CI stays `provider = mock`. **`PROTOCOL_VERSION = 5`**.
 
-`--no-time` no-objects 2-tick hash stays **`70e5204d…`**. `--no-time` default CLI with shipped objects stays **`04069600…`**. Default (time **on**) idle hashes **change** (document on implement).
+`--no-time` no-objects 2-tick hash stays **`70e5204d…`**. `--no-time` default CLI with shipped objects stays **`04069600…`**. Default (time **on**) shipped-objects idle hash is **`fed653be…`**; no-catalog time-on is **`9c3b270d…`**.
 
 ## In scope
 
@@ -140,7 +141,7 @@ Do **not** replace JSONL or sqlite. Do not add CPU/disk or viewer-frame OTLP thi
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
 | `--no-time` default CLI 2 ticks | shipped-objects `04069600…` |
-| default CLI 2 ticks (time on) | hash **≠** `04069600…` (lock the new value on implement) |
+| default CLI 2 ticks (time on) | shipped-objects `fed653be…`; no-catalog `9c3b270d…` |
 | `--no-time` | Rest +regen as today; no day/tod in inspector |
 | default / `--time`, 2 ticks | `day=0` `tod=2` for `ticks_per_day=240`; hash ≠ `--no-time` |
 | dawn refill | overlay on, force `tick=239` then one `tick()`: energy rises by the locked formula; empty leftover gets 20% max; full stays clamped |
@@ -184,7 +185,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M52-test-plan.md` (written on implement).
+Walkthrough: [`docs/M52-test-plan.md`](M52-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -193,7 +194,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `04069600…`; default (time on) idle hash **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `04069600…`; default (time on) shipped-objects `fed653be…`; Hello v5; format_version 3 write.
 
 ## Risks
 

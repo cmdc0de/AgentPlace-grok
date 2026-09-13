@@ -544,6 +544,8 @@ impl Simulation {
             telemetry_ticks: crate::timing::DurationStats::default(),
             telemetry_rss_last: None,
             telemetry_rss_peak: None,
+            time_enabled: true,
+            ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;

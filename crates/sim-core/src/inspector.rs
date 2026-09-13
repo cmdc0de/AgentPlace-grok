@@ -15,6 +15,12 @@ pub struct InspectorView {
     pub metrics: InspectorMetrics,
     #[serde(default)]
     pub inventions: Vec<InspectorInvention>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tod: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ticks_per_day: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -196,6 +202,12 @@ impl InspectorView {
                 flavor: i.flavor.clone(),
             })
             .collect();
+        let (day, tod, ticks_per_day) = if sim.time_enabled {
+            let (d, t) = crate::clock::day_tod(sim.tick, sim.ticks_per_day);
+            (Some(d), Some(t), Some(sim.ticks_per_day))
+        } else {
+            (None, None, None)
+        };
         Self {
             tick: sim.tick,
             agents,
@@ -209,6 +221,9 @@ impl InspectorView {
                 illness,
             },
             inventions,
+            day,
+            tod,
+            ticks_per_day,
         }
     }
 

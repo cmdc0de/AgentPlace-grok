@@ -29,6 +29,8 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 | `-o`, `--out-dir DIR` | off | Write checkpoints, Markdown summaries, JSONL events/decisions, optional timing JSONL. |
 | `--sqlite PATH` | off | Extra sink: same events/decisions/timing facts as JSONL, **typed columns** (no JSON blob). Does not replace JSONL. Hash-neutral. |
 | `--sqlite-http HOST:PORT` | off | Serve `GET /metrics` JSON from `--sqlite` (CORS `*`). Requires `--sqlite`. Hash-neutral. |
+| `--width N` / `--height N` | TOML `[world]` (shipping 64×64) | Override map size for a **new** sim. **32..=256**. Hashed. Ignored with `--load` / `--connect`. |
+| `--otlp-endpoint URL` | overlay `otlp_endpoint` empty | POST OTLP/JSON `wall_ns` + RSS to `{url}/v1/metrics`. Implies `--telemetry`. Hash-neutral. No TLS. |
 | `--checkpoint-every K` | config `[checkpoint] auto_interval_ticks` if `--out-dir` | Checkpoint every *K* ticks. Implies an out-dir (config `directory` if `-o` omitted). |
 | `--load PATH` | off | Restore a `.ckpt` and continue. Overlay flags (`--inventions`, `--pipeline-events`, `--catalog`, …) still apply **after** decode (do not double-grant). |
 | `--summarize` | off | Print the Markdown world summary to stdout. With `--listen`, emit when the listen session ends. |
@@ -62,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `04069600…` (M51 recipes + attack_bonus). No-objects stays `70e5204d…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` restores M51 hashes: shipped-objects `04069600…`, no-objects `70e5204d…`. Default (time on) shipped-objects 2-tick is `fed653be…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -77,7 +79,9 @@ These are **or** with the same-named overlay table. Off / unused ⇒ same hashes
 | `--pipeline-events` | `[pipeline] hash_events` | One hashed `Pipeline { stages }` per living agent per tick (complete mock = `31`). Does **not** hash wall-clock ns. |
 | `--catalog` | `[catalog] enabled` | Hash `[sim]` catalog items loaded from `--objects`. Does not imply `--sheet`. Empty catalog ≡ off for hash. |
 | `--objects DIR` | default `configs/objects` if present | Object-definition TOML directory (visuals + hashed `[sim]` when catalog on). |
-| `--telemetry` | `[telemetry] enabled` | In-process tick aggregates + RSS. Hash-neutral. OTLP only if `otlp_endpoint` is set. |
+| `--telemetry` | `[telemetry] enabled` | In-process tick aggregates + RSS. Hash-neutral. |
+| `--time` | `[time] enabled` omit = **true** | Day/night clock (hashed `ticks_per_day`). Redundant with the default. |
+| `--no-time` | `[time] enabled = false` | Disable the clock. Rest only. M51 hashes. Wins over `--time`. |
 
 ### Incentives / compare
 
@@ -90,14 +94,16 @@ These are **or** with the same-named overlay table. Off / unused ⇒ same hashes
 
 ### Typical recipes
 
-Idle hash with shipped objects (M46 catalog includes plank/charcoal/knife/net):
+Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
+# final_hash=fed653be…
+cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
 # final_hash=04069600…
 ```
 
-Without loading `configs/objects`, 2-tick hash is `70e5204d…`. Overlay-off telemetry does not change hashes.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -133,6 +139,8 @@ cargo run -p viewer -- --load checkpoints/….ckpt
 | `--token SECRET` | off | Hello token for `--connect`. |
 | `--objects DIR` | shipped `configs/objects` (cwd, then crate path) | Object TOML for meshes / catalog. Needed for glb; without defs the viewer uses primitives and prints `objects: no configs/objects dir`. |
 | `--catalog` | off | Enable catalog hashing the same as sim-cli `--catalog`. |
+| `--time` / `--no-time` | clock on | Same as sim-cli. `--no-time` on `--config` / `--load` / `--connect`. |
+| `--width N` / `--height N` | TOML | In-process `--config` only. Ignored with `--load` / `--connect`. 32..=256. |
 
 There is no viewer `--listen`, `--start-paused`, or `--pipeline-events`. Put those on `sim-cli`, or in the experiment overlay when the viewer **hosts** the sim (`--config`).
 
@@ -185,7 +193,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `04069600…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `fed653be…`. `--no-time` shipped-objects is `04069600…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.
