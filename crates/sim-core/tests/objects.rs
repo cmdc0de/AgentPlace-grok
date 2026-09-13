@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
-/// (includes M49 hammer/hoe/waterskin/dried_fish catalog `[sim]`).
-const IDLE_2: &str = "133ea72ed5004dcca5321348d14d3d1aa281c7188d30906e76b08f597ef7709b";
+/// (includes M50 satchel/rucksack/cooked_veg/bowl/club/pike/sling/bow catalog `[sim]`).
+const IDLE_2: &str = "35faecbd4484eb841e0a46264ca929fec7a08867ab4acbaaa0acbec56c74e4bb";
 const IDLE_2_NO_CATALOG: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 
 fn shipped_objects() -> PathBuf {
@@ -1087,4 +1087,45 @@ fn catalog_on_craft_dried_fish() {
     let mut sim = Simulation::new(tiny(0x49_12)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "dried_fish", &[(ItemId::Food(1), 4)]);
+}
+
+#[test]
+fn catalog_on_craft_club() {
+    let mut sim = Simulation::new(tiny(0x50_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "club", &[(ItemId::Wood, 4)]);
+}
+
+#[test]
+fn catalog_on_craft_satchel() {
+    let mut sim = Simulation::new(tiny(0x50_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "satchel", &[(ItemId::Fiber, 4), (ItemId::Wood, 4)]);
+}
+
+#[test]
+fn catalog_on_craft_pike() {
+    let mut sim = Simulation::new(tiny(0x50_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "pike", &[(ItemId::Wood, 4), (ItemId::Stone, 4)]);
+}
+
+#[test]
+fn catalog_off_new_m50_crafts_not_legal() {
+    let cfg = tiny(0x50_10);
+    let mut off = Simulation::new(cfg).unwrap();
+    let a = AgentId(0);
+    if let Some(ag) = off.agents.get_mut(&a) {
+        ag.try_add_item(ItemId::Stone, 4);
+        ag.try_add_item(ItemId::Wood, 4);
+        ag.try_add_item(ItemId::Fiber, 4);
+        ag.try_add_item(ItemId::Food(1), 2);
+    }
+    let legal = legal_actions(&off, off.agents.get(&a).unwrap());
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: Recipe::Catalog(_)
+        }
+    )));
 }

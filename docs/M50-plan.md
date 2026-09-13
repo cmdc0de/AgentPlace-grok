@@ -1,7 +1,8 @@
 # M50 — Viewer FPS HUD, sqlite run log, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M49 complete (`docs/M49-plan.md`, git tag `M49`, commit `189630e`)  
+**Walkthrough:** [`docs/M50-test-plan.md`](M50-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-14 FPS HUD, PG-15 sqlite run log, PG-9 recipes)
 
 ## Context
@@ -21,7 +22,7 @@ A researcher can:
 
 The attach page does **not** open the DB this slice. Schema is locked so a later slice can run those queries in the researcher UI.
 
-No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects **changes** (document on implement).
+No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects is **`35faecbd…`**.
 
 ## In scope
 
@@ -183,7 +184,7 @@ Inputs must not clone an existing recipe (spear is wood×1+stone×1; knife is st
 | Test | Asserts |
 |---|---|
 | no-objects 2 ticks | hash `70e5204d…` |
-| default CLI 2 ticks | shipped-objects hash **changes** (lock on implement); no-objects `70e5204d…` |
+| default CLI 2 ticks | shipped-objects hash `35faecbd…`; no-objects `70e5204d…` |
 | fps helper | 60 × 16.67 ms → fps ≈ 60, mean_ms ≈ 16.67; empty → 0 |
 | fps not hashed | frame window does not change `state_hash` |
 | sqlite `ticks` | one row per timed tick; `wall_ns` equals `TickTiming.wall_ns` (INTEGER, not JSON) |
@@ -229,7 +230,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --sql
 
 ## Verification
 
-Walkthrough: `docs/M50-test-plan.md` (written on implement).
+Walkthrough: [`docs/M50-test-plan.md`](M50-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -238,7 +239,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: no-objects hash `70e5204d…`; shipped-objects idle hash **new** (document); Hello v5; format_version 3 write; sqlite tables have no `json` column.
+Expect: no-objects hash `70e5204d…`; shipped-objects idle hash `35faecbd…`; Hello v5; format_version 3 write; sqlite tables have no `json` column.
 
 ## Risks
 

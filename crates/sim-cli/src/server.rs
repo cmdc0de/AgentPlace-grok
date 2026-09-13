@@ -1,6 +1,7 @@
 //! Hash-neutral attachable server. Connection logs go to stderr, never `SimEvent`.
 
 use crate::network::NetworkParams;
+use crate::sqlite::SqliteLog;
 use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
@@ -75,6 +76,8 @@ pub struct Hub {
     interval: u64,
     subscribers: HashMap<u64, Subscriber>,
     attach: Arc<Mutex<AttachCache>>,
+    sqlite: Option<SqliteLog>,
+    write_timing: bool,
 }
 
 impl Hub {
@@ -106,8 +109,23 @@ impl Hub {
             let events = &self.sim.events.events;
             if events.len() > self.last_event {
                 let _ = append_events_jsonl(path, &events[self.last_event..]);
-                self.last_event = events.len();
             }
+        }
+        if let Some(db) = &mut self.sqlite {
+            let events = &self.sim.events.events;
+            if events.len() > self.last_event {
+                let _ = db.insert_events(&events[self.last_event..], &self.sim.catalog);
+            }
+            let _ = db.insert_decisions(&self.sim.last_tick_decisions);
+            if self.write_timing {
+                if let Some(t) = &self.sim.last_tick_timing {
+                    let _ = db.insert_timing(t);
+                }
+            }
+        }
+        let events = &self.sim.events.events;
+        if events.len() > self.last_event {
+            self.last_event = events.len();
         }
         if let Some(path) = &self.decisions_path {
             let _ = append_decisions_jsonl(path, &self.sim.last_tick_decisions);
@@ -468,6 +486,7 @@ pub struct ServeOpts {
     pub lockstep_timeout_ms: u64,
     pub summarize: bool,
     pub report: bool,
+    pub sqlite: Option<PathBuf>,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -479,6 +498,14 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
     let mut decisions_path = None;
     let mut timing_path = None;
     let last_event = opts.sim.events.events.len();
+    let mut sqlite = match &opts.sqlite {
+        Some(p) => Some(SqliteLog::open(p).map_err(|e| e.to_string())?),
+        None => None,
+    };
+    if let Some(db) = &mut sqlite {
+        db.insert_events(&opts.sim.events.events, &opts.sim.catalog)
+            .map_err(|e| e.to_string())?;
+    }
     if let Some(dir) = &opts.out_dir {
         std::fs::create_dir_all(dir)?;
         let id = experiment_id(&opts.sim.config_hash()?);
@@ -511,6 +538,8 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         interval,
         subscribers: HashMap::new(),
         attach: Arc::clone(&attach),
+        sqlite,
+        write_timing: opts.write_timing,
     }));
     hub.lock().unwrap().refresh_attach();
 

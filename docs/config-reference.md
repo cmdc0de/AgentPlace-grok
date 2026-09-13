@@ -398,6 +398,14 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `hoe.toml` | item | Catalog craft stone+wood → 1. |
 | `waterskin.toml` | item | Catalog craft 2 fiber → 1. |
 | `dried_fish.toml` | item | Catalog craft 1 food (`ItemId::Food(1)`) → 1. |
+| `satchel.toml` | item | Catalog craft 2 fiber + 1 wood → 1. |
+| `rucksack.toml` | item | Catalog craft 3 fiber + 1 wood → 1. |
+| `cooked_veg.toml` | item | Catalog craft 1 food → 1. |
+| `bowl.toml` | item | Catalog craft 1 stone → 1. |
+| `club.toml` | item | Catalog craft 1 wood → 1. |
+| `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. |
+| `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. |
+| `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

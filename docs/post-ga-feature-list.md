@@ -20,13 +20,13 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-6 | Viewer 3D models | Open | Replace primitive meshes with authored models. M38: stem-named `.glb`. Later: per-object config (path + LOD). |
 | PG-7 | Browser researcher UI | Done (M36) | Attach page lists every agent, board posts, and metrics — no 3D required. |
 | PG-8 | Object / item definition files | Open | One config file per sim object: visuals (glb + LOD) and sim fields so new items/crafts are a file, not a Rust enum. |
-| PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. |
+| PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. M50 added satchel/rucksack/cooked_veg/bowl/club/pike/sling/bow. |
 | PG-10 | Missing-asset sentinel | Done (M47) | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
 | PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
 | PG-13 | Object visual scale | Done (M49) | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
-| PG-14 | Viewer FPS / frametime HUD | Open | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
-| PG-15 | SQLite run log | Open | CLI flag writes the same rows as events/decisions/timing JSONL into a sqlite3 file. Extra sink; JSONL unchanged. Hash-neutral. |
+| PG-14 | Viewer FPS / frametime HUD | Done (M50) | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
+| PG-15 | SQLite run log | Done (M50) | CLI `--sqlite PATH` writes unrolled events/decisions/timing columns. Extra sink; JSONL unchanged. Hash-neutral. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 

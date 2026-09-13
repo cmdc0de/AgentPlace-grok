@@ -1,6 +1,7 @@
 mod camera;
 mod charts;
 mod commands;
+mod fps;
 mod models;
 mod net;
 mod render;

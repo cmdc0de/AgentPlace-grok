@@ -2,6 +2,7 @@ mod client;
 mod network;
 mod overlay;
 mod server;
+mod sqlite;
 
 use sim_core::{
     ExperimentConfig, Simulation, append_decisions_jsonl, append_events_jsonl, append_timing_jsonl,
@@ -63,6 +64,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut catalog = false;
     let mut telemetry = false;
     let mut objects_path: Option<PathBuf> = None;
+    let mut sqlite_path: Option<PathBuf> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -79,6 +81,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 i += 1;
                 out_dir = Some(PathBuf::from(
                     args.get(i).ok_or("--out-dir requires a path")?,
+                ));
+            }
+            "--sqlite" => {
+                i += 1;
+                sqlite_path = Some(PathBuf::from(
+                    args.get(i).ok_or("--sqlite requires a path")?,
                 ));
             }
             "--checkpoint-every" => {
@@ -328,7 +336,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if checkpoint_every.is_some() && out_dir.is_none() {
         out_dir = Some(PathBuf::from(&sim.config.checkpoint.directory));
     }
-    let write_timing = overlay.metrics.timing.unwrap_or(out_dir.is_some());
+    let write_timing = overlay
+        .metrics
+        .timing
+        .unwrap_or(out_dir.is_some() || sqlite_path.is_some());
 
     let n = ticks.unwrap_or(if (summarize || report) && load_path.is_some() {
         0
@@ -374,6 +385,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             lockstep_timeout_ms,
             summarize,
             report,
+            sqlite: sqlite_path,
         });
     }
 
@@ -389,6 +401,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    let mut sqlite = match &sqlite_path {
+        Some(p) => Some(sqlite::SqliteLog::open(p)?),
+        None => None,
+    };
+    if let Some(db) = &mut sqlite {
+        db.insert_events(&sim.events.events, &sim.catalog)?;
+    }
     let mut jsonl_path = None;
     let mut decisions_path = None;
     let mut timing_path = None;
@@ -423,9 +442,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let events = &sim.events.events;
             if events.len() > last_event {
                 append_events_jsonl(path, &events[last_event..])?;
-                last_event = events.len();
             }
         }
+        if let Some(db) = &mut sqlite {
+            let events = &sim.events.events;
+            if events.len() > last_event {
+                db.insert_events(&events[last_event..], &sim.catalog)?;
+            }
+            db.insert_decisions(&sim.last_tick_decisions)?;
+            if write_timing {
+                if let Some(t) = &sim.last_tick_timing {
+                    db.insert_timing(t)?;
+                }
+            }
+        }
+        last_event = sim.events.events.len();
         if let Some(path) = &decisions_path {
             append_decisions_jsonl(path, &sim.last_tick_decisions)?;
         }
@@ -488,7 +519,7 @@ sim-cli — headless AgentTown runner
 
 Usage:
   sim-cli [--config PATH] [--ticks N] [--quiet]
-          [--out-dir DIR] [--checkpoint-every K]
+          [--out-dir DIR] [--sqlite PATH] [--checkpoint-every K]
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
@@ -513,6 +544,7 @@ Options:
       --load PATH           Restore a .ckpt and continue
       --summarize           Print the Markdown world summary
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir. With --listen, emit when the session ends
+      --sqlite PATH         Write events/decisions/timing as sqlite columns (extra sink; JSONL unchanged)
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS). Always binds; --report/--summarize do not skip it
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control

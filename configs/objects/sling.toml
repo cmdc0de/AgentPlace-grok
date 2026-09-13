@@ -1,0 +1,15 @@
+id = "sling"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/stones_and_grass.glb"
+[visual.lod]
+near = "assets/models/optimized/stones_and_grass.glb"
+mid  = "assets/models/optimized/stones_and_grass.glb"
+far  = "assets/models/optimized/stones_and_grass.glb"
+
+[sim]
+weight_milli = 90
+[sim.craft]
+inputs = [["fiber", 2], ["stone", 1]]
+output_qty = 1

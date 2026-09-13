@@ -234,6 +234,7 @@ keys:
   Space pause/play   . step   F follow toggle   0-9 follow agent
   arrows pan (constant height)   u raise camera   d lower camera
   L legend   C charts   H help   I inspector   B board   O fog   / console
+  Status shows fps= and frame_ms= (render, not sim tick wall_ms)
   Esc quit (saves window layout)
 commands:
   /help
@@ -693,6 +694,8 @@ mod tests {
         assert!(text.contains("arrows pan"));
         assert!(text.contains("d lower camera"));
         assert!(text.contains("L legend"));
+        assert!(text.contains("fps="));
+        assert!(text.contains("frame_ms="));
     }
 
     #[test]

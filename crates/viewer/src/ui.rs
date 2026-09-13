@@ -1,6 +1,7 @@
 //! Dear ImGui panels. Viewer-only; no types leak into sim-core.
 
 use crate::charts::{ChartRing, ChartSample};
+use crate::fps::FrameRing;
 use crate::commands::{
     CkptScrubber, WindowFlags, help_text, parse_command, remote_control, run_command,
 };
@@ -73,6 +74,7 @@ pub struct UiState {
     pub event_filter_agent: String,
     pub event_filter_kind: String,
     pub chart_ring: ChartRing,
+    pub frame_ring: FrameRing,
 }
 
 impl Default for UiState {
@@ -115,6 +117,7 @@ impl UiState {
             event_filter_agent: String::new(),
             event_filter_kind: String::new(),
             chart_ring: ChartRing::default(),
+            frame_ring: FrameRing::default(),
         };
         if let Ok(text) = fs::read_to_string(ui_persist_path()) {
             if let Ok(p) = serde_json::from_str::<UiPersist>(&text) {
@@ -150,7 +153,9 @@ pub fn imgui_ui(
     mut scrub: ResMut<CkptScrubber>,
     net: Option<Res<NetLink>>,
     guard: Res<ClickThroughGuard>,
+    time: Res<Time>,
 ) {
+    ui.frame_ring.push(time.delta_secs());
     record_decisions(&mut state, &mut ui);
     let imgui_ui = context.ui();
     ui.want_keyboard = imgui_ui.io().want_capture_keyboard;
@@ -293,6 +298,11 @@ fn draw_status(
                     state.sim.agents.len()
                 ));
             }
+            ui.text(format!(
+                "fps={:.1}  frame_ms={:.1}",
+                us.frame_ring.fps(),
+                us.frame_ring.mean_ms()
+            ));
             if ui.button("Pause") {
                 state.paused = true;
                 if state.remote {
