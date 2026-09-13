@@ -23,4 +23,4 @@ pub use protocol::{
     ClientMessage, ControlVerb, ErrorCode, ServerMessage, decode_frame, encode_frame, read_frame,
     write_frame,
 };
-pub use transport::{Connection, Listener, TransportError, parse_listen_url};
+pub use transport::{Connection, Listener, Scheme, TransportError, parse_listen_url};

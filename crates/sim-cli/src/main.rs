@@ -358,7 +358,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if !listen.is_empty() && !(summarize || report) {
+    if !listen.is_empty() {
         return server::serve(server::ServeOpts {
             sim,
             ticks: n,
@@ -372,6 +372,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             write_timing,
             lockstep,
             lockstep_timeout_ms,
+            summarize,
+            report,
         });
     }
 
@@ -510,9 +512,9 @@ Options:
       --checkpoint-every K  Checkpoint every K ticks (implies --out-dir from config if omitted)
       --load PATH           Restore a .ckpt and continue
       --summarize           Print the Markdown world summary
-      --report              Write food-economy report (md/csv); prints markdown if no --out-dir
+      --report              Write food-economy report (md/csv); prints markdown if no --out-dir. With --listen, emit when the session ends
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
-      --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS)
+      --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS). Always binds; --report/--summarize do not skip it
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control
       --allow-control       Listen: accept Control. Connect: send Control from stdin
       --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)

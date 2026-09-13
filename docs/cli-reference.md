@@ -29,8 +29,8 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 | `-o`, `--out-dir DIR` | off | Write checkpoints, Markdown summaries, JSONL events/decisions, optional timing JSONL. |
 | `--checkpoint-every K` | config `[checkpoint] auto_interval_ticks` if `--out-dir` | Checkpoint every *K* ticks. Implies an out-dir (config `directory` if `-o` omitted). |
 | `--load PATH` | off | Restore a `.ckpt` and continue. Overlay flags (`--inventions`, `--pipeline-events`, `--catalog`, …) still apply **after** decode (do not double-grant). |
-| `--summarize` | off | Print the Markdown world summary to stdout. |
-| `--report` | off | Food-economy report (md/csv). Prints markdown if no `--out-dir`. |
+| `--summarize` | off | Print the Markdown world summary to stdout. With `--listen`, emit when the listen session ends. |
+| `--report` | off | Food-economy report (md/csv). Prints markdown if no `--out-dir`. With `--listen`, emit when the listen session ends (does **not** skip the bind). |
 | `-h`, `--help` | | This flag list (same as the binary help). |
 
 ### LLM
@@ -50,7 +50,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--listen URL` | overlay `[network] tcp_listen` / `ws_listen` | Repeatable. `tcp://host:port` and/or `ws://host:port`. **No TLS / no `wss`**. |
+| `--listen URL` | overlay `[network] tcp_listen` / `ws_listen` | Repeatable. `tcp://host:port` and/or `ws://host:port`. **No TLS / no `wss`**. Always binds; `--report` / `--summarize` do not skip it. Prints `listen={url}` on **stderr** after the socket is open (still printed with `--quiet`). |
 | `--connect URL` | off | Attach as a client: print Welcome/Tick hash tail. Hash-neutral without `--allow-control`. |
 | `--allow-control` | overlay `[network] allow_control` | Listen: accept Control. Connect: stdin slash commands send Control. |
 | `--start-paused` | off | Listen without ticking until a client sends Play. Needs `--listen` **and** `--allow-control`. Viewer `--connect` does **not** auto-unpause. |
@@ -102,6 +102,7 @@ Listen paused for the viewer (Play in the window / `/play` from a control client
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
   --listen ws://127.0.0.1:9001 --allow-control --start-paused --quiet
+# wait for stderr: listen=ws://127.0.0.1:9001  (cargo compile + sim init happen first)
 ```
 
 M45 overlays:

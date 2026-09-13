@@ -3,7 +3,7 @@
 use crate::protocol::{self, CodecError};
 use serde::{Serialize, de::DeserializeOwned};
 use std::io::{self, ErrorKind};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 use tungstenite::protocol::WebSocket;
 use tungstenite::{Message, accept as ws_accept, client::client_with_config};
@@ -116,34 +116,35 @@ impl Listener {
         Ok(format!("{scheme}://{addr}"))
     }
 
+    pub fn scheme(&self) -> Scheme {
+        self.scheme
+    }
+
     pub fn accept(&self) -> Result<Connection, TransportError> {
         let (stream, _) = self.inner.accept()?;
-        self.finish_accept(stream)
+        Connection::from_accepted(stream, self.scheme)
     }
 
     /// Returns `Ok(None)` when no connection is pending.
     pub fn accept_nonblocking(&self) -> Result<Option<Connection>, TransportError> {
+        match self.accept_tcp_nonblocking()? {
+            Some(stream) => Ok(Some(Connection::from_accepted(stream, self.scheme)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// TCP accept only. WebSocket handshake is done in `Connection::from_accepted`
+    /// so the accept loop can spawn it on a worker thread.
+    pub fn accept_tcp_nonblocking(&self) -> Result<Option<TcpStream>, TransportError> {
         self.inner.set_nonblocking(true)?;
         let result = self.inner.accept();
         self.inner.set_nonblocking(false)?;
         match result {
-            Ok((stream, _)) => Ok(Some(self.finish_accept(stream)?)),
+            Ok((stream, _)) => Ok(Some(stream)),
             Err(e) if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::Interrupted => {
                 Ok(None)
             }
             Err(e) => Err(e.into()),
-        }
-    }
-
-    fn finish_accept(&self, stream: TcpStream) -> Result<Connection, TransportError> {
-        stream.set_nodelay(true)?;
-        stream.set_nonblocking(false)?;
-        match self.scheme {
-            Scheme::Tcp => Ok(Connection::Tcp(stream)),
-            Scheme::Ws => {
-                let ws = ws_accept(stream).map_err(|e| TransportError::Handshake(e.to_string()))?;
-                Ok(Connection::Ws(ws))
-            }
         }
     }
 }
@@ -154,10 +155,26 @@ pub enum Connection {
 }
 
 impl Connection {
+    pub fn from_accepted(stream: TcpStream, scheme: Scheme) -> Result<Self, TransportError> {
+        stream.set_nodelay(true)?;
+        stream.set_nonblocking(false)?;
+        stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+        match scheme {
+            Scheme::Tcp => Ok(Connection::Tcp(stream)),
+            Scheme::Ws => {
+                let ws = ws_accept(stream).map_err(|e| TransportError::Handshake(e.to_string()))?;
+                Ok(Connection::Ws(ws))
+            }
+        }
+    }
+
     pub fn connect(url: &str) -> Result<Self, TransportError> {
         let parsed = parse_listen_url(url)?;
-        let stream = TcpStream::connect(parsed.addr)?;
+        let stream = TcpStream::connect_timeout(&parsed.addr, Duration::from_secs(15))?;
         stream.set_nodelay(true)?;
+        stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(15)))?;
         match parsed.scheme {
             Scheme::Tcp => Ok(Connection::Tcp(stream)),
             Scheme::Ws => {
@@ -230,6 +247,14 @@ impl Connection {
         Ok(())
     }
 
+    pub fn set_write_timeout(&mut self, timeout: Option<Duration>) -> Result<(), TransportError> {
+        match self {
+            Connection::Tcp(stream) => stream.set_write_timeout(timeout)?,
+            Connection::Ws(ws) => ws.get_mut().set_write_timeout(timeout)?,
+        }
+        Ok(())
+    }
+
     pub fn peer_addr(&self) -> Option<SocketAddr> {
         match self {
             Connection::Tcp(s) => s.peer_addr().ok(),
@@ -240,10 +265,11 @@ impl Connection {
     pub fn close(self) -> Result<(), TransportError> {
         match self {
             Connection::Tcp(s) => {
-                let _ = s.shutdown(std::net::Shutdown::Both);
+                let _ = s.shutdown(Shutdown::Both);
             }
             Connection::Ws(mut ws) => {
                 let _ = ws.close(None);
+                let _ = ws.get_mut().shutdown(Shutdown::Both);
             }
         }
         Ok(())

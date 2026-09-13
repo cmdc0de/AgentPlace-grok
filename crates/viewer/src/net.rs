@@ -7,7 +7,7 @@ use shared::transport::Connection;
 use sim_bevy::SimState;
 use sim_core::{Simulation, TickTiming};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -140,8 +140,15 @@ fn io_loop(
 ) -> Result<(), Box<dyn std::error::Error>> {
     conn.set_read_timeout(Some(Duration::from_millis(25)))?;
     loop {
-        while let Ok(msg) = from_bevy.try_recv() {
-            conn.send_msg(&msg)?;
+        loop {
+            match from_bevy.try_recv() {
+                Ok(msg) => conn.send_msg(&msg)?,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    let _ = conn.close();
+                    return Ok(());
+                }
+            }
         }
         match conn.recv_msg::<ServerMessage>() {
             Ok(msg) => {
@@ -159,7 +166,10 @@ fn io_loop(
                 }
             }
             Err(shared::transport::TransportError::Timeout) => {}
-            Err(e) => return Err(e.into()),
+            Err(e) => {
+                let _ = conn.close();
+                return Err(e.into());
+            }
         }
     }
 }

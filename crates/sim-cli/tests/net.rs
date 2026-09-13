@@ -34,6 +34,18 @@ fn spawn_listen(
     thread::JoinHandle<String>,
     thread::JoinHandle<String>,
 ) {
+    spawn_listen_on("tcp://127.0.0.1:0", extra)
+}
+
+fn spawn_listen_on(
+    listen: &str,
+    extra: &[&str],
+) -> (
+    Child,
+    String,
+    thread::JoinHandle<String>,
+    thread::JoinHandle<String>,
+) {
     let mut child = Command::new(bin())
         .args([
             "--config",
@@ -44,7 +56,7 @@ fn spawn_listen(
             "mock",
             "--quiet",
             "--listen",
-            "tcp://127.0.0.1:0",
+            listen,
         ])
         .args(extra)
         .stdout(Stdio::piped())
@@ -85,7 +97,10 @@ fn spawn_listen(
     let url = rx
         .recv_timeout(Duration::from_secs(20))
         .expect("listen url on stderr");
-    assert!(url.starts_with("tcp://"), "bad listen url {url:?}");
+    assert!(
+        url.starts_with("tcp://") || url.starts_with("ws://"),
+        "bad listen url {url:?}"
+    );
     (child, url, out_h, err_h)
 }
 
@@ -285,6 +300,38 @@ fn disconnect_then_second_client() {
         .unwrap();
     let _ = conn2.close();
     let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn ws_drop_then_second_client() {
+    let (mut child, url, out_h, err_h) = spawn_listen_on(
+        "ws://127.0.0.1:0",
+        &["--allow-control", "--start-paused", "--lockstep"],
+    );
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: true,
+        want_decisions: true,
+    })
+    .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>();
+    drop(conn);
+    let started = Instant::now();
+    let (conn2, welcome, _) = dummy_read_hello(&url, None).expect("reconnect after drop");
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "reconnect Hello took {:?}",
+        started.elapsed()
+    );
+    match welcome {
+        ServerMessage::Welcome { .. } => {}
+        other => panic!("second client expected Welcome, got {other:?}"),
+    }
+    let _ = conn2.close();
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = out_h.join();
+    let _ = err_h.join();
 }
 
 #[test]
@@ -1437,6 +1484,31 @@ fn lockstep_timeout_advances_without_ack() {
 }
 
 #[test]
+fn lockstep_drop_subscriber_unblocks() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&[
+        "--allow-control",
+        "--start-paused",
+        "--lockstep",
+        "--ticks",
+        "2",
+    ]);
+    let (mut conn, _, _) = dummy_read_hello(&url, None).unwrap();
+    conn.send_msg(&ClientMessage::Subscribe {
+        want_events: false,
+        want_decisions: false,
+    })
+    .unwrap();
+    let _ = conn.recv_msg::<ServerMessage>().unwrap();
+    conn.send_msg(&ClientMessage::Control(ControlVerb::Play))
+        .unwrap();
+    let t1 = drain_until_tick(&mut conn);
+    assert_eq!(t1, 1);
+    drop(conn);
+    let hash = wait_hash(&mut child, out_h, err_h);
+    assert!(!hash.is_empty());
+}
+
+#[test]
 fn connect_auto_acks_lockstep() {
     let (mut child, url, out_h, err_h) = spawn_listen(&["--lockstep", "--ticks", "6"]);
     let client = Command::new(bin())
@@ -1546,4 +1618,23 @@ fn tick_metrics_include_inspector() {
     }
     let _ = conn.close();
     let _ = wait_hash(&mut child, out_h, err_h);
+}
+
+#[test]
+fn listen_report_still_binds() {
+    let (mut child, url, out_h, err_h) = spawn_listen(&["--report", "--ticks", "2"]);
+    dummy_read_hello(&url, None).expect("dummy connect while --report");
+    let status = child.wait().expect("wait sim-cli");
+    let stdout = out_h.join().unwrap();
+    let stderr = err_h.join().unwrap();
+    assert!(status.success(), "sim-cli failed: {stderr}\n{stdout}");
+    assert!(
+        stderr.lines().any(|l| l.starts_with("listen=")),
+        "listen url on stderr: {stderr}"
+    );
+    assert!(
+        stdout.contains("# Food-economy report"),
+        "report markdown in stdout: {stdout}"
+    );
+    assert!(stdout.contains("final_hash="), "{stdout}");
 }

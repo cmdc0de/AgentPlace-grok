@@ -25,6 +25,8 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
 | PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
 | PG-13 | Object visual scale | Done (M49) | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
+| PG-14 | Viewer FPS / frametime HUD | Open | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
+| PG-15 | SQLite run log | Open | CLI flag writes the same rows as events/decisions/timing JSONL into a sqlite3 file. Extra sink; JSONL unchanged. Hash-neutral. |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -348,8 +350,10 @@ Constraints for a later `/spec`:
 - Viewer render metrics are **native window only** unless a later slice puts Bevy in the browser.
 - Time-series **charts** in imgui / the attach page can consume these series later (already parked as charts). OTel export can ship without a new GUI.
 - Do not add hashed `SimEventKind` rows for “tick took 7 ms.”
+- On-screen FPS / average frametime in the native viewer is **PG-14**, not this theme.
+- sqlite3 for events/decisions/timing JSONL rows is **PG-15**, not this theme.
 
-Out of this theme until picked: protobuf/TLS on the **sim wire** (different from OTLP); distributed tracing of every LLM HTTP call unless that `/spec` wants spans; eBPF.
+Out of this theme until picked: protobuf/TLS on the **sim wire** (different from OTLP); distributed tracing of every LLM HTTP call unless that `/spec` wants spans; eBPF; imgui FPS HUD (**PG-14**).
 
 ---
 
@@ -421,6 +425,71 @@ Out of this theme until picked: skeletal animation, per-agent clothing, Bevy in 
 
 ---
 
+## PG-14 — Viewer FPS / frametime HUD
+
+**Shipped today:** Status / World show last **sim tick** `wall_ms` and a short tick-timing ring (mean/max text). M47 Charts are last-256 **sim ticks** (wall_ms, living, hungry, …). There is **no** frames-per-second readout and **no** render frametime. PG-11 wants OTel of viewer render times; that is **export**, not a HUD. A paused `--listen` server still draws frames.
+
+**Wanted:** the native Bevy viewer shows **FPS** and **average frametime in milliseconds** so a researcher can see whether the window is keeping up, independent of how long the sim tick took.
+
+| Number | Meaning |
+|---|---|
+| **FPS** | Frames per second from Bevy `Time::delta` (instantaneous or windowed — lock in `/spec`). |
+| **avg frametime (ms)** | Mean of the last *N* frame deltas, in milliseconds (e.g. last 60 frames or 1 s). |
+
+Sketch (lock placement / *N* in `/spec`): a compact line on the existing Status window (or a always-on HUD strip): `fps=59.8  frame_ms=16.7`. Update every render frame, including while the sim is paused.
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** Render FPS / frametime never enter `state_hash` or AGTN. No `SimEventKind` for “frame took 16 ms.”
+- **Native Bevy window only** unless that slice also wants the attach page. Distinct from sim `TickTiming.wall_ns` and from Charts `wall_ms`.
+- Paused server **still** updates FPS (rendering continues; sim ticks do not).
+- Sliding window size locked in `/spec` (do not store samples on `Simulation`).
+- `cargo test -p viewer` must not need a GPU window. Unit-test a helper: a slice of deltas → fps + mean ms.
+- Do not change shipping `default.toml` / `coop.toml`. No PROTOCOL bump. Overlay not required (always-on HUD is fine) unless the slice wants a toggle.
+- Ignore nothing about keys; this is display-only. Do not fight imgui `want_keyboard`.
+
+Out of this theme until picked: PG-11 OTel export of the same numbers; GPU profiler / GPU time; vsync / frame-cap flags; frame-time polyline in the Charts window; browser-page FPS.
+
+---
+
+## PG-15 — SQLite run log
+
+**Shipped today:** `--out-dir` appends three JSONL files: `{experiment_id}_events.jsonl` (`SimEvent`), `{experiment_id}_decisions.jsonl` (`DecisionRecord`, one line per agent per tick), and optional `{experiment_id}_timing.jsonl` (`TickTiming` when timing is on). `--compare` / `/events` / the checkpoint scrubber read those files. There is **no** sqlite (or other DB) sink. PG-11 OTel is a different extra sink (metrics, not event rows).
+
+**Wanted:** a **command-line parameter** so the **same rows** that go to those JSONL files also go to a **sqlite3** database a researcher can query (`SELECT … WHERE tick = 12`) without parsing JSONL.
+
+Sketch (lock flag name, path, and schema in `/spec`):
+
+```bash
+cargo run -p sim-cli -- --config configs/default.toml --ticks 80 \
+  --out-dir /tmp/run --sqlite /tmp/run/log.sqlite3 --llm mock --quiet
+```
+
+| Flag (sketch) | Meaning |
+|---|---|
+| `--sqlite PATH` | Open/create that sqlite3 file; insert the same events / decisions / timing rows JSONL would get. Omit ⇒ no DB (today). |
+
+| JSONL file | sqlite table (sketch) |
+|---|---|
+| `*_events.jsonl` | `events` |
+| `*_decisions.jsonl` | `decisions` |
+| `*_timing.jsonl` | `timing` (only when timing JSONL would have been written) |
+
+Constraints for a later `/spec`:
+
+- **Hash-neutral.** The DB is an extra I/O sink, same rule as JSONL / M8 timing ns: never in `state_hash` or AGTN. No new `SimEventKind` for “row written.”
+- **Same data as JSONL**, not a new log. Schema lock in `/spec`: typed columns vs one JSON text column per row (JSON column is the easy fidelity match).
+- CLI, not `ExperimentConfig`. Shipping `default.toml` / `coop.toml` unchanged. Overlay optional later; flag-only is enough for v1.
+- Do **not** replace JSONL. `--out-dir` still writes the files. `--sqlite` without `--out-dir` is allowed (DB only). `--out-dir` without `--sqlite` is today.
+- `--listen` serve path writes the same rows (headless and attach both append today).
+- `cargo test` never needs the network. Use a temp file or in-process sqlite; do not require a DBA or a server. Missing parent dir ⇒ create or fail with a clear error (lock in `/spec`).
+- Mock + no `--sqlite` ⇒ idle hashes **unchanged**. Opening the DB must not change hashes even when the flag is on.
+- No PROTOCOL bump. Not a viewer flag.
+
+Out of this theme until picked: Postgres / duckdb; replacing JSONL; using sqlite as a checkpoint store; OTel (PG-11); WASM / browser query UI.
+
+---
+
 ## How these interact
 
 ```
@@ -433,7 +502,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`d`), hash-neutral, native window only. PG-13 is **per-object `[visual] scale`** so each glb can be sized in TOML without re-exporting.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`d`), hash-neutral, native window only. PG-13 is **per-object `[visual] scale`** so each glb can be sized in TOML without re-exporting. PG-14 is the **native HUD** for FPS and average frametime (ms), hash-neutral, distinct from sim tick timing and from PG-11 export. PG-15 is a **sqlite3 extra sink** for the same events/decisions/timing rows as JSONL (`--sqlite PATH`), hash-neutral, JSONL unchanged.
 
 ---
 
@@ -449,4 +518,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, and per-object visual scale are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12 / PG-13**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, per-object visual scale, viewer FPS/frametime HUD, and sqlite run log are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12 / PG-13 / PG-14 / PG-15**, not parking-lot one-liners.

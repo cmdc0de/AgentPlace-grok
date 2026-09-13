@@ -6,9 +6,9 @@ use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
 use shared::transport::{Connection, Listener, TransportError};
 use sim_core::{
     AgentId, SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl,
-    append_timing_jsonl, ckpt_at_or_before, experiment_id, find_events_jsonl, jsonl_lines_for_tick,
-    jsonl_tick_at_or_before, list_checkpoints, list_jsonl_ticks, parse_item, summary_markdown,
-    write_report, write_run_checkpoint,
+    append_timing_jsonl, build_report, ckpt_at_or_before, experiment_id, find_events_jsonl,
+    jsonl_lines_for_tick, jsonl_tick_at_or_before, list_checkpoints, list_jsonl_ticks, parse_item,
+    report_markdown, summary_markdown, write_report, write_run_checkpoint,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -26,11 +26,47 @@ struct Subscriber {
     acked_tick: Option<u64>,
 }
 
+/// Welcome + Snapshot for new clients. Separate mutex so Hello does not wait
+/// out a long `sim.tick()` (LLM) that holds `Hub`.
+struct AttachCache {
+    welcome: ServerMessage,
+    snapshot: ServerMessage,
+}
+
+impl AttachCache {
+    fn placeholder() -> Self {
+        Self {
+            welcome: ServerMessage::Welcome {
+                tick: 0,
+                state_hash: [0; 32],
+                experiment_id: String::new(),
+            },
+            snapshot: ServerMessage::Snapshot {
+                checkpoint_bytes: Vec::new(),
+            },
+        }
+    }
+}
+
+struct ClientSlot {
+    id: u64,
+    hub: Arc<Mutex<Hub>>,
+}
+
+impl Drop for ClientSlot {
+    fn drop(&mut self) {
+        let mut hub = match self.hub.lock() {
+            Ok(h) => h,
+            Err(e) => e.into_inner(),
+        };
+        hub.subscribers.remove(&self.id);
+    }
+}
+
 pub struct Hub {
     pub sim: Simulation,
     paused: bool,
     allow_control: bool,
-    token: Option<String>,
     jsonl_path: Option<PathBuf>,
     decisions_path: Option<PathBuf>,
     timing_path: Option<PathBuf>,
@@ -38,6 +74,7 @@ pub struct Hub {
     out_dir: Option<PathBuf>,
     interval: u64,
     subscribers: HashMap<u64, Subscriber>,
+    attach: Arc<Mutex<AttachCache>>,
 }
 
 impl Hub {
@@ -84,7 +121,16 @@ impl Hub {
             }
         }
         self.broadcast_tick();
+        self.refresh_attach();
         true
+    }
+
+    fn refresh_attach(&self) {
+        let welcome = self.welcome();
+        let Ok(snapshot) = self.snapshot() else {
+            return;
+        };
+        *self.attach.lock().unwrap() = AttachCache { welcome, snapshot };
     }
 
     fn broadcast_tick(&self) {
@@ -420,6 +466,8 @@ pub struct ServeOpts {
     pub write_timing: bool,
     pub lockstep: bool,
     pub lockstep_timeout_ms: u64,
+    pub summarize: bool,
+    pub report: bool,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -450,11 +498,11 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         .checkpoint_every
         .unwrap_or(opts.sim.config.checkpoint.auto_interval_ticks);
 
+    let attach = Arc::new(Mutex::new(AttachCache::placeholder()));
     let hub = Arc::new(Mutex::new(Hub {
         sim: opts.sim,
         paused: opts.start_paused,
         allow_control: opts.allow_control,
-        token: opts.token,
         jsonl_path,
         decisions_path,
         timing_path,
@@ -462,7 +510,9 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         out_dir: opts.out_dir.clone(),
         interval,
         subscribers: HashMap::new(),
+        attach: Arc::clone(&attach),
     }));
+    hub.lock().unwrap().refresh_attach();
 
     let running = Arc::new(AtomicBool::new(true));
     let next_id = Arc::new(AtomicU64::new(1));
@@ -472,10 +522,12 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         let bound = listener.local_url()?;
         eprintln!("listen={bound}");
         let hub = Arc::clone(&hub);
+        let attach = Arc::clone(&attach);
         let running = Arc::clone(&running);
         let next_id = Arc::clone(&next_id);
+        let token = opts.token.clone();
         listener_threads.push(thread::spawn(move || {
-            accept_loop(listener, hub, running, next_id);
+            accept_loop(listener, hub, attach, running, next_id, token);
         }));
     }
     // Give dummy / GUI clients a moment to Hello before ticks start. Does not
@@ -513,6 +565,21 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(dir) = &hub.out_dir {
             let _ = write_run_checkpoint(&hub.sim, dir);
         }
+        if opts.summarize {
+            print!("{}", summary_markdown(&hub.sim)?);
+        }
+        if opts.report {
+            if let Some(dir) = &hub.out_dir {
+                let (md, csv) = write_report(&hub.sim, dir)?;
+                println!("report={}", md.display());
+                if let Some(csv) = csv {
+                    println!("report_csv={}", csv.display());
+                }
+            } else {
+                let built = build_report(&hub.sim)?;
+                print!("{}", report_markdown(&built));
+            }
+        }
         println!("final_tick={}", hub.sim.tick);
         println!("final_hash={}", hub.sim.state_hash());
         if !opts.quiet {
@@ -539,21 +606,33 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
 fn accept_loop(
     listener: Listener,
     hub: Arc<Mutex<Hub>>,
+    attach: Arc<Mutex<AttachCache>>,
     running: Arc<AtomicBool>,
     next_id: Arc<AtomicU64>,
+    token: Option<String>,
 ) {
+    let scheme = listener.scheme();
     while running.load(Ordering::Relaxed) {
-        match listener.accept_nonblocking() {
-            Ok(Some(conn)) => {
+        match listener.accept_tcp_nonblocking() {
+            Ok(Some(stream)) => {
                 let id = next_id.fetch_add(1, Ordering::Relaxed);
-                if let Some(addr) = conn.peer_addr() {
-                    eprintln!("net: client {id} connected from {addr}");
-                } else {
-                    eprintln!("net: client {id} connected");
-                }
                 let hub = Arc::clone(&hub);
+                let attach = Arc::clone(&attach);
+                let token = token.clone();
                 thread::spawn(move || {
-                    if let Err(e) = handle_client(id, conn, hub) {
+                    let conn = match Connection::from_accepted(stream, scheme) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("net: client {id} handshake error: {e}");
+                            return;
+                        }
+                    };
+                    if let Some(addr) = conn.peer_addr() {
+                        eprintln!("net: client {id} connected from {addr}");
+                    } else {
+                        eprintln!("net: client {id} connected");
+                    }
+                    if let Err(e) = handle_client(id, conn, hub, attach, token) {
                         if !matches!(e, TransportError::Closed | TransportError::Timeout) {
                             eprintln!("net: client {id} error: {e}");
                         }
@@ -574,9 +653,16 @@ fn handle_client(
     id: u64,
     mut conn: Connection,
     hub: Arc<Mutex<Hub>>,
+    attach: Arc<Mutex<AttachCache>>,
+    server_token: Option<String>,
 ) -> Result<(), TransportError> {
+    let _slot = ClientSlot {
+        id,
+        hub: Arc::clone(&hub),
+    };
     let (out_tx, out_rx) = mpsc::channel::<ServerMessage>();
     conn.set_read_timeout(Some(Duration::from_secs(10)))?;
+    conn.set_write_timeout(Some(Duration::from_secs(10)))?;
     let first: ClientMessage = conn.recv_msg()?;
     let ClientMessage::Hello {
         protocol_version,
@@ -589,32 +675,27 @@ fn handle_client(
         })?;
         return Ok(());
     };
-    let (welcome, snapshot) = {
-        let hub = hub.lock().unwrap();
-        if protocol_version != PROTOCOL_VERSION {
-            drop(hub);
+    if protocol_version != PROTOCOL_VERSION {
+        conn.send_msg(&ServerMessage::Error {
+            code: ErrorCode::Protocol,
+            message: format!(
+                "unsupported protocol_version {protocol_version} (server {PROTOCOL_VERSION})"
+            ),
+        })?;
+        return Ok(());
+    }
+    if let Some(need) = &server_token {
+        if token.as_deref() != Some(need.as_str()) {
             conn.send_msg(&ServerMessage::Error {
-                code: ErrorCode::Protocol,
-                message: format!(
-                    "unsupported protocol_version {protocol_version} (server {PROTOCOL_VERSION})"
-                ),
+                code: ErrorCode::Unauthorized,
+                message: "invalid token".into(),
             })?;
             return Ok(());
         }
-        if let Some(need) = &hub.token {
-            if token.as_deref() != Some(need.as_str()) {
-                drop(hub);
-                conn.send_msg(&ServerMessage::Error {
-                    code: ErrorCode::Unauthorized,
-                    message: "invalid token".into(),
-                })?;
-                return Ok(());
-            }
-        }
-        (
-            hub.welcome(),
-            hub.snapshot().map_err(TransportError::Handshake)?,
-        )
+    }
+    let (welcome, snapshot) = {
+        let cache = attach.lock().unwrap();
+        (cache.welcome.clone(), cache.snapshot.clone())
     };
     conn.send_msg(&welcome)?;
     conn.send_msg(&snapshot)?;
@@ -658,17 +739,8 @@ fn handle_client(
                 })?;
             }
             Ok(ClientMessage::RequestSnapshot) => {
-                let snap = {
-                    let hub = hub.lock().unwrap();
-                    hub.snapshot()
-                };
-                match snap {
-                    Ok(msg) => conn.send_msg(&msg)?,
-                    Err(e) => conn.send_msg(&ServerMessage::Error {
-                        code: ErrorCode::Internal,
-                        message: e,
-                    })?,
-                }
+                let snap = attach.lock().unwrap().snapshot.clone();
+                conn.send_msg(&snap)?;
             }
             Ok(ClientMessage::Control(verb)) => {
                 let reply = {
@@ -679,7 +751,9 @@ fn handle_client(
                     ) {
                         eprintln!("net: control {verb:?} from client {id}");
                     }
-                    hub.apply_control(verb)
+                    let reply = hub.apply_control(verb);
+                    hub.refresh_attach();
+                    reply
                 };
                 conn.send_msg(&reply)?;
             }
@@ -693,13 +767,16 @@ fn handle_client(
                         }
                     } else {
                         match hub.sim.inject_schedule_toml(&schedule_toml) {
-                            Ok(()) => ServerMessage::ReportReady {
-                                markdown_or_path: format!(
-                                    "injected {} incentive(s) at tick {}",
-                                    hub.sim.incentives.incentives.len(),
-                                    hub.sim.tick
-                                ),
-                            },
+                            Ok(()) => {
+                                hub.refresh_attach();
+                                ServerMessage::ReportReady {
+                                    markdown_or_path: format!(
+                                        "injected {} incentive(s) at tick {}",
+                                        hub.sim.incentives.incentives.len(),
+                                        hub.sim.tick
+                                    ),
+                                }
+                            }
                             Err(e) => ServerMessage::Error {
                                 code: ErrorCode::Internal,
                                 message: e.to_string(),
@@ -722,11 +799,7 @@ fn handle_client(
                 })?;
             }
             Err(TransportError::Timeout) => continue,
-            Err(e) => {
-                let mut hub = hub.lock().unwrap();
-                hub.subscribers.remove(&id);
-                return Err(e);
-            }
+            Err(e) => return Err(e),
         }
     }
 }
