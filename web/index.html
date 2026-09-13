@@ -54,6 +54,11 @@
   <h2>Inventions</h2>
   <div id="inventions"></div>
   <h2>Metrics</h2>
+  <div>
+    <label>Sqlite metrics URL <input id="sqlite-metrics-url" size="40" value="http://127.0.0.1:9002/metrics" /></label>
+    <button id="sqlite-metrics-refresh">Refresh</button>
+  </div>
+  <div id="sqlite-metrics" class="muted">Needs sim-cli --sqlite PATH --sqlite-http 127.0.0.1:9002</div>
   <div id="metrics"></div>
   <h3>Session charts (last 256 ticks)</h3>
   <div id="charts">
@@ -350,6 +355,32 @@
       return null;
     }
     let ws = null;
+    document.getElementById("sqlite-metrics-refresh").onclick = async () => {
+      const url = document.getElementById("sqlite-metrics-url").value.trim();
+      const el = document.getElementById("sqlite-metrics");
+      try {
+        const r = await fetch(url);
+        const j = await r.json();
+        let html = "<table><tbody>";
+        html += "<tr><th>median_wall_ns</th><td>" + esc(j.median_wall_ns) + "</td></tr>";
+        html += "<tr><th>median_agent_ns</th><td>" + esc(j.median_agent_ns) + "</td></tr>";
+        html += "</tbody></table>";
+        html += "<h3>events by kind</h3><table><thead><tr><th>kind</th><th>n</th></tr></thead><tbody>";
+        for (const row of (j.events_by_kind || [])) {
+          html += "<tr><td>" + esc(row.kind) + "</td><td>" + esc(row.n) + "</td></tr>";
+        }
+        html += "</tbody></table><h3>crafts</h3><table><thead><tr><th>item</th><th>n</th></tr></thead><tbody>";
+        for (const row of (j.crafts || [])) {
+          html += "<tr><td>" + esc(row.item) + "</td><td>" + esc(row.n) + "</td></tr>";
+        }
+        html += "</tbody></table>";
+        el.className = "";
+        el.innerHTML = html;
+      } catch (e) {
+        el.className = "muted";
+        el.textContent = String(e);
+      }
+    };
     document.getElementById("connect").onclick = () => {
       const url = document.getElementById("url").value.trim();
       const token = document.getElementById("token").value.trim();

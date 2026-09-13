@@ -487,6 +487,7 @@ pub struct ServeOpts {
     pub summarize: bool,
     pub report: bool,
     pub sqlite: Option<PathBuf>,
+    pub sqlite_http: Option<String>,
 }
 
 pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
@@ -544,6 +545,9 @@ pub fn serve(mut opts: ServeOpts) -> Result<(), Box<dyn std::error::Error>> {
     hub.lock().unwrap().refresh_attach();
 
     let running = Arc::new(AtomicBool::new(true));
+    if let (Some(bind), Some(path)) = (&opts.sqlite_http, &opts.sqlite) {
+        crate::sqlite::spawn_metrics_http(bind, path.clone(), Arc::clone(&running))?;
+    }
     let next_id = Arc::new(AtomicU64::new(1));
     let mut listener_threads = Vec::new();
     for url in &opts.listen {

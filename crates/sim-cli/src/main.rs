@@ -65,6 +65,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut telemetry = false;
     let mut objects_path: Option<PathBuf> = None;
     let mut sqlite_path: Option<PathBuf> = None;
+    let mut sqlite_http: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -88,6 +89,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 sqlite_path = Some(PathBuf::from(
                     args.get(i).ok_or("--sqlite requires a path")?,
                 ));
+            }
+            "--sqlite-http" => {
+                i += 1;
+                sqlite_http = Some(
+                    args.get(i)
+                        .ok_or("--sqlite-http requires host:port")?
+                        .clone(),
+                );
             }
             "--checkpoint-every" => {
                 i += 1;
@@ -369,6 +378,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    if sqlite_http.is_some() && sqlite_path.is_none() {
+        return Err("--sqlite-http requires --sqlite".into());
+    }
+
     if !listen.is_empty() {
         return server::serve(server::ServeOpts {
             sim,
@@ -386,6 +399,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             summarize,
             report,
             sqlite: sqlite_path,
+            sqlite_http,
         });
     }
 
@@ -407,6 +421,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     if let Some(db) = &mut sqlite {
         db.insert_events(&sim.events.events, &sim.catalog)?;
+    }
+    let http_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    if let (Some(bind), Some(path)) = (&sqlite_http, &sqlite_path) {
+        sqlite::spawn_metrics_http(bind, path.clone(), std::sync::Arc::clone(&http_running))?;
     }
     let mut jsonl_path = None;
     let mut decisions_path = None;
@@ -489,6 +507,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         emit_report(&sim, out_dir.as_deref())?;
     }
 
+    http_running.store(false, std::sync::atomic::Ordering::Relaxed);
     println!("final_tick={}", sim.tick);
     println!("final_hash={}", sim.state_hash());
     if tick_ns_n > 0 {
@@ -519,7 +538,7 @@ sim-cli — headless AgentTown runner
 
 Usage:
   sim-cli [--config PATH] [--ticks N] [--quiet]
-          [--out-dir DIR] [--sqlite PATH] [--checkpoint-every K]
+          [--out-dir DIR] [--sqlite PATH] [--sqlite-http HOST:PORT] [--checkpoint-every K]
           [--load PATH] [--summarize] [--report]
           [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
           [--connect tcp://HOST:PORT]
@@ -545,6 +564,7 @@ Options:
       --summarize           Print the Markdown world summary
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir. With --listen, emit when the session ends
       --sqlite PATH         Write events/decisions/timing as sqlite columns (extra sink; JSONL unchanged)
+      --sqlite-http HOST:PORT  Serve GET /metrics JSON from --sqlite (needs --sqlite; CORS *)
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS). Always binds; --report/--summarize do not skip it
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control

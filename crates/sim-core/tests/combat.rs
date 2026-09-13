@@ -361,3 +361,79 @@ fn checkpoint_round_trip_default_health() {
     assert!(restored.agents.values().all(|a| !a.incapacitated));
     assert_eq!(restored.state_hash(), sim.state_hash());
 }
+
+fn shipped_objects() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
+}
+
+fn give_slug(sim: &mut Simulation, id: AgentId, slug: &str) {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug}"))
+        .item;
+    let added = sim.agents.get_mut(&id).unwrap().try_add_item(item, 1);
+    assert_eq!(added, 1, "give {slug}");
+}
+
+#[test]
+fn attack_no_weapon_is_base_damage() {
+    let mut sim = Simulation::new(tiny(0x51_20)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE));
+}
+
+#[test]
+fn attack_hold_pike_adds_800() {
+    let mut sim = Simulation::new(tiny(0x51_21)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    give_slug(&mut sim, a, "pike");
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE + 800));
+}
+
+#[test]
+fn attack_two_weapons_uses_max_not_sum() {
+    let mut sim = Simulation::new(tiny(0x51_22)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    give_slug(&mut sim, a, "club");
+    give_slug(&mut sim, a, "pike");
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE + 800), "max pike 800 not 300+800");
+}
+
+#[test]
+fn attack_catalog_off_weapon_no_bonus() {
+    let mut sim = Simulation::new(tiny(0x51_23)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE));
+}

@@ -1,4 +1,4 @@
-id = "club"
+id = "ladder"
 kind = "item"
 
 [visual]
@@ -9,8 +9,7 @@ mid  = "assets/models/optimized/wood_pile.glb"
 far  = "assets/models/optimized/wood_pile.glb"
 
 [sim]
-weight_milli = 250
-attack_bonus = 300
+weight_milli = 400
 [sim.craft]
-inputs = [["wood", 1]]
+inputs = [["wood", 3]]
 output_qty = 1

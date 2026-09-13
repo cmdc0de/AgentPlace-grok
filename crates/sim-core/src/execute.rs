@@ -264,7 +264,12 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         str_score,
         def_dex,
     );
-    let damage = if hit { atk.sheet.attack_damage() } else { 0 };
+    let bonus = crate::objects::max_held_attack_bonus(atk, &sim.catalog);
+    let damage = if hit {
+        atk.sheet.attack_damage().saturating_add(bonus)
+    } else {
+        0
+    };
     if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;

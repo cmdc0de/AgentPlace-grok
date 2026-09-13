@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Locked on implement from `sim-cli --config configs/default.toml --ticks 2` with shipped objects
-/// (includes M50 satchel/rucksack/cooked_veg/bowl/club/pike/sling/bow catalog `[sim]`).
-const IDLE_2: &str = "35faecbd4484eb841e0a46264ca929fec7a08867ab4acbaaa0acbec56c74e4bb";
+/// (includes M51 tent/millstone/stew/ladder and weapon attack_bonus).
+const IDLE_2: &str = "0406960048c1ada1c4910f7bd81bba89ed61a75ec85c2f43abc0d5491dfdff44";
 const IDLE_2_NO_CATALOG: &str = "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 
 fn shipped_objects() -> PathBuf {
@@ -1128,4 +1128,22 @@ fn catalog_off_new_m50_crafts_not_legal() {
             recipe: Recipe::Catalog(_)
         }
     )));
+}
+
+#[test]
+fn catalog_on_craft_tent() {
+    let mut sim = Simulation::new(tiny(0x51_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "tent",
+        &[(ItemId::Fiber, 6), (ItemId::Wood, 4)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_stew() {
+    let mut sim = Simulation::new(tiny(0x51_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "stew", &[(ItemId::Food(1), 4)]);
 }

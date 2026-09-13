@@ -1,7 +1,8 @@
 # M51 — Sqlite metrics page, weapon combat bonuses, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M50 complete (`docs/M50-plan.md`, git tag `M50`, commit `35776f1`)  
+**Walkthrough:** [`docs/M51-test-plan.md`](M51-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-15 leftover queries, PG-9 recipes); After-M50 weapon combat bonuses
 
 ## Context
@@ -19,7 +20,7 @@ A researcher can:
 3. Turn on `--catalog` / objects dir and **Craft** **tent, millstone, stew, ladder**. Catalog-off ⇒ idle no-objects hash unchanged.
 4. CI stays `provider = mock`. **`PROTOCOL_VERSION = 5`**.
 
-No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects **changes** (document on implement).
+No-objects 2-tick hash stays **`70e5204d…`**. Default CLI with shipped objects is **`04069600…`**.
 
 ## In scope
 
@@ -128,7 +129,7 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 | Test | Asserts |
 |---|---|
 | no-objects 2 ticks | hash `70e5204d…` |
-| default CLI 2 ticks | shipped-objects hash **changes** (lock on implement); no-objects `70e5204d…` |
+| default CLI 2 ticks | shipped-objects hash `04069600…`; no-objects `70e5204d…` |
 | `--sqlite-http` without `--sqlite` | process error |
 | `/metrics` empty DB | medians `null`, lists `[]` |
 | `/metrics` fixture | median_wall_ns is the middle `ticks.wall_ns`; events_by_kind counts match |
@@ -172,7 +173,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M51-test-plan.md` (written on implement).
+Walkthrough: [`docs/M51-test-plan.md`](M51-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -181,7 +182,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: no-objects hash `70e5204d…`; shipped-objects idle hash **new** (document); Hello v5; format_version 3 write.
+Expect: no-objects hash `70e5204d…`; shipped-objects idle hash `04069600…`; Hello v5; format_version 3 write.
 
 ## Risks
 

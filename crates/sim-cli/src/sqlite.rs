@@ -7,7 +7,13 @@ use sim_core::decision_log::DecisionRecord;
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::objects::CatalogEntry;
 use sim_core::timing::TickTiming;
-use std::path::Path;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::Duration;
 
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS ticks (
@@ -236,6 +242,114 @@ impl SqliteLog {
         tx.commit()?;
         Ok(())
     }
+}
+
+pub const SQL_MEDIAN_WALL: &str =
+    "SELECT wall_ns FROM ticks ORDER BY wall_ns LIMIT 1 OFFSET (SELECT COUNT(*) FROM ticks) / 2";
+pub const SQL_MEDIAN_AGENT: &str = "SELECT (perceive_ns+retrieve_ns+select_ns+execute_ns+remember_ns) AS agent_ns FROM agent_timing ORDER BY 1 LIMIT 1 OFFSET (SELECT COUNT(*) FROM agent_timing) / 2";
+pub const SQL_EVENTS_BY_KIND: &str =
+    "SELECT kind, COUNT(*) AS n FROM events GROUP BY kind ORDER BY n DESC, kind";
+pub const SQL_CRAFTS: &str =
+    "SELECT item, COUNT(*) AS n FROM events WHERE kind = 'craft' GROUP BY item ORDER BY n DESC, item";
+
+pub fn metrics_json(conn: &Connection) -> Result<serde_json::Value, rusqlite::Error> {
+    use rusqlite::OptionalExtension;
+    let median_wall_ns: Option<i64> = conn
+        .query_row(SQL_MEDIAN_WALL, [], |r| r.get(0))
+        .optional()?;
+    let median_agent_ns: Option<i64> = conn
+        .query_row(SQL_MEDIAN_AGENT, [], |r| r.get(0))
+        .optional()?;
+    let mut events_by_kind = Vec::new();
+    let mut stmt = conn.prepare(SQL_EVENTS_BY_KIND)?;
+    let rows = stmt.query_map([], |r| {
+        Ok(serde_json::json!({
+            "kind": r.get::<_, String>(0)?,
+            "n": r.get::<_, i64>(1)?,
+        }))
+    })?;
+    for row in rows {
+        events_by_kind.push(row?);
+    }
+    let mut crafts = Vec::new();
+    let mut stmt = conn.prepare(SQL_CRAFTS)?;
+    let rows = stmt.query_map([], |r| {
+        Ok(serde_json::json!({
+            "item": r.get::<_, Option<String>>(0)?.unwrap_or_default(),
+            "n": r.get::<_, i64>(1)?,
+        }))
+    })?;
+    for row in rows {
+        crafts.push(row?);
+    }
+    Ok(serde_json::json!({
+        "median_wall_ns": median_wall_ns,
+        "median_agent_ns": median_agent_ns,
+        "events_by_kind": events_by_kind,
+        "crafts": crafts,
+    }))
+}
+
+/// Serve GET/OPTIONS `/metrics` until `running` is false. Prints `sqlite_http=` on stderr.
+pub fn spawn_metrics_http(
+    bind: &str,
+    db_path: PathBuf,
+    running: Arc<AtomicBool>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind(bind)?;
+    listener.set_nonblocking(true)?;
+    let addr = listener.local_addr()?;
+    let url = format!("http://{addr}/metrics");
+    eprintln!("sqlite_http={url}");
+    thread::spawn(move || {
+        while running.load(Ordering::Relaxed) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    let _ = handle_metrics_http(stream, &db_path);
+                }
+                Err(e) if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::Interrupted => {
+                    thread::sleep(Duration::from_millis(20));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+    Ok(url)
+}
+
+fn handle_metrics_http(mut stream: TcpStream, db_path: &Path) -> std::io::Result<()> {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let mut buf = [0u8; 2048];
+    let n = stream.read(&mut buf)?;
+    let req = String::from_utf8_lossy(&buf[..n]);
+    let first = req.lines().next().unwrap_or("");
+    let cors = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\n";
+    if first.starts_with("OPTIONS ") {
+        let resp = format!("HTTP/1.1 204 No Content\r\n{cors}\r\n");
+        stream.write_all(resp.as_bytes())?;
+        return Ok(());
+    }
+    if !first.starts_with("GET /metrics") && !first.starts_with("GET / ") {
+        let body = b"not found";
+        let resp = format!(
+            "HTTP/1.1 404 Not Found\r\n{cors}Content-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        stream.write_all(body)?;
+        return Ok(());
+    }
+    let body = match Connection::open(db_path).and_then(|c| metrics_json(&c)) {
+        Ok(v) => v.to_string(),
+        Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+    };
+    let resp = format!(
+        "HTTP/1.1 200 OK\r\n{cors}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(resp.as_bytes())?;
+    stream.write_all(body.as_bytes())?;
+    Ok(())
 }
 
 fn primary_action_name(v: &serde_json::Value) -> String {
@@ -544,7 +658,12 @@ mod tests {
     use sim_core::AgentId;
     use sim_core::event_log::SimEvent;
     use sim_core::timing::AgentTiming;
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
 
     fn tmp_db() -> (SqliteLog, PathBuf) {
         use std::sync::atomic::{AtomicU64, Ordering};
@@ -675,5 +794,65 @@ mod tests {
             )
             .unwrap();
         assert!(n >= 1, "legal rows={n}");
+    }
+
+    #[test]
+    fn metrics_empty_db_null_medians() {
+        let (log, _path) = tmp_db();
+        let v = metrics_json(&log.conn).unwrap();
+        assert!(v["median_wall_ns"].is_null(), "{v}");
+        assert!(v["median_agent_ns"].is_null(), "{v}");
+        assert_eq!(v["events_by_kind"], serde_json::json!([]));
+        assert_eq!(v["crafts"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn metrics_fixture_median_and_kinds() {
+        let (mut log, _path) = tmp_db();
+        for wall in [10i64, 30, 20] {
+            log.conn
+                .execute(
+                    "INSERT INTO ticks (tick, wall_ns, world_ns, board_ns, incentive_ns, agents_ns)
+                     VALUES (?1, ?2, 0, 0, 0, 0)",
+                    params![wall / 10, wall],
+                )
+                .unwrap();
+        }
+        log.insert_events(
+            &[SimEvent {
+                tick: 1,
+                agent: AgentId(0),
+                kind: SimEventKind::Wait,
+            }],
+            &[],
+        )
+        .unwrap();
+        let v = metrics_json(&log.conn).unwrap();
+        assert_eq!(v["median_wall_ns"], 20);
+        let kinds = v["events_by_kind"].as_array().unwrap();
+        assert_eq!(kinds[0]["kind"], "wait");
+        assert_eq!(kinds[0]["n"], 1);
+    }
+
+    #[test]
+    fn metrics_http_cors_and_json() {
+        let (log, path) = tmp_db();
+        drop(log);
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path, Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let mut stream = TcpStream::connect(addr).unwrap();
+        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream
+            .write_all(b"GET /metrics HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut buf = Vec::new();
+        let _ = stream.read_to_end(&mut buf);
+        let resp = String::from_utf8_lossy(&buf);
+        assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+        assert!(resp.contains("median_wall_ns"), "{resp}");
+        running.store(false, Ordering::Relaxed);
     }
 }

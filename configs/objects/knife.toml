@@ -10,6 +10,7 @@ far  = "assets/models/optimized/herrscher_of_truths_spear.glb"
 
 [sim]
 weight_milli = 150
+attack_bonus = 200
 [sim.craft]
 inputs = [["stone", 1], ["fiber", 1]]
 output_qty = 1

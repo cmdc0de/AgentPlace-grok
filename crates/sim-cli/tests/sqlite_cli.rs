@@ -72,3 +72,26 @@ fn sqlite_cli_without_out_dir_creates_db() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("final_hash="), "{stdout}");
 }
+
+#[test]
+fn sqlite_http_requires_sqlite() {
+    let out = Command::new(bin())
+        .args([
+            "--config",
+            config().to_str().unwrap(),
+            "--ticks",
+            "0",
+            "--llm",
+            "mock",
+            "--sqlite-http",
+            "127.0.0.1:0",
+        ])
+        .output()
+        .expect("sim-cli");
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("--sqlite-http requires --sqlite"),
+        "{err}"
+    );
+}

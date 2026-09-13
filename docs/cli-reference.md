@@ -28,6 +28,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 | `-q`, `--quiet` | off | Print `final_tick`, `final_hash`, and last/mean `tick_ns` only. |
 | `-o`, `--out-dir DIR` | off | Write checkpoints, Markdown summaries, JSONL events/decisions, optional timing JSONL. |
 | `--sqlite PATH` | off | Extra sink: same events/decisions/timing facts as JSONL, **typed columns** (no JSON blob). Does not replace JSONL. Hash-neutral. |
+| `--sqlite-http HOST:PORT` | off | Serve `GET /metrics` JSON from `--sqlite` (CORS `*`). Requires `--sqlite`. Hash-neutral. |
 | `--checkpoint-every K` | config `[checkpoint] auto_interval_ticks` if `--out-dir` | Checkpoint every *K* ticks. Implies an out-dir (config `directory` if `-o` omitted). |
 | `--load PATH` | off | Restore a `.ckpt` and continue. Overlay flags (`--inventions`, `--pipeline-events`, `--catalog`, …) still apply **after** decode (do not double-grant). |
 | `--summarize` | off | Print the Markdown world summary to stdout. With `--listen`, emit when the listen session ends. |
@@ -61,7 +62,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `35faecbd…` (M50 recipes). No-objects stays `70e5204d…`.
+These are **or** with the same-named overlay table. Off / unused ⇒ same hashes as no flag. Default 2-tick with shipped objects is `04069600…` (M51 recipes + attack_bonus). No-objects stays `70e5204d…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -93,7 +94,7 @@ Idle hash with shipped objects (M46 catalog includes plank/charcoal/knife/net):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=35faecbd…
+# final_hash=04069600…
 ```
 
 Without loading `configs/objects`, 2-tick hash is `70e5204d…`. Overlay-off telemetry does not change hashes.
@@ -184,7 +185,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `35faecbd…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (loads `configs/objects`) 2-tick hash `04069600…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

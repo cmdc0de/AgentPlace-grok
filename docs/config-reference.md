@@ -392,7 +392,7 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `cord.toml` | item | Catalog craft 2 fiber → 1. Extra file; catalog-on only. |
 | `plank.toml` | item | Catalog craft 2 wood → 1. |
 | `charcoal.toml` | item | Catalog craft 1 wood → 1. |
-| `knife.toml` | item | Catalog craft stone+fiber → 1. |
+| `knife.toml` | item | Catalog craft stone+fiber → 1. `[sim] attack_bonus = 200`. |
 | `net.toml` | item | Catalog craft 3 fiber → 1. |
 | `hammer.toml` | item | Catalog craft 2 stone + 1 wood → 1. |
 | `hoe.toml` | item | Catalog craft stone+wood → 1. |
@@ -402,10 +402,14 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `rucksack.toml` | item | Catalog craft 3 fiber + 1 wood → 1. |
 | `cooked_veg.toml` | item | Catalog craft 1 food → 1. |
 | `bowl.toml` | item | Catalog craft 1 stone → 1. |
-| `club.toml` | item | Catalog craft 1 wood → 1. |
-| `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. |
-| `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. |
-| `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. |
+| `club.toml` | item | Catalog craft 1 wood → 1. `[sim] attack_bonus = 300`. |
+| `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] attack_bonus = 800`. |
+| `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`. |
+| `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`. |
+| `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. |
+| `millstone.toml` | item | Catalog craft 3 stone → 1. |
+| `stew.toml` | item | Catalog craft 2 food → 1. |
+| `ladder.toml` | item | Catalog craft 3 wood → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

@@ -1,0 +1,15 @@
+id = "tent"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/low_poly_cloth.glb"
+[visual.lod]
+near = "assets/models/optimized/low_poly_cloth.glb"
+mid  = "assets/models/optimized/low_poly_cloth.glb"
+far  = "assets/models/optimized/low_poly_cloth.glb"
+
+[sim]
+weight_milli = 500
+[sim.craft]
+inputs = [["fiber", 3], ["wood", 2]]
+output_qty = 1

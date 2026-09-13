@@ -93,6 +93,9 @@ pub struct SimDef {
     pub fiber_yield: Option<u32>,
     #[serde(default)]
     pub grow_ticks: Option<u64>,
+    /// Extra Attack damage millipoints when this item is held. Omit = 0.
+    #[serde(default)]
+    pub attack_bonus: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -111,6 +114,7 @@ pub struct CatalogEntry {
     pub weight_milli: u32,
     pub inputs: Vec<(ItemId, u32)>,
     pub output_qty: u32,
+    pub attack_bonus: u32,
 }
 
 pub fn builtin_item(slug: &str) -> Option<ItemId> {
@@ -348,6 +352,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 weight_milli: sim.weight_milli.unwrap_or(400),
                 inputs,
                 output_qty,
+                attack_bonus: sim.attack_bonus.unwrap_or(0),
             }
         })
         .collect()
@@ -499,6 +504,20 @@ pub fn remap_catalog_holdings(
     }
 }
 
+/// Max `[sim] attack_bonus` among items in pockets or pack. 0 if none.
+pub fn max_held_attack_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| {
+            e.attack_bonus > 0
+                && (agent.inventory.get(&e.item).copied().unwrap_or(0) > 0
+                    || agent.pack.get(&e.item).copied().unwrap_or(0) > 0)
+        })
+        .map(|e| e.attack_bonus)
+        .max()
+        .unwrap_or(0)
+}
+
 pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
     if entries.is_empty() {
         return;
@@ -508,6 +527,7 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.slug.as_bytes());
         hasher.update(e.weight_milli.to_le_bytes());
         hasher.update(e.output_qty.to_le_bytes());
+        hasher.update(e.attack_bonus.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

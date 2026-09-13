@@ -66,7 +66,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M48** | Done (tag `M48`) | [`M48-plan.md`](M48-plan.md), walkthrough [`M48-test-plan.md`](M48-test-plan.md) | INT invent quality, agent meshes, hot-reload glb |
 | **M49** | Done (tag `M49`) | [`M49-plan.md`](M49-plan.md), walkthrough [`M49-test-plan.md`](M49-test-plan.md) | Object visual scale, extra recipes, invention flavor text |
 | **M50** | Done (tag `M50`) | [`M50-plan.md`](M50-plan.md), walkthrough [`M50-test-plan.md`](M50-test-plan.md) | Viewer FPS HUD, sqlite run log, extra recipes |
-| **M51** | Planned — next | [`M51-plan.md`](M51-plan.md) | Sqlite metrics page, weapon combat bonuses, extra recipes |
+| **M51** | Done (tag `M51`) | [`M51-plan.md`](M51-plan.md), walkthrough [`M51-test-plan.md`](M51-test-plan.md) | Sqlite metrics page, weapon combat bonuses, extra recipes |
 | After M51 | Not started | listed at the bottom of `M51-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -181,7 +181,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 54b | `M49-test-plan.md` | M49 walkthrough (visual scale, extra recipes, invention flavor) |
 | 55 | `M50-plan.md` | Milestone 50 (done, tag `M50`): viewer FPS HUD, sqlite run log, extra recipes |
 | 55b | `M50-test-plan.md` | M50 walkthrough (FPS HUD, sqlite columns, extra recipes) |
-| 56 | `M51-plan.md` | Milestone 51 (planned): sqlite metrics page, weapon combat bonuses, extra recipes |
+| 56 | `M51-plan.md` | Milestone 51 (done, tag `M51`): sqlite metrics page, weapon combat bonuses, extra recipes |
+| 56b | `M51-test-plan.md` | M51 walkthrough (sqlite /metrics, attack_bonus, extra recipes) |
 
 ---
 
@@ -190,7 +191,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M51-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M51 is next (`M51-plan.md`). Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M51 is implemented (`M51-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -218,11 +219,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M50 are done. Next is M51 ([`M51-plan.md`](M51-plan.md)).
+M1–M51 are done. M51 is implemented ([`M51-plan.md`](M51-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M51-plan.md.
-M51 is planned (sqlite metrics page, weapon combat bonuses, extra recipes;
+M51 is implemented (sqlite metrics page, weapon combat bonuses, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.
