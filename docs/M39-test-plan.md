@@ -1,6 +1,6 @@
 # M39 test plan — see each new feature
 
-Walkthrough for [`M39-plan.md`](M39-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (object TOML visuals + LOD, hashed catalog Craft). Next slice: [`M49-plan.md`](M49-plan.md).
+Walkthrough for [`M39-plan.md`](M39-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (object TOML visuals + LOD, hashed catalog Craft). Next slice: [`M50-plan.md`](M50-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

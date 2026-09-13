@@ -99,8 +99,9 @@ Live `OpenAiCompatClient`: short JSON `{"reflection":"..."}` / `{"plan":["...", 
 | **M46** | Done — [`M46-plan.md`](M46-plan.md) — CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry |
 | **M47** | Done — [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
 | **M48** | Done — [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
-| **M49** | [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
-| After M49 | protobuf/TLS; Unix sockets |
+| **M49** | Done — [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
+| **M50** | [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
+| After M50 | protobuf/TLS; Unix sockets; website querying sqlite; weapon combat bonuses |
 | Not M26 | Browser; combat; CI Win/mac; PROTOCOL bump; auto-execute plan |
 
 ## Key decisions

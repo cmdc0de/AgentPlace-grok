@@ -1,6 +1,6 @@
 # M25 test plan — see each new feature
 
-Walkthrough for [`M25-plan.md`](M25-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (reflection-on-evict, lockstep Ack timeout). Next slice: [`M49-plan.md`](M49-plan.md).
+Walkthrough for [`M25-plan.md`](M25-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (reflection-on-evict, lockstep Ack timeout). Next slice: [`M50-plan.md`](M50-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

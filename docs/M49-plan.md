@@ -74,7 +74,8 @@ On **successful** Invent only:
 
 | Later | What |
 |---|---|
-| After M49 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings |
+| **M50** | [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
+| After M50 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; website querying sqlite; weapon combat bonuses |
 | Not M49 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; mouse-drag orbit; per-LOD / non-uniform scale; recipe durability / workstations; tool bonuses |
 
 ## Key decisions

@@ -65,7 +65,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M47** | Done (tag `M47`) | [`M47-plan.md`](M47-plan.md), walkthrough [`M47-test-plan.md`](M47-test-plan.md) | Viewer camera pan, missing-asset sentinel, time-series charts |
 | **M48** | Done (tag `M48`) | [`M48-plan.md`](M48-plan.md), walkthrough [`M48-test-plan.md`](M48-test-plan.md) | INT invent quality, agent meshes, hot-reload glb |
 | **M49** | Done (tag `M49`) | [`M49-plan.md`](M49-plan.md), walkthrough [`M49-test-plan.md`](M49-test-plan.md) | Object visual scale, extra recipes, invention flavor text |
-| After M49 | Not started | listed at the bottom of `M49-plan.md` | protobuf/TLS |
+| **M50** | Planned — next | [`M50-plan.md`](M50-plan.md) | Viewer FPS HUD, sqlite run log, extra recipes |
+| After M50 | Not started | listed at the bottom of `M50-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -177,15 +178,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 53b | `M48-test-plan.md` | M48 walkthrough (INT invent quality, agent meshes, hot-reload glb) |
 | 54 | `M49-plan.md` | Milestone 49 (done, tag `M49`): object visual scale, extra recipes, invention flavor text |
 | 54b | `M49-test-plan.md` | M49 walkthrough (visual scale, extra recipes, invention flavor) |
+| 55 | `M50-plan.md` | Milestone 50 (planned): viewer FPS HUD, sqlite run log, extra recipes |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M49-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M50-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M49 is implemented (`M49-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M50 is next (`M50-plan.md`). Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -213,11 +215,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M49 are done. M49 is implemented ([`M49-plan.md`](M49-plan.md)); later work is at the bottom of that file.
+M1–M49 are done. Next is M50 ([`M50-plan.md`](M50-plan.md)).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M49-plan.md.
-M49 is implemented (object visual scale, extra recipes, invention flavor text;
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M50-plan.md.
+M50 is planned (viewer FPS HUD, sqlite run log, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.

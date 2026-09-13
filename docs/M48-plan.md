@@ -71,8 +71,9 @@ Native Bevy window only. No extra Bevy `file_watcher` feature required (CI stays
 
 | Later | What |
 |---|---|
-| **M49** | [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
-| After M49 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings |
+| **M49** | Done — [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
+| **M50** | [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
+| After M50 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; website querying sqlite; weapon combat bonuses |
 | Not M48 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; mouse-drag orbit; scroll zoom; DEX defense (already M41); Invent **chance** formula (already M35); recipe durability / workstations |
 
 ## Key decisions
