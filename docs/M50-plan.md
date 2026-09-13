@@ -166,8 +166,9 @@ Inputs must not clone an existing recipe (spear is wood×1+stone×1; knife is st
 
 | Later | What |
 |---|---|
-| **M51** | [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
-| After M51 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; weapon range; spear melee |
+| **M51** | Done — [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
+| **M52** | [`M52-plan.md`](M52-plan.md) — day/night clock, world-size CLI, OTLP export |
+| After M52 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; weapon range; spear melee |
 | Not M50 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; OTel leftover (PG-11); GPU profiler; replacing JSONL; sqlite as checkpoint store; JSON blob column; recipe durability / workstations |
 
 ## Key decisions

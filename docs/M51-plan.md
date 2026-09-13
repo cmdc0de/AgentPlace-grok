@@ -112,8 +112,9 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 
 | Later | What |
 |---|---|
-| After M51 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; weapon **range**; spear melee; durability / workstations |
-| Not M51 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; OTel leftover (PG-11); replacing JSONL; sqlite as checkpoint store |
+| **M52** | Planned — [`M52-plan.md`](M52-plan.md) — day/night clock (default on), world-size CLI, OTLP export |
+| After M52 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; weapon **range**; spear melee; durability / workstations; PG-17 sleep places; night action gating; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP |
+| Not M51 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; sqlite as checkpoint store |
 
 ## Key decisions
 
@@ -122,7 +123,7 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 3. Weapon bonuses are `[sim] attack_bonus`; **max** held, not sum. Spear hunt-only.
 4. New recipes + attack_bonus on existing files change **shipped-objects** idle hash; no-objects hash unchanged.
 5. Do not change shipping `coop.toml`. No TLS. CI never needs the network.
-6. sql.js / ad-hoc SQL / weapon range / spear melee are After M51.
+6. sql.js / ad-hoc SQL / weapon range / spear melee are After M52.
 
 ## Tests (M51 acceptance bar)
 

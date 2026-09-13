@@ -80,8 +80,9 @@ Do not add time-series charts, wasm32 on Win/mac, or `/save` in the page.
 | **M48** | Done — [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
 | **M49** | Done — [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
 | **M50** | Done — [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
-| **M51** | [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
-| After M51 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; wasm32 on Win/mac; sql.js / ad-hoc SQL; weapon range; spear melee |
+| **M51** | Done — [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
+| **M52** | [`M52-plan.md`](M52-plan.md) — day/night clock, world-size CLI, OTLP export |
+| After M52 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; wasm32 on Win/mac; sql.js / ad-hoc SQL; weapon range; spear melee |
 | Not M42 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

@@ -1,6 +1,6 @@
 # M40 test plan — see each new feature
 
-Walkthrough for [`M40-plan.md`](M40-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (config-owned objects + recipes, optimized glb paths). Next slice: [`M51-plan.md`](M51-plan.md).
+Walkthrough for [`M40-plan.md`](M40-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (config-owned objects + recipes, optimized glb paths). Next slice: [`M52-plan.md`](M52-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

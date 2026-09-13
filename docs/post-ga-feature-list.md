@@ -22,14 +22,14 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-8 | Object / item definition files | Open | One config file per sim object: visuals (glb + LOD) and sim fields so new items/crafts are a file, not a Rust enum. |
 | PG-9 | Crafting recipe catalog | Open | Dedicate a milestone to **more recipes** (new object TOML + crafts), not new Craft mechanics. M50 added satchel/rucksack/cooked_veg/bowl/club/pike/sling/bow. |
 | PG-10 | Missing-asset sentinel | Done (M47) | Configured glb missing ⇒ one fixed, unmistakable mesh so a bad path is obvious. Not today’s silent primitive. |
-| PG-11 | OpenTelemetry / performance metrics | Open | OTLP export of sim + viewer timings, plus process CPU / disk / memory. Hash-neutral; overlay off in CI. |
+| PG-11 | OpenTelemetry / performance metrics | Open (M52 plans JSON POST) | M46 in-process aggregates + RSS. M52: sim-cli OTLP/JSON POST of wall_ns + RSS. Leftover: protobuf/gRPC, CPU/disk, viewer-frame OTLP. |
 | PG-12 | Viewer camera pan (keys) | Done (M47) | Arrow keys pan at constant height; `u` up, `d` down (`L` stays legend). Hash-neutral. Native window only. |
 | PG-13 | Object visual scale | Done (M49) | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
 | PG-14 | Viewer FPS / frametime HUD | Done (M50) | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
 | PG-15 | SQLite run log | Done (M50) | CLI `--sqlite PATH` writes unrolled events/decisions/timing columns. Extra sink; JSONL unchanged. Hash-neutral. |
-| PG-16 | Day / night cycle | Open | Sim clock (day vs night) plus viewer lighting. Dawn Rest refill scales with how tired the agent was. Overlay off ⇒ today (no clock). |
+| PG-16 | Day / night cycle | Planned (M52) | Sim clock (day vs night) plus viewer lighting. Dawn refill scales with tiredness. **Default on**; `--no-time` ⇒ today (no clock, M51 hashes). |
 | PG-17 | Sleep places | Open | Craft tent / house / cabin (and similar) as **places to sleep**; better shelter ⇒ more energy at dawn. PG-9 files; rest math is PG-16. |
-| PG-18 | World size CLI | Open | Set map `width` × `height` from the command line without editing shipping TOML. Hashed (same as changing `[world]`). |
+| PG-18 | World size CLI | Planned (M52) | Set map `width` × `height` from the command line without editing shipping TOML. Hashed (same as changing `[world]`). |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -501,12 +501,12 @@ Out of this theme until picked: Postgres / duckdb; replacing JSONL; using sqlite
 
 ```toml
 [time]
-enabled = false          # omit = false
+enabled = true           # omit = true (M52 default on)
 ticks_per_day = 240      # omit = 240 when enabled; lock default in `/spec`
 # later: dusk_tick, dawn_tick, …
 ```
 
-CLI: `--time` (or `--day-night`) turns overlay on.
+CLI: `--time` (redundant with default). `--no-time` turns overlay off.
 
 | Surface | What |
 |---|---|
