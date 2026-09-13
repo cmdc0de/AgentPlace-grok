@@ -27,6 +27,9 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-13 | Object visual scale | Done (M49) | Per-object `[visual] scale` on each glb so a researcher can size each mesh without re-exporting. Hash-neutral. |
 | PG-14 | Viewer FPS / frametime HUD | Done (M50) | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
 | PG-15 | SQLite run log | Done (M50) | CLI `--sqlite PATH` writes unrolled events/decisions/timing columns. Extra sink; JSONL unchanged. Hash-neutral. |
+| PG-16 | Day / night cycle | Open | Sim clock (day vs night) plus viewer lighting. Dawn Rest refill scales with how tired the agent was. Overlay off ⇒ today (no clock). |
+| PG-17 | Sleep places | Open | Craft tent / house / cabin (and similar) as **places to sleep**; better shelter ⇒ more energy at dawn. PG-9 files; rest math is PG-16. |
+| PG-18 | World size CLI | Open | Set map `width` × `height` from the command line without editing shipping TOML. Hashed (same as changing `[world]`). |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
 
@@ -490,6 +493,95 @@ Out of this theme until picked: Postgres / duckdb; replacing JSONL; using sqlite
 
 ---
 
+## PG-16 — Day / night cycle
+
+**Shipped today:** time is **ticks only**. There is no day index, no night, no viewer lighting change. **Rest** adds a fixed **0.4** energy per tick (clamped to `energy_max`). Tired is energy &lt; 1/3 max. CON can raise `energy_max` (M42); it does not change how much Rest restores. Mock Rest is legal when tired.
+
+**Wanted:** an opt-in **day/night clock** in the sim, shown in the native viewer (and later the attach page), so Rest at dawn depends on how tired the agent was.
+
+```toml
+[time]
+enabled = false          # omit = false
+ticks_per_day = 240      # omit = 240 when enabled; lock default in `/spec`
+# later: dusk_tick, dawn_tick, …
+```
+
+CLI: `--time` (or `--day-night`) turns overlay on.
+
+| Surface | What |
+|---|---|
+| **Sim** | `day` + `tod` (tick-within-day) hashed when overlay **on**. Night can gate actions (lock which in `/spec`: e.g. Hunt/Farm worse or illegal). |
+| **Rest / dawn** | At dawn (or when Rest completes overnight): energy refill **scales with tiredness** — more depleted last night ⇒ less energy this morning, unless a **PG-17** sleep place improves it. Overlay off / unused ⇒ today’s +0.4/tick Rest. |
+| **Viewer** | Hash-neutral sky / light (day bright, night dim). Status line `day N  tod t/T`. Native window; attach page optional in that `/spec`. |
+
+Constraints for a later `/spec`:
+
+- Overlay **off** ⇒ no clock fields, **same hashes** as today. On ⇒ hashed day/tod (skip+BoardBlob so old ckpts load).
+- Viewer lighting is **not** hashed. No PROTOCOL bump unless Tick grows a field the page needs (prefer Status-only / inspector JSON extra key like M36).
+- `--load` restores day/tod; do not double-apply dawn refill.
+- `cargo test` never needs a GPU. Unit-test dawn refill helper with fake energy.
+- Do not change shipping `default.toml` / `coop.toml`. CI `provider = mock`.
+
+Out of this theme until picked: seasons, weather, timezones, real-time wall clock, PG-17 shelter recipes (consume this clock).
+
+---
+
+## PG-17 — Sleep places (tent / house / cabin)
+
+**Shipped today:** Rest is anywhere (no bed). Household homes (M33) are a **crate cell**, not a shelter. M51 plans a **held** `tent` craft (fiber×3 + wood×2) — that is an item, not a place you sleep. No house/cabin.
+
+**Wanted:** recipes that **place a sleep structure** on a land cell. Sleeping there at night / dawn improves the PG-16 morning energy refill.
+
+Sketch (lock ids and bonuses in `/spec`; PG-9 object TOML, not new Craft verbs):
+
+| id | Role | Dawn energy vs open-air Rest |
+|---|---|---|
+| `tent` | Portable / cheap camp | modest bonus |
+| `cabin` | Small built shelter | larger bonus |
+| `house` | Durable home | largest bonus (optional household-home link) |
+
+- Place with existing Store / a new Place verb (lock in `/spec`). One structure per cell unless that slice says otherwise.
+- Overlay / catalog-off ⇒ crafts illegal; Rest math stays PG-16-off today.
+- **Hash:** structures in the world and `[sim]` recipe fields **are** hashed. Visuals are not.
+- Viewer: authored glb or primitive; missing path is PG-10 sentinel.
+
+Constraints for a later `/spec`:
+
+- Do not invent a new `ItemId` enum arm per building if catalog slugs suffice.
+- `--load` restores placed structures; do not double-grant dawn bonus.
+- Mock need not pick Place/Craft unless that slice says so.
+- Shipping `default.toml` unchanged. No PROTOCOL bump.
+
+Out of this theme until picked: interiors, multi-room, furniture, seasons (PG-16), PG-1 household auto-cabin.
+
+---
+
+## PG-18 — World size from the CLI
+
+**Shipped today:** map size is hashed `[world] width` / `height` in experiment TOML (shipping `configs/default.toml` is **64×64**, minimum **32**). Researchers already can edit a copy of the TOML. There is **no** `sim-cli` / viewer flag to override size. Viewer always shows whatever world the sim loaded.
+
+**Wanted:** a **command-line parameter** so a researcher sets how large the world is without editing shipping TOML.
+
+```bash
+sim-cli --config configs/default.toml --width 96 --height 96 --ticks 80 --llm mock --quiet
+```
+
+| Flag (sketch) | Meaning |
+|---|---|
+| `--width N` / `--height N` | Override `[world] width` / `height` for this process. Omit ⇒ TOML (64/64 shipping). |
+
+Constraints for a later `/spec`:
+
+- **Hashed.** Size is ExperimentConfig / world gen. Same master seed + different size ⇒ **different** `state_hash` (document it). Not overlay-off identity.
+- Do **not** change shipping `default.toml` / `coop.toml` unless that is the slice.
+- Keep the existing minimum (32) unless `/spec` raises it. Upper bound lock in `/spec` so CI / memory stay bounded.
+- Viewer / `--load` use the world in the checkpoint; flags apply at **new** sim, not decode (do not reshape a ckpt).
+- No PROTOCOL bump. `cargo test` never needs the network.
+
+Out of this theme until picked: infinite / streaming maps, chunk LOD, hex grids.
+
+---
+
 ## How these interact
 
 ```
@@ -502,7 +594,7 @@ Founders: roll sheet (PG-3) ──► live, relate (PG-1 feelings already shippe
 
 Ship PG-3 before or with PG-2 so a birth has something to calculate. PG-1 kinship can land with PG-2 (links at birth) or slightly earlier (data model only).
 
-PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`d`), hash-neutral, native window only. PG-13 is **per-object `[visual] scale`** so each glb can be sized in TOML without re-exporting. PG-14 is the **native HUD** for FPS and average frametime (ms), hash-neutral, distinct from sim tick timing and from PG-11 export. PG-15 is a **sqlite3 extra sink** for the same events/decisions/timing rows as JSONL (`--sqlite PATH`), hash-neutral, JSONL unchanged.
+PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of the M31 sheet. PG-5 inventions consume INT (PG-4) and write a hashed invention table; inventor vs society payoffs stay separate. PG-6 is viewer-only 3D art (M38 stem files; later config + LOD). PG-7 is the **browser** researcher UI (agents, posts, metrics) without 3D. PG-8 is the **object catalog**: one file per kind so new crafts and new looks are config, with `[sim]` hashed and `[visual]` / LOD not. PG-9 is a **content** slice on top of PG-8: more recipes in one milestone. PG-10 is the viewer missing-path mesh so a bad `glb` is obvious. PG-11 is **OpenTelemetry**: sim tick + viewer frame aggregates and process CPU/disk/memory, hash-neutral, overlay off unless a plan turns it on. PG-12 is **viewer camera pan** (arrows + `u`/`d`), hash-neutral, native window only. PG-13 is **per-object `[visual] scale`** so each glb can be sized in TOML without re-exporting. PG-14 is the **native HUD** for FPS and average frametime (ms), hash-neutral, distinct from sim tick timing and from PG-11 export. PG-15 is a **sqlite3 extra sink** for the same events/decisions/timing rows as JSONL (`--sqlite PATH`), hash-neutral, JSONL unchanged. PG-16 is the **day/night clock** (sim hashed, viewer lighting not) and tiredness-scaled dawn energy. PG-17 is **sleep places** (tent/house/cabin recipes) that feed PG-16 refill. PG-18 is **CLI world size** (`--width` / `--height`) on top of today’s hashed `[world]` TOML.
 
 ---
 
@@ -518,4 +610,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, per-object visual scale, viewer FPS/frametime HUD, and sqlite run log are **PG-4 / PG-5 / PG-6 / PG-7 / PG-8 / PG-9 / PG-10 / PG-11 / PG-12 / PG-13 / PG-14 / PG-15**, not parking-lot one-liners.
+Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, per-object visual scale, viewer FPS/frametime HUD, sqlite run log, day/night, sleep places, and world-size CLI are **PG-4 through PG-18**, not parking-lot one-liners.

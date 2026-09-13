@@ -98,8 +98,9 @@ Docs only (no hash / protocol change):
 | **M47** | Done — [`M47-plan.md`](M47-plan.md) — viewer camera pan, missing-asset sentinel, time-series charts |
 | **M48** | Done — [`M48-plan.md`](M48-plan.md) — INT invent quality, agent meshes, hot-reload glb |
 | **M49** | Done — [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
-| **M50** | [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
-| After M50 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; website querying sqlite; weapon combat bonuses |
+| **M50** | Done — [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
+| **M51** | [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
+| After M51 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; weapon range; spear melee |
 | Not M45 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; hashing wall-clock ns |
 
 ## Key decisions

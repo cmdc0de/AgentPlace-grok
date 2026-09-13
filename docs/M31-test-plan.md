@@ -1,6 +1,6 @@
 # M31 test plan — see each new feature
 
-Walkthrough for [`M31-plan.md`](M31-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (kinship, reproduction, D&D-like sheet). Next slice: [`M50-plan.md`](M50-plan.md).
+Walkthrough for [`M31-plan.md`](M31-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (kinship, reproduction, D&D-like sheet). Next slice: [`M51-plan.md`](M51-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -1,6 +1,6 @@
 # M43 test plan — see each new feature
 
-Walkthrough for [`M43-plan.md`](M43-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (WIS toxin detect, CHA speech range/weight, DEX flee). Next slice: [`M50-plan.md`](M50-plan.md).
+Walkthrough for [`M43-plan.md`](M43-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (WIS toxin detect, CHA speech range/weight, DEX flee). Next slice: [`M51-plan.md`](M51-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

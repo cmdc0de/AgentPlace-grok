@@ -166,7 +166,8 @@ Inputs must not clone an existing recipe (spear is wood×1+stone×1; knife is st
 
 | Later | What |
 |---|---|
-| After M50 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; **website / attach page querying the sqlite file**; weapon combat bonuses |
+| **M51** | [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
+| After M51 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; weapon range; spear melee |
 | Not M50 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; OTel leftover (PG-11); GPU profiler; replacing JSONL; sqlite as checkpoint store; JSON blob column; recipe durability / workstations |
 
 ## Key decisions
@@ -177,7 +178,7 @@ Inputs must not clone an existing recipe (spear is wood×1+stone×1; knife is st
 4. Sqlite is **typed columns**, not a JSON text field. `rusqlite` bundled in **sim-cli only**.
 5. New recipes change **shipped-objects** idle hash; no-objects hash unchanged.
 6. Do not change shipping `coop.toml`. No TLS. CI never needs the network.
-7. Website sqlite queries and weapon combat bonuses are After M50.
+7. Website sqlite queries and weapon combat bonuses moved to **M51**.
 
 ## Tests (M50 acceptance bar)
 
