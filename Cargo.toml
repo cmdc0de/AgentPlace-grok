@@ -35,3 +35,5 @@ sim-llm = { path = "crates/sim-llm" }
 bevy_mod_imgui = "0.10"
 tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
+bevy_gltf_draco = { version = "0.2" }
+
