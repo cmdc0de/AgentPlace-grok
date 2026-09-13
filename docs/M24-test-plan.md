@@ -1,6 +1,6 @@
 # M24 test plan — see each new feature
 
-Walkthrough for [`M24-plan.md`](M24-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (wire `/set`, `--connect` `/inject`, lockstep `AckTick`). Next slice: [`M52-plan.md`](M52-plan.md).
+Walkthrough for [`M24-plan.md`](M24-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (wire `/set`, `--connect` `/inject`, lockstep `AckTick`). Next slice: [`M53-plan.md`](M53-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

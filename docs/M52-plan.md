@@ -122,7 +122,8 @@ Do **not** replace JSONL or sqlite. Do not add CPU/disk or viewer-frame OTLP thi
 
 | Later | What |
 |---|---|
-| After M52 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; weapon **range**; spear melee; durability / workstations; PG-17 sleep places; night action gating; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP |
+| **M53** | Planned — [`M53-plan.md`](M53-plan.md) — sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
+| After M53 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; weapon **range**; spear melee; durability / workstations; interiors / pickup of sleep places; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP |
 | Not M52 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; sqlite as checkpoint store; PG-9 extra recipes |
 
 ## Key decisions

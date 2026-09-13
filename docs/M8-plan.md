@@ -134,8 +134,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M49** | Done — [`M49-plan.md`](M49-plan.md) — object visual scale, extra recipes, invention flavor text |
 | **M50** | Done — [`M50-plan.md`](M50-plan.md) — viewer FPS HUD, sqlite run log, extra recipes |
 | **M51** | Done — [`M51-plan.md`](M51-plan.md) — sqlite metrics page, weapon combat bonuses, extra recipes |
-| **M52** | [`M52-plan.md`](M52-plan.md) — day/night clock, world-size CLI, OTLP export |
-| After M52 | Protobuf/TLS; sql.js / ad-hoc SQL; weapon range; spear melee |
+| **M52** | Done — [`M52-plan.md`](M52-plan.md) — day/night clock, world-size CLI, OTLP export |
+| **M53** | [`M53-plan.md`](M53-plan.md) — sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
+| After M53 | Protobuf/TLS; sql.js / ad-hoc SQL; weapon range; spear melee |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

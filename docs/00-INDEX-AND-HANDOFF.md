@@ -68,7 +68,8 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M50** | Done (tag `M50`) | [`M50-plan.md`](M50-plan.md), walkthrough [`M50-test-plan.md`](M50-test-plan.md) | Viewer FPS HUD, sqlite run log, extra recipes |
 | **M51** | Done (tag `M51`) | [`M51-plan.md`](M51-plan.md), walkthrough [`M51-test-plan.md`](M51-test-plan.md) | Sqlite metrics page, weapon combat bonuses, extra recipes |
 | **M52** | Done (tag `M52`) | [`M52-plan.md`](M52-plan.md), walkthrough [`M52-test-plan.md`](M52-test-plan.md) | Day/night clock (default on), world-size CLI, OTLP export |
-| After M52 | Not started | listed at the bottom of `M52-plan.md` | protobuf/TLS |
+| **M53** | **Planned — next** | [`M53-plan.md`](M53-plan.md) | Sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
+| After M53 | Not started | listed at the bottom of `M53-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -186,15 +187,16 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 56b | `M51-test-plan.md` | M51 walkthrough (sqlite /metrics, attack_bonus, extra recipes) |
 | 57 | `M52-plan.md` | Milestone 52 (done, tag `M52`): day/night clock, world-size CLI, OTLP export |
 | 57b | `M52-test-plan.md` | M52 walkthrough (day/night, world-size CLI, OTLP/JSON) |
+| 58 | `M53-plan.md` | Milestone 53 (planned): sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M52-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M53-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M52 is implemented (`M52-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M53 is next (`M53-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -222,11 +224,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M52 are done. M52 is implemented ([`M52-plan.md`](M52-plan.md)); later work is at the bottom of that file.
+M1–M52 are done. Next is M53 ([`M53-plan.md`](M53-plan.md)).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M52-plan.md.
-M52 is implemented (day/night clock default on, --width/--height, OTLP/JSON export;
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/M53-plan.md.
+Implement M53 (sleep places N×N, night Hunt/Farm gating, CON dawn bonus;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.

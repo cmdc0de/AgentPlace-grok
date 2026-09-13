@@ -28,7 +28,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 | PG-14 | Viewer FPS / frametime HUD | Done (M50) | Native window shows FPS and average frametime (ms). Hash-neutral. Distinct from sim tick `wall_ms` and from PG-11 OTel. |
 | PG-15 | SQLite run log | Done (M50) | CLI `--sqlite PATH` writes unrolled events/decisions/timing columns. Extra sink; JSONL unchanged. Hash-neutral. |
 | PG-16 | Day / night cycle | Done (M52) | Sim clock (day vs night) plus viewer lighting. Dawn refill scales with tiredness. **Default on**; `--no-time` ⇒ today (no clock, M51 hashes). |
-| PG-17 | Sleep places | Open | Craft tent / house / cabin (and similar) as **places to sleep**; better shelter ⇒ more energy at dawn. PG-9 files; rest math is PG-16. |
+| PG-17 | Sleep places | Planned (M53) | Place tent 1×1 / cabin 2×2 / house 4×4; better shelter ⇒ more dawn energy. PG-9 files; rest math is PG-16. |
 | PG-18 | World size CLI | Done (M52) | Set map `width` × `height` from the command line without editing shipping TOML. Hashed (same as changing `[world]`). |
 
 Add a row when something is a post-GA experiment. When a milestone ships it, mark **Done** and point at that plan.
