@@ -889,6 +889,11 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
                 "{{\"type\":\"placed\",\"x\":{x},\"y\":{y},\"item\":\"{item:?}\"}}"
             )
         }
+        SimEventKind::PickedUp { x, y, item } => {
+            format!(
+                "{{\"type\":\"picked_up\",\"x\":{x},\"y\":{y},\"item\":\"{item:?}\"}}"
+            )
+        }
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

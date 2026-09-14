@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `3a294816…`; `--no-time` shipped-objects `6e8b124a…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `7b8864e9…`; `--no-time` shipped-objects `35746f95…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item.
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev).
 
 ### `[time]` (M52)
 
@@ -406,7 +406,7 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `fiber.toml` | item | Weight 40. |
 | `stone.toml` | item | Weight 300. Minerals. |
 | `basket.toml` | item | Craft 2 fiber → 1. Worn pack 8/25. |
-| `spear.toml` | item | Craft wood+stone. Hunt tool. |
+| `spear.toml` | item | Craft wood+stone. Hunt tool. `[sim] attack_bonus = 500`, `attack_range = 2`. |
 | `fishing_rod.toml` | item | Craft wood+fiber. Fish tool. |
 | `backpack.toml` | item | Craft 4 fiber. Worn pack 12/40. |
 | `cord.toml` | item | Catalog craft 2 fiber → 1. Extra file; catalog-on only. |
@@ -424,8 +424,12 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `bowl.toml` | item | Catalog craft 1 stone → 1. |
 | `club.toml` | item | Catalog craft 1 wood → 1. `[sim] attack_bonus = 300`. |
 | `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] attack_bonus = 800`. |
-| `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`. |
-| `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`. |
+| `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`, `attack_range = 2`. |
+| `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`, `attack_range = 3`. |
+| `torch.toml` | item | Catalog craft 1 wood + 1 fiber → 1. |
+| `axe.toml` | item | Catalog craft 2 wood + 1 stone → 1. |
+| `jar.toml` | item | Catalog craft 2 stone → 1. |
+| `bread.toml` | item | Catalog craft 2 food → 1. |
 | `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. `[sim] sleep_bonus = 100`, `sleep_size = 1` (1×1). Place on land. |
 | `cabin.toml` | item | Catalog craft 4 wood + 2 stone → 1. `sleep_bonus = 200`, `sleep_size = 2` (2×2). |
 | `house.toml` | item | Catalog craft 6 wood + 3 stone + 2 fiber → 1. `sleep_bonus = 300`, `sleep_size = 4` (4×4). |

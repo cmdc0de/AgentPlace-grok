@@ -1,7 +1,8 @@
 # M54 — Sleep pickup, household auto-cabin, spear melee + range, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M53 complete (`docs/M53-plan.md`, git tag `M53`, commit `8f1ca2e`)  
+**Walkthrough:** [`docs/M54-test-plan.md`](M54-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-17 leftovers, PG-9 recipes); M51 later-table spear melee / weapon range
 
 ## Context
@@ -91,8 +92,8 @@ No tool-use bonuses this slice (axe does not change gather). Catalog-off / empty
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M53 `6e8b124a…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M53 `3a294816…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `35746f95…` |
+| default CLI 2 ticks (time on) | hash `7b8864e9…` |
 | catalog-off | Pickup illegal; torch Craft illegal |
 | Place tent then Pickup | origin gone; inventory +1 tent; `PickedUp` event |
 | Pickup with full pockets+pack | Wait; origin stays |
@@ -142,7 +143,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M54-test-plan.md` (written on implement).
+Walkthrough: [`docs/M54-test-plan.md`](M54-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -151,7 +152,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `35746f95…`; default (time on) `7b8864e9…`; Hello v5; format_version 3 write.
 
 ## Risks
 

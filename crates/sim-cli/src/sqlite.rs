@@ -655,6 +655,13 @@ impl EventRow {
                 r.item = Some(item_label(*item, catalog));
                 r
             }
+            SimEventKind::PickedUp { x, y, item } => {
+                let mut r = Self::blank(tick, agent, "picked_up");
+                r.x = Some(*x as i64);
+                r.y = Some(*y as i64);
+                r.item = Some(item_label(*item, catalog));
+                r
+            }
         }
     }
 }

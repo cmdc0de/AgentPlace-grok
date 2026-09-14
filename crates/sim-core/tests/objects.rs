@@ -11,13 +11,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M53 catalog: tent sleep + cabin/house).
-const IDLE_2_NO_TIME: &str = "6e8b124a46573e18e60f946950922305d60a54b9cbdcf74ff9ebe12234e4c8d5";
+/// `--no-time` shipped-objects 2-tick (M54 catalog: pickup/range/recipes).
+const IDLE_2_NO_TIME: &str = "35746f95698dc1ce00985dcdc3e06160bc3ed8c24f2e45eafed6a168d661785b";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "3a294816b006d2e1f62f8a07da79d45caa7db921e88ede000c77827ffba56103";
+const IDLE_2: &str = "7b8864e94592bc29b6680ed9ffd2eb303dd376b825ddbeceb5e7d8ef3effa0fc";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1197,4 +1197,40 @@ fn catalog_on_craft_house() {
         "house",
         &[(ItemId::Wood, 12), (ItemId::Stone, 6), (ItemId::Fiber, 4)],
     );
+}
+
+#[test]
+fn catalog_on_craft_torch() {
+    let mut sim = Simulation::new(tiny(0x54_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "torch",
+        &[(ItemId::Wood, 2), (ItemId::Fiber, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_axe() {
+    let mut sim = Simulation::new(tiny(0x54_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "axe",
+        &[(ItemId::Wood, 4), (ItemId::Stone, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_jar() {
+    let mut sim = Simulation::new(tiny(0x54_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "jar", &[(ItemId::Stone, 4)]);
+}
+
+#[test]
+fn catalog_on_craft_bread() {
+    let mut sim = Simulation::new(tiny(0x54_14)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "bread", &[(ItemId::Food(1), 4)]);
 }

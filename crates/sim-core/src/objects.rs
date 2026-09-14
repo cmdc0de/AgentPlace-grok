@@ -96,6 +96,9 @@ pub struct SimDef {
     /// Extra Attack damage millipoints when this item is held. Omit = 0.
     #[serde(default)]
     pub attack_bonus: Option<u32>,
+    /// Chebyshev Attack range when held. Omit = 1 (adjacent).
+    #[serde(default)]
+    pub attack_range: Option<u32>,
     /// Dawn energy millipoints of `energy_max`. Omit = 0 (not a sleep place).
     #[serde(default)]
     pub sleep_bonus: Option<u32>,
@@ -121,6 +124,7 @@ pub struct CatalogEntry {
     pub inputs: Vec<(ItemId, u32)>,
     pub output_qty: u32,
     pub attack_bonus: u32,
+    pub attack_range: u32,
     pub sleep_bonus: u32,
     pub sleep_size: u32,
 }
@@ -367,6 +371,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 inputs,
                 output_qty,
                 attack_bonus: sim.attack_bonus.unwrap_or(0),
+                attack_range: sim.attack_range.unwrap_or(1).max(1),
                 sleep_bonus: sim.sleep_bonus.unwrap_or(0),
                 sleep_size: clamp_sleep_size(sim.sleep_size.unwrap_or(1)),
             }
@@ -511,7 +516,8 @@ pub fn remap_catalog_holdings(
             | SimEventKind::Give { item, .. }
             | SimEventKind::Pack { item, .. }
             | SimEventKind::Unpack { item, .. }
-            | SimEventKind::Placed { item, .. } => {
+            | SimEventKind::Placed { item, .. }
+            | SimEventKind::PickedUp { item, .. } => {
                 *item = remap_catalog_item(*item, old_slugs, entries);
             }
             SimEventKind::Craft { recipe, .. } => {
@@ -541,6 +547,39 @@ pub fn max_held_attack_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
         .unwrap_or(0)
 }
 
+/// Max `[sim] attack_range` among held items. Unarmed / omit = 1.
+pub fn max_held_attack_range(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| {
+            agent.inventory.get(&e.item).copied().unwrap_or(0) > 0
+                || agent.pack.get(&e.item).copied().unwrap_or(0) > 0
+        })
+        .map(|e| e.attack_range.max(1))
+        .max()
+        .unwrap_or(1)
+}
+
+pub fn can_stow_one(
+    agent: &Agent,
+    item: ItemId,
+    storage: &crate::haul::StorageParams,
+) -> bool {
+    if agent.pocket_fit_qty(item) >= 1 {
+        return true;
+    }
+    if Agent::is_pack_carrier(item) || !agent.has_pack(storage) {
+        return false;
+    }
+    let (slot_cap, weight_cap) = agent.worn_pack_caps(storage);
+    if agent.pack_count() >= slot_cap {
+        return false;
+    }
+    let unit = crate::haul::item_weight_milli(item);
+    let room_w = weight_cap.saturating_sub(agent.pack_weight_milli());
+    unit == 0 || room_w >= unit
+}
+
 pub fn sleep_entry(catalog: &[CatalogEntry], item: ItemId) -> Option<&CatalogEntry> {
     catalog.iter().find(|e| e.item == item && e.sleep_bonus > 0)
 }
@@ -551,12 +590,22 @@ pub fn sleep_covers(
     x: u32,
     y: u32,
 ) -> Option<ItemId> {
+    sleep_origin_at(world, catalog, x, y).map(|(_, item)| item)
+}
+
+/// Origin (min x,y) and item of the footprint covering `(x, y)`.
+pub fn sleep_origin_at(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    x: u32,
+    y: u32,
+) -> Option<((u32, u32), ItemId)> {
     for (&(ox, oy), &item) in &world.sleep_places {
         let n = sleep_entry(catalog, item)
             .map(|e| e.sleep_size)
             .unwrap_or(1);
         if x >= ox && x < ox.saturating_add(n) && y >= oy && y < oy.saturating_add(n) {
-            return Some(item);
+            return Some(((ox, oy), item));
         }
     }
     None
@@ -616,6 +665,7 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.weight_milli.to_le_bytes());
         hasher.update(e.output_qty.to_le_bytes());
         hasher.update(e.attack_bonus.to_le_bytes());
+        hasher.update(e.attack_range.to_le_bytes());
         hasher.update(e.sleep_bonus.to_le_bytes());
         hasher.update(e.sleep_size.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());

@@ -42,6 +42,7 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::Reproduce { with } => reproduce(sim, id, *with),
         PrimaryAction::Invent => invent(sim, id),
         PrimaryAction::Place { item } => place(sim, id, *item),
+        PrimaryAction::Pickup => pickup(sim, id),
     }
 }
 
@@ -247,7 +248,8 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         return;
     };
     let dist = crate::observation::chebyshev(atk.x, atk.y, def.x, def.y);
-    if dist != 1 {
+    let range = crate::objects::max_held_attack_range(atk, &sim.catalog);
+    if dist < 1 || dist > range {
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -357,7 +359,18 @@ fn pair_bond(sim: &mut Simulation, id: AgentId, target: AgentId) {
     if sim.household_crates_enabled && !sim.household_home.contains_key(&hid) {
         if let Some(ag) = sim.agents.get(&id) {
             if sim.world.is_land(ag.x, ag.y) {
-                sim.household_home.insert(hid, (ag.x, ag.y));
+                let (ax, ay) = (ag.x, ag.y);
+                sim.household_home.insert(hid, (ax, ay));
+                if let Some(cabin) = sim
+                    .catalog
+                    .iter()
+                    .find(|e| e.slug == "cabin" && e.sleep_bonus > 0)
+                    .map(|e| e.item)
+                {
+                    if crate::objects::can_place(&sim.world, &sim.catalog, ax, ay, cabin) {
+                        sim.world.sleep_places.insert((ax, ay), cabin);
+                    }
+                }
             }
         }
     }
@@ -910,6 +923,41 @@ fn place(sim: &mut Simulation, id: AgentId, item: crate::agent::ItemId) {
         sim,
         id,
         SimEventKind::Placed { x, y, item },
+    );
+}
+
+fn pickup(sim: &mut Simulation, id: AgentId) {
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    let Some(((ox, oy), item)) =
+        crate::objects::sleep_origin_at(&sim.world, &sim.catalog, agent.x, agent.y)
+    else {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    };
+    if !crate::objects::can_stow_one(agent, item, &sim.storage) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    sim.world.sleep_places.remove(&(ox, oy));
+    let Some(a) = sim.agents.get_mut(&id) else {
+        sim.world.sleep_places.insert((ox, oy), item);
+        return;
+    };
+    if a.add_to_pockets_or_pack(item, 1, &sim.storage) < 1 {
+        sim.world.sleep_places.insert((ox, oy), item);
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    push(
+        sim,
+        id,
+        SimEventKind::PickedUp {
+            x: ox,
+            y: oy,
+            item,
+        },
     );
 }
 

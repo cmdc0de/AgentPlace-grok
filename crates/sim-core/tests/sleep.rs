@@ -132,6 +132,13 @@ fn catalog_off_place_illegal() {
     assert!(!legal
         .iter()
         .any(|x| matches!(x, PrimaryAction::Place { .. })));
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Pickup)));
+    assert!(!legal.iter().any(|x| matches!(
+        x,
+        PrimaryAction::Craft {
+            recipe: sim_core::action::Recipe::Catalog(_)
+        }
+    )));
 }
 
 #[test]
@@ -415,4 +422,258 @@ fn con_zero_matches_unused_dawn() {
     assert!(a.tick());
     assert!(b.tick());
     assert_eq!(a.agents[&id].needs.energy, b.agents[&id].needs.energy);
+}
+
+fn place_adjacent(sim: &mut Simulation) -> (AgentId, AgentId) {
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let a = ids[0];
+    let b = ids[1];
+    let (x, y) = {
+        let ag = sim.agents.get(&a).unwrap();
+        (ag.x, ag.y)
+    };
+    let mut nx = x.saturating_add(1);
+    let mut ny = y;
+    if !sim.world.in_bounds(nx as i32, ny as i32) || !sim.world.is_land(nx, ny) {
+        nx = x.saturating_sub(1);
+    }
+    if !sim.world.is_land(nx, ny) {
+        ny = y.saturating_add(1);
+        nx = x;
+    }
+    if let Some(ag) = sim.agents.get_mut(&b) {
+        ag.x = nx;
+        ag.y = ny;
+    }
+    (a, b)
+}
+
+fn ready_pair(sim: &mut Simulation, a: AgentId, b: AgentId) {
+    sim.enable_reproduction();
+    let emax = sim.config.energy_max_milli();
+    for id in [a, b] {
+        let ag = sim.agents.get_mut(&id).unwrap();
+        ag.sheet.charisma = 0;
+        ag.needs.energy = emax;
+    }
+}
+
+#[test]
+fn place_tent_then_pickup() {
+    let mut sim = Simulation::new(tiny(0x54_20)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    give(&mut sim, id, "tent");
+    let item = catalog_item(&sim, "tent");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    assert_eq!(sim.world.sleep_places.get(&(x, y)), Some(&item));
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Pickup);
+    assert!(sim.world.sleep_places.is_empty());
+    assert_eq!(
+        sim.agents[&id].inventory.get(&item).copied().unwrap_or(0),
+        1
+    );
+    assert!(sim.events.events.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::PickedUp { x: px, y: py, .. } if px == x && py == y
+    )));
+}
+
+#[test]
+fn pickup_full_pockets_and_pack_waits() {
+    let mut sim = Simulation::new(tiny(0x54_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    give(&mut sim, id, "tent");
+    let item = catalog_item(&sim, "tent");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let ag = sim.agents.get_mut(&id).unwrap();
+    ag.inventory.clear();
+    ag.pack.clear();
+    ag.inventory_cap = 1;
+    ag.try_add_item(ItemId::Stone, 1);
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Pickup);
+    assert_eq!(sim.world.sleep_places.get(&(x, y)), Some(&item));
+    assert_eq!(
+        sim.agents[&id].inventory.get(&item).copied().unwrap_or(0),
+        0
+    );
+    assert!(sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
+}
+
+#[test]
+fn pickup_cabin_from_non_origin() {
+    let mut sim = Simulation::new(tiny(0x54_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 2);
+    park(&mut sim, id, x, y);
+    let cabin = catalog_item(&sim, "cabin");
+    give(&mut sim, id, "cabin");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: cabin });
+    park(&mut sim, id, x + 1, y + 1);
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Pickup);
+    assert!(sim.world.sleep_places.is_empty());
+    assert_eq!(
+        sleep_covers(&sim.world, &sim.catalog, x + 1, y + 1),
+        None
+    );
+    assert_eq!(
+        sim.agents[&id].inventory.get(&cabin).copied().unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn load_then_pickup_tent() {
+    let mut sim = Simulation::new(tiny(0x54_23)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    let tent = catalog_item(&sim, "tent");
+    give(&mut sim, id, "tent");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: tent });
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.apply_objects_dir(&shipped()).unwrap();
+    assert_eq!(loaded.world.sleep_places.get(&(x, y)), Some(&tent));
+    let before = loaded.agents[&id]
+        .inventory
+        .get(&tent)
+        .copied()
+        .unwrap_or(0);
+    sim_core::execute::execute_primary(&mut loaded, id, &PrimaryAction::Pickup);
+    assert!(loaded.world.sleep_places.is_empty());
+    assert_eq!(
+        loaded.agents[&id].inventory.get(&tent).copied().unwrap_or(0),
+        before + 1
+    );
+}
+
+#[test]
+fn household_auto_cabin_on_pair_bond() {
+    let mut sim = Simulation::new(tiny(0x54_30)).unwrap();
+    apply_shipped(&mut sim);
+    let (ox, oy) = land_square(&sim, 2);
+    park(&mut sim, AgentId(0), ox, oy);
+    park(&mut sim, AgentId(1), ox + 1, oy);
+    let (a, b) = (AgentId(0), AgentId(1));
+    ready_pair(&mut sim, a, b);
+    sim.enable_household_crates();
+    let wood_before = sim.agents[&a]
+        .inventory
+        .get(&ItemId::Wood)
+        .copied()
+        .unwrap_or(0);
+    let stone_before = sim.agents[&a]
+        .inventory
+        .get(&ItemId::Stone)
+        .copied()
+        .unwrap_or(0);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    let hid = sim.agents[&a].kinship.household.expect("household");
+    assert_eq!(sim.household_home.get(&hid), Some(&(ox, oy)));
+    let cabin = catalog_item(&sim, "cabin");
+    assert_eq!(sim.world.sleep_places.get(&(ox, oy)), Some(&cabin));
+    assert_eq!(
+        sim.agents[&a]
+            .inventory
+            .get(&ItemId::Wood)
+            .copied()
+            .unwrap_or(0),
+        wood_before
+    );
+    assert_eq!(
+        sim.agents[&a]
+            .inventory
+            .get(&ItemId::Stone)
+            .copied()
+            .unwrap_or(0),
+        stone_before
+    );
+}
+
+#[test]
+fn household_auto_cabin_skips_when_cannot_place() {
+    let mut sim = Simulation::new(tiny(0x54_31)).unwrap();
+    apply_shipped(&mut sim);
+    let cabin = catalog_item(&sim, "cabin");
+    let w = sim.world.width;
+    let h = sim.world.height;
+    let mut origin = None;
+    for y in 0..h {
+        for x in 0..w {
+            if sim.world.is_land(x, y) && !can_place(&sim.world, &sim.catalog, x, y, cabin) {
+                for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32) {
+                        origin = Some((x, y, nx as u32, ny as u32));
+                        break;
+                    }
+                }
+            }
+            if origin.is_some() {
+                break;
+            }
+        }
+        if origin.is_some() {
+            break;
+        }
+    }
+    let (ax, ay, bx, by) = origin.expect("land cell where cabin cannot place + neighbor");
+    park(&mut sim, AgentId(0), ax, ay);
+    park(&mut sim, AgentId(1), bx, by);
+    ready_pair(&mut sim, AgentId(0), AgentId(1));
+    sim.enable_household_crates();
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::PairBond { target: AgentId(1) },
+    );
+    let hid = sim.agents[&AgentId(0)].kinship.household.expect("home");
+    assert_eq!(sim.household_home.get(&hid), Some(&(ax, ay)));
+    assert!(sim.world.sleep_places.is_empty());
+}
+
+#[test]
+fn load_restores_auto_cabin_no_remint() {
+    let mut sim = Simulation::new(tiny(0x54_32)).unwrap();
+    apply_shipped(&mut sim);
+    let (ox, oy) = land_square(&sim, 2);
+    park(&mut sim, AgentId(0), ox, oy);
+    park(&mut sim, AgentId(1), ox + 1, oy);
+    ready_pair(&mut sim, AgentId(0), AgentId(1));
+    sim.enable_household_crates();
+    sim_core::execute::execute_primary(
+        &mut sim,
+        AgentId(0),
+        &PrimaryAction::PairBond { target: AgentId(1) },
+    );
+    let hid = sim.agents[&AgentId(0)].kinship.household.unwrap();
+    let cabin = catalog_item(&sim, "cabin");
+    assert_eq!(sim.world.sleep_places.len(), 1);
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    loaded.apply_objects_dir(&shipped()).unwrap();
+    loaded.enable_household_crates();
+    assert_eq!(loaded.household_home.get(&hid), Some(&(ox, oy)));
+    assert_eq!(loaded.world.sleep_places.get(&(ox, oy)), Some(&cabin));
+    assert_eq!(loaded.world.sleep_places.len(), 1);
+}
+
+#[test]
+fn household_off_pair_bond_no_cabin() {
+    let mut sim = Simulation::new(tiny(0x54_33)).unwrap();
+    apply_shipped(&mut sim);
+    let (a, b) = place_adjacent(&mut sim);
+    ready_pair(&mut sim, a, b);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::PairBond { target: b });
+    assert!(sim.household_home.is_empty());
+    assert!(sim.world.sleep_places.is_empty());
 }

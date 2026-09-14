@@ -11,6 +11,7 @@ far  = "assets/models/optimized/stylized_old_fishing_rod_low_poly.glb"
 [sim]
 weight_milli = 180
 attack_bonus = 600
+attack_range = 3
 [sim.craft]
 inputs = [["wood", 2], ["fiber", 1]]
 output_qty = 1

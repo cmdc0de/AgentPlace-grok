@@ -1,4 +1,4 @@
-id = "spear"
+id = "axe"
 kind = "item"
 
 [visual]
@@ -9,9 +9,7 @@ mid  = "assets/models/optimized/herrscher_of_truths_spear.glb"
 far  = "assets/models/optimized/herrscher_of_truths_spear.glb"
 
 [sim]
-weight_milli = 200
-attack_bonus = 500
-attack_range = 2
+weight_milli = 250
 [sim.craft]
-inputs = [["wood", 1], ["stone", 1]]
+inputs = [["wood", 2], ["stone", 1]]
 output_qty = 1

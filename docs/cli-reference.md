@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `6e8b124a…` (M53 tent sleep + cabin/house). Default (time on) shipped-objects is `3a294816…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `35746f95…` (M54 range/recipes). Default (time on) shipped-objects is `7b8864e9…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -73,7 +73,7 @@ These are **or** with the same-named overlay table. `[time]` **omit = true** (cl
 | `--sheet` | `[agents.sheet] enabled` | Roll founder STR/DEX/CON/INT/WIS/CHA. Score 0 ⇒ modifier 0 / today’s constants. |
 | `--reproduction` | `[population] reproduction` | PairBond / Reproduce. Implies `--sheet`. Mock does not pick them. |
 | `--aging` | `[population] aging` | Accrue `age_ticks`. Childhood gates PairBond / Reproduce / Attack. |
-| `--household-crates` | `[population] household_crates` | PairBond mints a home cell; members Store/Retrieve within Chebyshev 1. |
+| `--household-crates` | `[population] household_crates` | PairBond mints a home cell; members Store/Retrieve within Chebyshev 1. Catalog on ⇒ also Place a cabin if 2×2 land is free. |
 | `--culture` | `[population] culture` | Founder culture ids `1..=culture_count`; children copy a parent. |
 | `--inventions` | `[inventions] enabled` | Invent GatherBonus → MoveBonus → SenseBonus. Does **not** imply `--sheet`. `tree` / `patent_ticks` come from overlay only. |
 | `--pipeline-events` | `[pipeline] hash_events` | One hashed `Pipeline { stages }` per living agent per tick (complete mock = `31`). Does **not** hash wall-clock ns. |
@@ -98,12 +98,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=3a294816…
+# final_hash=7b8864e9…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=6e8b124a…
+# final_hash=35746f95…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` a tent/cabin/house on land (N×N) for extra dawn energy.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N). Spear/sling/bow have Attack range.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -193,7 +193,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `3a294816…`. `--no-time` shipped-objects is `6e8b124a…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `7b8864e9…`. `--no-time` shipped-objects is `35746f95…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

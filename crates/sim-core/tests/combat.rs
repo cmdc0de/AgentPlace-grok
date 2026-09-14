@@ -437,3 +437,124 @@ fn attack_catalog_off_weapon_no_bonus() {
     });
     assert_eq!(dmg, Some(ATTACK_DAMAGE));
 }
+
+#[test]
+fn attack_hold_spear_adds_500() {
+    let mut sim = Simulation::new(tiny(0x54_40)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim.agents
+        .get_mut(&a)
+        .unwrap()
+        .try_add_item(sim_core::ItemId::Spear, 1);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE + 500));
+}
+
+#[test]
+fn attack_catalog_off_spear_is_base_damage() {
+    let mut sim = Simulation::new(tiny(0x54_41)).unwrap();
+    sim.conflict_enabled = true;
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim.agents
+        .get_mut(&a)
+        .unwrap()
+        .try_add_item(sim_core::ItemId::Spear, 1);
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let dmg = sim.events.events.iter().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage),
+        _ => None,
+    });
+    assert_eq!(dmg, Some(ATTACK_DAMAGE));
+}
+
+fn park_at_chebyshev(sim: &mut Simulation, a: AgentId, b: AgentId, dist: u32) {
+    let (x, y) = {
+        let ag = sim.agents.get(&a).unwrap();
+        (ag.x, ag.y)
+    };
+    let mut nx = x.saturating_add(dist);
+    let mut ny = y;
+    if !sim.world.in_bounds(nx as i32, ny as i32) || !sim.world.is_land(nx, ny) {
+        nx = x;
+        ny = y.saturating_add(dist);
+    }
+    if !sim.world.is_land(nx, ny) {
+        nx = x.saturating_sub(dist);
+        ny = y;
+    }
+    if let Some(ag) = sim.agents.get_mut(&b) {
+        ag.x = nx;
+        ag.y = ny;
+    }
+}
+
+#[test]
+fn bow_attack_legal_at_chebyshev_3_not_4() {
+    let mut sim = Simulation::new(tiny(0x54_42)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let a = ids[0];
+    let b = ids[1];
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    give_slug(&mut sim, a, "bow");
+    park_at_chebyshev(&mut sim, a, b, 3);
+    let d = sim_core::observation::chebyshev(
+        sim.agents[&a].x,
+        sim.agents[&a].y,
+        sim.agents[&b].x,
+        sim.agents[&b].y,
+    );
+    assert_eq!(d, 3);
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b)));
+    park_at_chebyshev(&mut sim, a, b, 4);
+    let d4 = sim_core::observation::chebyshev(
+        sim.agents[&a].x,
+        sim.agents[&a].y,
+        sim.agents[&b].x,
+        sim.agents[&b].y,
+    );
+    assert_eq!(d4, 4);
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b)));
+}
+
+#[test]
+fn unarmed_and_club_attack_only_adjacent() {
+    let mut sim = Simulation::new(tiny(0x54_43)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let ids: Vec<AgentId> = sim.agents.keys().copied().collect();
+    let a = ids[0];
+    let b = ids[1];
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    park_at_chebyshev(&mut sim, a, b, 2);
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Attack { .. })));
+    give_slug(&mut sim, a, "club");
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Attack { .. })));
+    let (a2, b2) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a2).unwrap().needs.energy = 10_000;
+    let legal = legal_actions(&sim, sim.agents.get(&a2).unwrap());
+    assert!(legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b2)));
+}

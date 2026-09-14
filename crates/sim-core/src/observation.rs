@@ -820,7 +820,9 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 continue;
             }
             let dist = chebyshev(agent.x, agent.y, other.x, other.y);
-            if dist == 1
+            let range = crate::objects::max_held_attack_range(agent, &sim.catalog);
+            if dist >= 1
+                && dist <= range
                 && agent.needs.energy >= crate::conflict::ATTACK_ENERGY_COST
                 && !sim.is_child(agent)
             {
@@ -882,6 +884,15 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
             if crate::objects::can_place(&sim.world, &sim.catalog, agent.x, agent.y, entry.item) {
                 legal.push(PrimaryAction::Place { item: entry.item });
+            }
+        }
+        if !sim.catalog.is_empty() {
+            if let Some((_, item)) =
+                crate::objects::sleep_origin_at(&sim.world, &sim.catalog, agent.x, agent.y)
+            {
+                if crate::objects::can_stow_one(agent, item, &sim.storage) {
+                    legal.push(PrimaryAction::Pickup);
+                }
             }
         }
     }
@@ -1054,6 +1065,7 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         PrimaryAction::Place { item } => {
             format!("Place {}", item_display_name(*item, species))
         }
+        PrimaryAction::Pickup => "Pickup".into(),
     }
 }
 

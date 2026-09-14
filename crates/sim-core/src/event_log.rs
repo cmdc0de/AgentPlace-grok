@@ -126,6 +126,11 @@ pub enum SimEventKind {
         y: u32,
         item: ItemId,
     },
+    PickedUp {
+        x: u32,
+        y: u32,
+        item: ItemId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,6 +326,12 @@ pub fn hash_kind_slugs(kind: &SimEventKind, hasher: &mut impl sha2::Digest, slug
             hasher.update(y.to_le_bytes());
             hash_item_slugs(hasher, *item, slugs);
         }
+        SimEventKind::PickedUp { x, y, item } => {
+            hasher.update([34u8]);
+            hasher.update(x.to_le_bytes());
+            hasher.update(y.to_le_bytes());
+            hash_item_slugs(hasher, *item, slugs);
+        }
     }
 }
 
@@ -397,6 +408,7 @@ pub fn kind_label(kind: &SimEventKind) -> &'static str {
         SimEventKind::Invented { .. } => "Invented",
         SimEventKind::Pipeline { .. } => "Pipeline",
         SimEventKind::Placed { .. } => "Placed",
+        SimEventKind::PickedUp { .. } => "PickedUp",
     }
 }
 
@@ -436,6 +448,7 @@ pub fn kind_slug(kind: &SimEventKind) -> &'static str {
         SimEventKind::Invented { .. } => "invented",
         SimEventKind::Pipeline { .. } => "pipeline",
         SimEventKind::Placed { .. } => "placed",
+        SimEventKind::PickedUp { .. } => "picked_up",
     }
 }
 

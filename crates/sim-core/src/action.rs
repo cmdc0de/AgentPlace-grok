@@ -69,6 +69,7 @@ pub enum PrimaryAction {
     Place {
         item: ItemId,
     },
+    Pickup,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

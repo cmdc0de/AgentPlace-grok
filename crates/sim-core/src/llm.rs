@@ -599,6 +599,7 @@ pub fn parse_choice_json(
                 .unwrap_or(ItemId::Wood);
             PrimaryAction::Place { item }
         }
+        "pickup" => PrimaryAction::Pickup,
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {

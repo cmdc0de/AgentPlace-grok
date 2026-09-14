@@ -57,6 +57,7 @@ pub fn legal_names(legal: &[PrimaryAction]) -> Vec<String> {
             PrimaryAction::Reproduce { .. } => "Reproduce".into(),
             PrimaryAction::Invent => "Invent".into(),
             PrimaryAction::Place { .. } => "Place".into(),
+            PrimaryAction::Pickup => "Pickup".into(),
         })
         .collect()
 }
@@ -122,6 +123,7 @@ pub fn mock_branch_for(primary: &PrimaryAction) -> &'static str {
         PrimaryAction::Reproduce { .. } => "reproduce",
         PrimaryAction::Invent => "invent",
         PrimaryAction::Place { .. } => "place",
+        PrimaryAction::Pickup => "pickup",
     }
 }
 
