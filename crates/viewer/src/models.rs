@@ -247,6 +247,15 @@ mod tests {
     }
 
     #[test]
+    fn draco_decoder_plugin_registers() {
+        use bevy::prelude::*;
+        let mut app = App::new();
+        app.init_resource::<bevy::gltf::extensions::GltfExtensionHandlers>();
+        app.add_plugins(bevy_gltf_draco::GltfDracoDecoderPlugin);
+        assert!(app.is_plugin_added::<bevy_gltf_draco::GltfDracoDecoderPlugin>());
+    }
+
+    #[test]
     fn should_reload_newer_only() {
         let t0 = SystemTime::UNIX_EPOCH;
         let t1 = t0 + std::time::Duration::from_secs(1);

@@ -1042,11 +1042,7 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let bonus = if agent.has_tool(ItemId::Basket) {
-        15
-    } else {
-        0
-    };
+    let bonus = crate::objects::gather_skill_bonus(&agent, &sim.catalog);
     let ok = {
         let rng = sim.rngs.agent_stream(id);
         skill_roll(
@@ -1140,7 +1136,7 @@ fn gather_stone(sim: &mut Simulation, id: AgentId) {
         skill_roll(
             rng,
             agent.abilities.gather,
-            0,
+            crate::objects::stone_gather_skill_bonus(&agent, &sim.catalog),
             agent.illness_ticks > 0,
             agent.needs.hunger,
             agent.needs.thirst,

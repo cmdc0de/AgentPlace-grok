@@ -111,6 +111,9 @@ pub struct SimDef {
     /// Added to Fish skill_roll bonus when held. Omit = 0.
     #[serde(default)]
     pub fish_bonus: Option<u32>,
+    /// Added to vegetation Gather skill_roll bonus when held. Omit = 0.
+    #[serde(default)]
+    pub gather_bonus: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -135,6 +138,7 @@ pub struct CatalogEntry {
     pub sleep_size: u32,
     pub farm_bonus: u32,
     pub fish_bonus: u32,
+    pub gather_bonus: u32,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -384,6 +388,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 sleep_size: clamp_sleep_size(sim.sleep_size.unwrap_or(1)),
                 farm_bonus: sim.farm_bonus.unwrap_or(0),
                 fish_bonus: sim.fish_bonus.unwrap_or(0),
+                gather_bonus: sim.gather_bonus.unwrap_or(0),
             }
         })
         .collect()
@@ -607,6 +612,27 @@ pub fn fish_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
     if held == 0 { -15 } else { held }
 }
 
+/// Max `[sim] gather_bonus` among held items. 0 if none.
+pub fn max_held_gather_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| e.gather_bonus > 0 && holds(agent, e.item))
+        .map(|e| e.gather_bonus)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Vegetation Gather `skill_roll` bonus. Basket +15 (pockets), catalog axe max, else 0.
+pub fn gather_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
+    let basket = if agent.has_tool(ItemId::Basket) { 15 } else { 0 };
+    basket.max(max_held_gather_bonus(agent, catalog) as i32)
+}
+
+/// Stone gather stays 0 even with an axe.
+pub fn stone_gather_skill_bonus(_agent: &Agent, _catalog: &[CatalogEntry]) -> i32 {
+    0
+}
+
 pub fn can_stow_one(
     agent: &Agent,
     item: ItemId,
@@ -717,6 +743,7 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.sleep_size.to_le_bytes());
         hasher.update(e.farm_bonus.to_le_bytes());
         hasher.update(e.fish_bonus.to_le_bytes());
+        hasher.update(e.gather_bonus.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

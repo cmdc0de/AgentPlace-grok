@@ -4,20 +4,21 @@ use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
     CatalogParams, ObjectDef, catalog_entries, default_objects_dir, farm_skill_bonus,
-    fish_skill_bonus, load_object_defs, lod_band, pick_visual_path,
+    fish_skill_bonus, gather_skill_bonus, load_object_defs, lod_band, pick_visual_path,
+    stone_gather_skill_bonus,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M55 catalog: hoe/net bonuses + recipes).
-const IDLE_2_NO_TIME: &str = "5028d7ed5dd201cda87cfb5ee668e534490951b04373b851c89ccac6301bebec";
+/// `--no-time` shipped-objects 2-tick (M56 catalog: axe gather + recipes).
+const IDLE_2_NO_TIME: &str = "6d2df92b8eb0e599155cb4c5e820a4b6536d78f74ac5dfde2e4f74b84ee2a207";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "32fc63242204f3fd25de981dc672cda08730e32bd8e9078c1fa19745b4549611";
+const IDLE_2: &str = "34f165913c1abb8efc4ed82988815282d14c536002944e3eed51ef3dcb1a7124";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1321,4 +1322,87 @@ fn net_fish_bonus_25_bare_minus_15_rod_net_max() {
         .try_add_item(ItemId::FishingRod, 1);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(fish_skill_bonus(a, &sim.catalog), 25, "rod+net max not sum");
+}
+
+#[test]
+fn catalog_off_gather_basket_identity() {
+    let mut sim = Simulation::new(tiny(0x56_20)).unwrap();
+    let a = sim.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(gather_skill_bonus(a, &[]), 0);
+    sim.agents
+        .get_mut(&AgentId(0))
+        .unwrap()
+        .try_add_item(ItemId::Basket, 1);
+    let a = sim.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(gather_skill_bonus(a, &[]), 15);
+}
+
+#[test]
+fn axe_gather_bonus_25_vs_zero_basket_max() {
+    let mut sim = Simulation::new(tiny(0x56_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(gather_skill_bonus(a, &sim.catalog), 0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(axe, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(gather_skill_bonus(a, &sim.catalog), 25);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Basket, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(
+        gather_skill_bonus(a, &sim.catalog),
+        25,
+        "basket+axe max not sum"
+    );
+}
+
+#[test]
+fn stone_gather_bonus_stays_zero_with_axe() {
+    let mut sim = Simulation::new(tiny(0x56_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(axe, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(stone_gather_skill_bonus(a, &sim.catalog), 0);
+}
+
+#[test]
+fn catalog_on_craft_fence() {
+    let mut sim = Simulation::new(tiny(0x56_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "fence", &[(ItemId::Wood, 8)]);
+}
+
+#[test]
+fn catalog_on_craft_mat() {
+    let mut sim = Simulation::new(tiny(0x56_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "mat", &[(ItemId::Fiber, 10)]);
+}
+
+#[test]
+fn catalog_on_craft_snare() {
+    let mut sim = Simulation::new(tiny(0x56_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "snare",
+        &[(ItemId::Fiber, 4), (ItemId::Wood, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_spit() {
+    let mut sim = Simulation::new(tiny(0x56_14)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "spit",
+        &[(ItemId::Wood, 4), (ItemId::Fiber, 2)],
+    );
 }

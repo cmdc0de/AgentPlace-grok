@@ -1,7 +1,8 @@
 # M56 — Axe gather bonus, Draco glTF decode, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M55 complete (`docs/M55-plan.md`, git tag `M55`, commit `6a6eb05`)  
+**Walkthrough:** [`docs/M56-test-plan.md`](M56-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes, PG-6 leftover decode); M55 later-table axe gather bonus / GltfDracoDecoderPlugin
 
 ## Context
@@ -79,8 +80,8 @@ No tool-use bonuses on these four. Catalog-off / empty catalog / no objects dir 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M55 `5028d7ed…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M55 `32fc6324…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `6d2df92b…` |
+| default CLI 2 ticks (time on) | hash `34f16591…` |
 | catalog-off Gather | bonus 0 without basket; +15 with basket |
 | hold axe, catalog on | Gather `skill_roll` bonus 25 vs 0 without; basket+axe 25 not 40 |
 | stone gather | bonus still 0 with axe |
@@ -121,7 +122,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M56-test-plan.md` (written on implement).
+Walkthrough: [`docs/M56-test-plan.md`](M56-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -130,7 +131,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `6d2df92b…`; default (time on) `34f16591…`; Hello v5; format_version 3 write.
 
 ## Risks
 

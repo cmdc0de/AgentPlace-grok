@@ -262,6 +262,7 @@ fn main() {
             }),
     )
     .add_plugins(plugin)
+    .add_plugins(bevy_gltf_draco::GltfDracoDecoderPlugin)
     .add_plugins(bevy_mod_imgui::ImguiPlugin {
         ini_filename: Some(ui::imgui_ini_path()),
         ..Default::default()

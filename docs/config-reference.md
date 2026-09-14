@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `32fc6324…`; `--no-time` shipped-objects `5028d7ed…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `34f16591…`; `--no-time` shipped-objects `6d2df92b…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` (omit 0) added to Farm/Fish `skill_roll`.
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather `skill_roll`. Native viewer registers `GltfDracoDecoderPlugin` (hash-neutral).
 
 ### `[time]` (M52)
 
@@ -427,7 +427,7 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`, `attack_range = 2`. |
 | `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`, `attack_range = 3`. |
 | `torch.toml` | item | Catalog craft 1 wood + 1 fiber → 1. |
-| `axe.toml` | item | Catalog craft 2 wood + 1 stone → 1. |
+| `axe.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] gather_bonus = 25`. |
 | `jar.toml` | item | Catalog craft 2 stone → 1. |
 | `bread.toml` | item | Catalog craft 2 food → 1. |
 | `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. `[sim] sleep_bonus = 100`, `sleep_size = 1` (1×1). Place on land. |
@@ -440,6 +440,10 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `needle.toml` | item | Catalog craft 1 stone + 1 fiber → 1. |
 | `bucket.toml` | item | Catalog craft 2 wood → 1. |
 | `shield.toml` | item | Catalog craft 3 wood → 1. |
+| `fence.toml` | item | Catalog craft 4 wood → 1. |
+| `mat.toml` | item | Catalog craft 5 fiber → 1. |
+| `snare.toml` | item | Catalog craft 2 fiber + 1 wood → 1. |
+| `spit.toml` | item | Catalog craft 2 wood + 1 fiber → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

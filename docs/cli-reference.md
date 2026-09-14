@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `5028d7ed…` (M55 hoe/net + recipes). Default (time on) shipped-objects is `32fc6324…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `6d2df92b…` (M56 axe gather + recipes). Default (time on) shipped-objects is `34f16591…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -98,12 +98,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=32fc6324…
+# final_hash=34f16591…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=5028d7ed…
+# final_hash=6d2df92b…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N). Spear/sling/bow have Attack range. Hoe/net raise Farm/Fish odds.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N). Spear/sling/bow have Attack range. Hoe/net/axe raise Farm/Fish/Gather odds. Native viewer registers Draco glTF decode.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -193,7 +193,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `32fc6324…`. `--no-time` shipped-objects is `5028d7ed…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `34f16591…`. `--no-time` shipped-objects is `6d2df92b…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.
