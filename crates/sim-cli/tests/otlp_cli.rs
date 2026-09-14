@@ -58,6 +58,10 @@ fn otlp_endpoint_posts_json_and_keeps_hash() {
     assert!(req.starts_with("POST /v1/metrics"), "{req}");
     assert!(req.contains("agentplace.tick.wall_ns"), "{req}");
     assert!(req.contains("agentplace.process.rss_bytes"), "{req}");
+    assert!(req.contains("agentplace.process.cpu_user_ns"), "{req}");
+    assert!(req.contains("agentplace.process.cpu_system_ns"), "{req}");
+    assert!(req.contains("agentplace.process.disk_read_bytes"), "{req}");
+    assert!(req.contains("agentplace.process.disk_write_bytes"), "{req}");
     assert!(req.contains("agentplace-sim"), "{req}");
 
     let off = Command::new(bin())

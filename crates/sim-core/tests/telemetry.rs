@@ -49,4 +49,12 @@ fn telemetry_on_records_and_same_hash() {
     );
     assert_eq!(off.telemetry_ticks.count(), 0);
     assert!(on.telemetry_otlp_endpoint.is_empty());
+    assert!(off.telemetry_cpu_user_ns.is_none());
+    assert!(off.telemetry_disk_read_bytes.is_none());
+    if cfg!(target_os = "linux") {
+        assert!(on.telemetry_cpu_user_ns.is_some());
+        assert!(on.telemetry_cpu_system_ns.is_some());
+        assert!(on.telemetry_disk_read_bytes.is_some());
+        assert!(on.telemetry_disk_write_bytes.is_some());
+    }
 }

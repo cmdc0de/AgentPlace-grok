@@ -114,6 +114,9 @@ pub struct SimDef {
     /// Added to vegetation Gather skill_roll bonus when held. Omit = 0.
     #[serde(default)]
     pub gather_bonus: Option<u32>,
+    /// Added to stone Gather skill_roll bonus when held. Omit = 0.
+    #[serde(default)]
+    pub stone_gather_bonus: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -139,6 +142,7 @@ pub struct CatalogEntry {
     pub farm_bonus: u32,
     pub fish_bonus: u32,
     pub gather_bonus: u32,
+    pub stone_gather_bonus: u32,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -389,6 +393,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 farm_bonus: sim.farm_bonus.unwrap_or(0),
                 fish_bonus: sim.fish_bonus.unwrap_or(0),
                 gather_bonus: sim.gather_bonus.unwrap_or(0),
+                stone_gather_bonus: sim.stone_gather_bonus.unwrap_or(0),
             }
         })
         .collect()
@@ -628,9 +633,19 @@ pub fn gather_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
     basket.max(max_held_gather_bonus(agent, catalog) as i32)
 }
 
-/// Stone gather stays 0 even with an axe.
-pub fn stone_gather_skill_bonus(_agent: &Agent, _catalog: &[CatalogEntry]) -> i32 {
-    0
+/// Max `[sim] stone_gather_bonus` among held items. 0 if none.
+pub fn max_held_stone_gather_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| e.stone_gather_bonus > 0 && holds(agent, e.item))
+        .map(|e| e.stone_gather_bonus)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Stone Gather `skill_roll` bonus. Max held catalog `stone_gather_bonus`, else 0.
+pub fn stone_gather_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
+    max_held_stone_gather_bonus(agent, catalog) as i32
 }
 
 pub fn can_stow_one(
@@ -744,6 +759,7 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.farm_bonus.to_le_bytes());
         hasher.update(e.fish_bonus.to_le_bytes());
         hasher.update(e.gather_bonus.to_le_bytes());
+        hasher.update(e.stone_gather_bonus.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

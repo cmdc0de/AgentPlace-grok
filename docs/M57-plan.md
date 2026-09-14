@@ -1,7 +1,8 @@
 # M57 — Hammer stone-gather bonus, process CPU/disk telemetry, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M56 complete (`docs/M56-plan.md`, git tag `M56`, commit `852297e`)  
+**Walkthrough:** [`docs/M57-test-plan.md`](M57-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes, PG-11 leftover CPU/disk); M56 Not-list stone-gather bonus
 
 ## Context
@@ -113,8 +114,8 @@ No tool-use bonuses on these four. Catalog-off / empty catalog / no objects dir 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M56 `6d2df92b…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M56 `34f16591…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `e2848016…` |
+| default CLI 2 ticks (time on) | hash `35c79482…` |
 | catalog-off stone Gather | bonus 0 |
 | hold hammer, catalog on | stone Gather `skill_roll` bonus 25 vs 0 without; two tools max not sum |
 | vegetation Gather with hammer | still basket +15 / axe 25 / else 0 (hammer does not add) |
@@ -159,7 +160,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M57-test-plan.md` (written on implement).
+Walkthrough: [`docs/M57-test-plan.md`](M57-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -168,7 +169,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `e2848016…`; default (time on) `35c79482…`; Hello v5; format_version 3 write.
 
 ## Risks
 

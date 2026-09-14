@@ -98,6 +98,78 @@ pub fn process_rss_bytes() -> Option<u64> {
     Some(pages.saturating_mul(4096))
 }
 
+fn clk_tck() -> u64 {
+    #[cfg(unix)]
+    {
+        // SAFETY: sysconf(_SC_CLK_TCK); 2 is _SC_CLK_TCK on Linux glibc/musl.
+        let v = unsafe { sysconf_clk_tck(2) };
+        if v > 0 { v as u64 } else { 100 }
+    }
+    #[cfg(not(unix))]
+    {
+        100
+    }
+}
+
+#[cfg(unix)]
+unsafe extern "C" {
+    #[link_name = "sysconf"]
+    fn sysconf_clk_tck(name: i32) -> i64;
+}
+
+fn ticks_to_ns(ticks: u64) -> u64 {
+    ticks.saturating_mul(1_000_000_000 / clk_tck().max(1))
+}
+
+fn proc_stat_after_comm() -> Option<String> {
+    let text = std::fs::read_to_string("/proc/self/stat").ok()?;
+    let rest = text.rsplit_once(')')?.1.to_string();
+    Some(rest)
+}
+
+/// Cumulative user-mode CPU ns. None if the host cannot report it.
+pub fn process_cpu_user_ns() -> Option<u64> {
+    let rest = proc_stat_after_comm()?;
+    let mut it = rest.split_whitespace();
+    for _ in 0..11 {
+        it.next()?;
+    }
+    let utime: u64 = it.next()?.parse().ok()?;
+    Some(ticks_to_ns(utime))
+}
+
+/// Cumulative system-mode CPU ns. None if the host cannot report it.
+pub fn process_cpu_system_ns() -> Option<u64> {
+    let rest = proc_stat_after_comm()?;
+    let mut it = rest.split_whitespace();
+    for _ in 0..12 {
+        it.next()?;
+    }
+    let stime: u64 = it.next()?.parse().ok()?;
+    Some(ticks_to_ns(stime))
+}
+
+fn proc_io_field(name: &str) -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/self/io").ok()?;
+    let prefix = format!("{name}:");
+    for line in text.lines() {
+        if let Some(v) = line.trim().strip_prefix(&prefix) {
+            return v.trim().parse().ok();
+        }
+    }
+    None
+}
+
+/// Cumulative bytes read from storage. None if the host cannot report it.
+pub fn process_disk_read_bytes() -> Option<u64> {
+    proc_io_field("read_bytes")
+}
+
+/// Cumulative bytes written to storage. None if the host cannot report it.
+pub fn process_disk_write_bytes() -> Option<u64> {
+    proc_io_field("write_bytes")
+}
+
 impl PipelineParams {
     pub fn from_config_toml(s: &str) -> Self {
         #[derive(Default, Deserialize)]

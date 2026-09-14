@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M56 catalog: axe gather + recipes).
-const IDLE_2_NO_TIME: &str = "6d2df92b8eb0e599155cb4c5e820a4b6536d78f74ac5dfde2e4f74b84ee2a207";
+/// `--no-time` shipped-objects 2-tick (M57 catalog: hammer stone-gather + recipes).
+const IDLE_2_NO_TIME: &str = "e2848016bf0e3c82f7b14cd69f31b25550a066fcebddc541d0b9051be91db0a0";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "34f165913c1abb8efc4ed82988815282d14c536002944e3eed51ef3dcb1a7124";
+const IDLE_2: &str = "35c794827f5e4744ff9dffd4b49dab04b97e85d5d76fef4fe401e04ba847e44d";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1372,6 +1372,58 @@ fn stone_gather_bonus_stays_zero_with_axe() {
 }
 
 #[test]
+fn catalog_off_stone_gather_identity() {
+    let sim = Simulation::new(tiny(0x57_20)).unwrap();
+    let a = sim.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(stone_gather_skill_bonus(a, &[]), 0);
+}
+
+#[test]
+fn hammer_stone_gather_bonus_25_max_not_sum() {
+    let mut sim = Simulation::new(tiny(0x57_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(stone_gather_skill_bonus(a, &sim.catalog), 0);
+    let hammer = sim.catalog.iter().find(|e| e.slug == "hammer").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(hammer, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(stone_gather_skill_bonus(a, &sim.catalog), 25);
+    if let Some(e) = sim.catalog.iter_mut().find(|e| e.slug == "knife") {
+        e.stone_gather_bonus = 10;
+    }
+    let knife = sim.catalog.iter().find(|e| e.slug == "knife").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(knife, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(
+        stone_gather_skill_bonus(a, &sim.catalog),
+        25,
+        "hammer+knife max not sum"
+    );
+}
+
+#[test]
+fn vegetation_gather_with_hammer_unchanged() {
+    let mut sim = Simulation::new(tiny(0x57_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let hammer = sim.catalog.iter().find(|e| e.slug == "hammer").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(hammer, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(gather_skill_bonus(a, &sim.catalog), 0, "hammer is not vegetation");
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Basket, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(gather_skill_bonus(a, &sim.catalog), 15);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(axe, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(gather_skill_bonus(a, &sim.catalog), 25);
+}
+
+#[test]
 fn catalog_on_craft_fence() {
     let mut sim = Simulation::new(tiny(0x56_11)).unwrap();
     apply_shipped(&mut sim);
@@ -1404,5 +1456,37 @@ fn catalog_on_craft_spit() {
         &mut sim,
         "spit",
         &[(ItemId::Wood, 4), (ItemId::Fiber, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_barrel() {
+    let mut sim = Simulation::new(tiny(0x57_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "barrel", &[(ItemId::Wood, 10)]);
+}
+
+#[test]
+fn catalog_on_craft_cloak() {
+    let mut sim = Simulation::new(tiny(0x57_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "cloak", &[(ItemId::Fiber, 12)]);
+}
+
+#[test]
+fn catalog_on_craft_pot() {
+    let mut sim = Simulation::new(tiny(0x57_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "pot", &[(ItemId::Stone, 8)]);
+}
+
+#[test]
+fn catalog_on_craft_lantern() {
+    let mut sim = Simulation::new(tiny(0x57_14)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "lantern",
+        &[(ItemId::Wood, 2), (ItemId::Fiber, 2), (ItemId::Stone, 2)],
     );
 }

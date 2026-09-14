@@ -147,6 +147,10 @@ pub struct Simulation {
     pub telemetry_ticks: crate::timing::DurationStats,
     pub telemetry_rss_last: Option<u64>,
     pub telemetry_rss_peak: Option<u64>,
+    pub telemetry_cpu_user_ns: Option<u64>,
+    pub telemetry_cpu_system_ns: Option<u64>,
+    pub telemetry_disk_read_bytes: Option<u64>,
+    pub telemetry_disk_write_bytes: Option<u64>,
     /// Overlay `[time] enabled`. Default **on**. Hashed when true.
     pub time_enabled: bool,
     /// Overlay `[time] ticks_per_day`. Default 240. Hashed when time is on.
@@ -250,6 +254,10 @@ impl Simulation {
             telemetry_ticks: crate::timing::DurationStats::default(),
             telemetry_rss_last: None,
             telemetry_rss_peak: None,
+            telemetry_cpu_user_ns: None,
+            telemetry_cpu_system_ns: None,
+            telemetry_disk_read_bytes: None,
+            telemetry_disk_write_bytes: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         })
@@ -1069,6 +1077,18 @@ impl Simulation {
             if let Some(rss) = timing::process_rss_bytes() {
                 self.telemetry_rss_last = Some(rss);
                 self.telemetry_rss_peak = Some(self.telemetry_rss_peak.unwrap_or(0).max(rss));
+            }
+            if let Some(v) = timing::process_cpu_user_ns() {
+                self.telemetry_cpu_user_ns = Some(v);
+            }
+            if let Some(v) = timing::process_cpu_system_ns() {
+                self.telemetry_cpu_system_ns = Some(v);
+            }
+            if let Some(v) = timing::process_disk_read_bytes() {
+                self.telemetry_disk_read_bytes = Some(v);
+            }
+            if let Some(v) = timing::process_disk_write_bytes() {
+                self.telemetry_disk_write_bytes = Some(v);
             }
         }
         true

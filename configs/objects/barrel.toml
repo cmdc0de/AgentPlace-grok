@@ -1,0 +1,15 @@
+id = "barrel"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/wood.glb"
+[visual.lod]
+near = "assets/models/optimized/wood.glb"
+mid  = "assets/models/optimized/wood_pile.glb"
+far  = "assets/models/optimized/wood_pile.glb"
+
+[sim]
+weight_milli = 400
+[sim.craft]
+inputs = [["wood", 5]]
+output_qty = 1

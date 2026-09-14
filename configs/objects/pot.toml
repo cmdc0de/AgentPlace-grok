@@ -1,4 +1,4 @@
-id = "hammer"
+id = "pot"
 kind = "item"
 
 [visual]
@@ -9,8 +9,7 @@ mid  = "assets/models/optimized/stones_and_grass.glb"
 far  = "assets/models/optimized/stones_and_grass.glb"
 
 [sim]
-weight_milli = 250
-stone_gather_bonus = 25
+weight_milli = 200
 [sim.craft]
-inputs = [["stone", 2], ["wood", 1]]
+inputs = [["stone", 4]]
 output_qty = 1
