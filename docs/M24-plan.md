@@ -127,8 +127,9 @@ Hello **v4 vs v5** is Protocol. Old v4 clients cannot talk to a lockstep v5 serv
 | **M52** | Done — [`M52-plan.md`](M52-plan.md) — day/night clock, world-size CLI, OTLP export |
 | **M53** | Done — [`M53-plan.md`](M53-plan.md) — sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
 | **M54** | Done — [`M54-plan.md`](M54-plan.md) — sleep pickup, household auto-cabin, spear melee + range, extra recipes |
-| **M55** | [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
-| After M55 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
+| **M55** | Done — [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
+| **M56** | [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
+| After M56 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
 | Not M24 | Browser; combat; CI Win/mac; hashed pipeline events |
 
 ## Key decisions

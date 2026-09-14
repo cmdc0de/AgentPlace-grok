@@ -1,7 +1,7 @@
 # Medium-Priority Specifications
 ## Communication • Conflict & Sanctions • Checkpoints • Error Handling • Testing
 
-> **Current slice:** [`M55-plan.md`](M55-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+> **Current slice:** [`M56-plan.md`](M56-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
 
 Related documents:
 - `simulation-architecture-spec.md`
