@@ -1,7 +1,8 @@
 # M55 — Ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M54 complete (`docs/M54-plan.md`, git tag `M54`, commit `55316ed`)  
+**Walkthrough:** [`docs/M55-test-plan.md`](M55-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-4 DEX leftover, PG-9 recipes); M54 Not-list hoe/net farm/fish bonuses
 
 ## Context
@@ -85,8 +86,8 @@ No tool-use bonuses on these four. Catalog-off / empty catalog / no objects dir 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M54 `35746f95…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M54 `7b8864e9…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `5028d7ed…` |
+| default CLI 2 ticks (time on) | hash `32fc6324…` |
 | unused DEX + bow | same hit as M41 STR formula (identity) |
 | attacker DEX 18 + bow vs defender DEX 18 | can miss on a locked seed; club (range 1) still uses STR |
 | defender DEX 0 + bow | always hit |
@@ -131,7 +132,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M55-test-plan.md` (written on implement).
+Walkthrough: [`docs/M55-test-plan.md`](M55-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -140,7 +141,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `5028d7ed…`; default (time on) `32fc6324…`; Hello v5; format_version 3 write.
 
 ## Risks
 

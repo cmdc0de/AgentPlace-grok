@@ -3,21 +3,21 @@
 use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
-    CatalogParams, ObjectDef, catalog_entries, default_objects_dir, load_object_defs, lod_band,
-    pick_visual_path,
+    CatalogParams, ObjectDef, catalog_entries, default_objects_dir, farm_skill_bonus,
+    fish_skill_bonus, load_object_defs, lod_band, pick_visual_path,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M54 catalog: pickup/range/recipes).
-const IDLE_2_NO_TIME: &str = "35746f95698dc1ce00985dcdc3e06160bc3ed8c24f2e45eafed6a168d661785b";
+/// `--no-time` shipped-objects 2-tick (M55 catalog: hoe/net bonuses + recipes).
+const IDLE_2_NO_TIME: &str = "5028d7ed5dd201cda87cfb5ee668e534490951b04373b851c89ccac6301bebec";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "7b8864e94592bc29b6680ed9ffd2eb303dd376b825ddbeceb5e7d8ef3effa0fc";
+const IDLE_2: &str = "32fc63242204f3fd25de981dc672cda08730e32bd8e9078c1fa19745b4549611";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1233,4 +1233,92 @@ fn catalog_on_craft_bread() {
     let mut sim = Simulation::new(tiny(0x54_14)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "bread", &[(ItemId::Food(1), 4)]);
+}
+
+#[test]
+fn catalog_on_craft_rope() {
+    let mut sim = Simulation::new(tiny(0x55_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "rope", &[(ItemId::Fiber, 8)]);
+}
+
+#[test]
+fn catalog_on_craft_needle() {
+    let mut sim = Simulation::new(tiny(0x55_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "needle",
+        &[(ItemId::Stone, 2), (ItemId::Fiber, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_bucket() {
+    let mut sim = Simulation::new(tiny(0x55_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "bucket", &[(ItemId::Wood, 4)]);
+}
+
+#[test]
+fn catalog_on_craft_shield() {
+    let mut sim = Simulation::new(tiny(0x55_14)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "shield", &[(ItemId::Wood, 6)]);
+}
+
+#[test]
+fn catalog_off_farm_fish_identity() {
+    let mut sim = Simulation::new(tiny(0x55_20)).unwrap();
+    let a = sim.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(farm_skill_bonus(a, &[]), 0);
+    assert_eq!(fish_skill_bonus(a, &[]), -15);
+    sim.agents
+        .get_mut(&AgentId(0))
+        .unwrap()
+        .try_add_item(ItemId::FishingRod, 1);
+    let a = sim.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(fish_skill_bonus(a, &[]), 25);
+}
+
+#[test]
+fn hoe_farm_bonus_25_vs_zero() {
+    let mut sim = Simulation::new(tiny(0x55_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(farm_skill_bonus(a, &sim.catalog), 0);
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "hoe")
+        .unwrap()
+        .item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(item, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(farm_skill_bonus(a, &sim.catalog), 25);
+}
+
+#[test]
+fn net_fish_bonus_25_bare_minus_15_rod_net_max() {
+    let mut sim = Simulation::new(tiny(0x55_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(fish_skill_bonus(a, &sim.catalog), -15);
+    let net = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "net")
+        .unwrap()
+        .item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(net, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(fish_skill_bonus(a, &sim.catalog), 25);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::FishingRod, 1);
+    let a = sim.agents.get(&id).unwrap();
+    assert_eq!(fish_skill_bonus(a, &sim.catalog), 25, "rod+net max not sum");
 }

@@ -258,13 +258,17 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         return;
     }
     let cost = crate::conflict::ATTACK_ENERGY_COST;
-    let str_score = atk.sheet.strength;
+    let offense = if range > 1 && atk.sheet.dexterity != 0 {
+        atk.sheet.dexterity
+    } else {
+        atk.sheet.strength
+    };
     let def_dex = def.sheet.dexterity;
     let hit = crate::sheet::AbilitySheet::attack_hits(
         sim.config.master_seed,
         sim.tick,
         id.0,
-        str_score,
+        offense,
         def_dex,
     );
     let bonus = crate::objects::max_held_attack_bonus(atk, &sim.catalog);
@@ -1376,11 +1380,7 @@ fn fish(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
-    let bonus = if agent.has_tool(ItemId::FishingRod) {
-        25
-    } else {
-        -15
-    };
+    let bonus = crate::objects::fish_skill_bonus(&agent, &sim.catalog);
     let ok = {
         let rng = sim.rngs.agent_stream(id);
         skill_roll(
@@ -1424,7 +1424,7 @@ fn farm(sim: &mut Simulation, id: AgentId, species: u8) {
         skill_roll(
             rng,
             agent.abilities.farm,
-            0,
+            crate::objects::farm_skill_bonus(&agent, &sim.catalog),
             agent.illness_ticks > 0,
             agent.needs.hunger,
             agent.needs.thirst,

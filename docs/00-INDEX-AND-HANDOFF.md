@@ -70,7 +70,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M52** | Done (tag `M52`) | [`M52-plan.md`](M52-plan.md), walkthrough [`M52-test-plan.md`](M52-test-plan.md) | Day/night clock (default on), world-size CLI, OTLP export |
 | **M53** | Done (tag `M53`) | [`M53-plan.md`](M53-plan.md), walkthrough [`M53-test-plan.md`](M53-test-plan.md) | Sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
 | **M54** | Done (tag `M54`) | [`M54-plan.md`](M54-plan.md), walkthrough [`M54-test-plan.md`](M54-test-plan.md) | Sleep pickup, household auto-cabin, spear melee + range, extra recipes |
-| **M55** | Planned — next | [`M55-plan.md`](M55-plan.md) | Ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
+| **M55** | Done (tag `M55`) | [`M55-plan.md`](M55-plan.md), walkthrough [`M55-test-plan.md`](M55-test-plan.md) | Ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
 | After M55 | Not started | listed at the bottom of `M55-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -193,7 +193,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 58b | `M53-test-plan.md` | M53 walkthrough (Place N×N, night Hunt/Farm, CON dawn) |
 | 59 | `M54-plan.md` | Milestone 54 (done, tag `M54`): sleep pickup, household auto-cabin, spear melee + range, extra recipes |
 | 59b | `M54-test-plan.md` | M54 walkthrough (Pickup, auto-cabin, spear range, extra recipes) |
-| 60 | `M55-plan.md` | Milestone 55 (planned): ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
+| 60 | `M55-plan.md` | Milestone 55 (done, tag `M55`): ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
+| 60b | `M55-test-plan.md` | M55 walkthrough (ranged DEX, hoe/net, extra recipes) |
 
 ---
 
@@ -202,7 +203,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M55-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). Next is M55 (`M55-plan.md`). Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M55 is implemented (`M55-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -230,11 +231,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M54 are done. Next is M55 ([`M55-plan.md`](M55-plan.md)).
+M1–M55 are done. M55 is implemented ([`M55-plan.md`](M55-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M55-plan.md.
-Implement M55 (ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes;
+M55 is implemented (ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.

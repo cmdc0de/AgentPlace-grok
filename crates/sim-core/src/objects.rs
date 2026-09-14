@@ -105,6 +105,12 @@ pub struct SimDef {
     /// N×N footprint. Omit = 1. Clamped 1..=8.
     #[serde(default)]
     pub sleep_size: Option<u32>,
+    /// Added to Farm skill_roll bonus when held. Omit = 0.
+    #[serde(default)]
+    pub farm_bonus: Option<u32>,
+    /// Added to Fish skill_roll bonus when held. Omit = 0.
+    #[serde(default)]
+    pub fish_bonus: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -127,6 +133,8 @@ pub struct CatalogEntry {
     pub attack_range: u32,
     pub sleep_bonus: u32,
     pub sleep_size: u32,
+    pub farm_bonus: u32,
+    pub fish_bonus: u32,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -374,6 +382,8 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 attack_range: sim.attack_range.unwrap_or(1).max(1),
                 sleep_bonus: sim.sleep_bonus.unwrap_or(0),
                 sleep_size: clamp_sleep_size(sim.sleep_size.unwrap_or(1)),
+                farm_bonus: sim.farm_bonus.unwrap_or(0),
+                fish_bonus: sim.fish_bonus.unwrap_or(0),
             }
         })
         .collect()
@@ -560,6 +570,43 @@ pub fn max_held_attack_range(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
         .unwrap_or(1)
 }
 
+fn holds(agent: &Agent, item: ItemId) -> bool {
+    agent.inventory.get(&item).copied().unwrap_or(0) > 0
+        || agent.pack.get(&item).copied().unwrap_or(0) > 0
+}
+
+/// Max `[sim] farm_bonus` among held items. 0 if none.
+pub fn max_held_farm_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| e.farm_bonus > 0 && holds(agent, e.item))
+        .map(|e| e.farm_bonus)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Max `[sim] fish_bonus` among held items. 0 if none.
+pub fn max_held_fish_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
+    catalog
+        .iter()
+        .filter(|e| e.fish_bonus > 0 && holds(agent, e.item))
+        .map(|e| e.fish_bonus)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Farm `skill_roll` bonus. Catalog-off / not holding hoe ⇒ 0.
+pub fn farm_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
+    max_held_farm_bonus(agent, catalog) as i32
+}
+
+/// Fish `skill_roll` bonus. Rod +25 (pockets), catalog net max, else −15. Max not sum.
+pub fn fish_skill_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> i32 {
+    let rod = if agent.has_tool(ItemId::FishingRod) { 25 } else { 0 };
+    let held = rod.max(max_held_fish_bonus(agent, catalog) as i32);
+    if held == 0 { -15 } else { held }
+}
+
 pub fn can_stow_one(
     agent: &Agent,
     item: ItemId,
@@ -668,6 +715,8 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.attack_range.to_le_bytes());
         hasher.update(e.sleep_bonus.to_le_bytes());
         hasher.update(e.sleep_size.to_le_bytes());
+        hasher.update(e.farm_bonus.to_le_bytes());
+        hasher.update(e.fish_bonus.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

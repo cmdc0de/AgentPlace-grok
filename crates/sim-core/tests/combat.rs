@@ -558,3 +558,107 @@ fn unarmed_and_club_attack_only_adjacent() {
         .iter()
         .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b2)));
 }
+
+fn last_attack_miss(sim: &Simulation, b: AgentId) -> Option<bool> {
+    sim.events.events.iter().rev().find_map(|e| match e.kind {
+        SimEventKind::Attack { target, damage } if target == b => Some(damage == 0),
+        _ => None,
+    })
+}
+
+#[test]
+fn unused_dex_bow_same_hit_as_str() {
+    let cfg = tiny(0x55_40);
+    let mut bow = Simulation::new(cfg.clone()).unwrap();
+    let mut melee = Simulation::new(cfg).unwrap();
+    bow.conflict_enabled = true;
+    melee.conflict_enabled = true;
+    bow.apply_objects_dir(&shipped_objects()).unwrap();
+    melee.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut bow);
+    place_adjacent(&mut melee);
+    bow.agents.get_mut(&b).unwrap().sheet.dexterity = 18;
+    melee.agents.get_mut(&b).unwrap().sheet.dexterity = 18;
+    give_slug(&mut bow, a, "bow");
+    let mut bow_miss = Vec::new();
+    let mut melee_miss = Vec::new();
+    for t in 0..24 {
+        bow.tick = t;
+        melee.tick = t;
+        bow.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+        melee.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+        bow.agents.get_mut(&b).unwrap().health = 10_000;
+        melee.agents.get_mut(&b).unwrap().health = 10_000;
+        bow.agents.get_mut(&b).unwrap().incapacitated = false;
+        melee.agents.get_mut(&b).unwrap().incapacitated = false;
+        sim_core::execute::execute_primary(&mut bow, a, &PrimaryAction::Attack { target: b });
+        sim_core::execute::execute_primary(&mut melee, a, &PrimaryAction::Attack { target: b });
+        bow_miss.push(last_attack_miss(&bow, b).unwrap());
+        melee_miss.push(last_attack_miss(&melee, b).unwrap());
+    }
+    assert_eq!(bow_miss, melee_miss, "unused DEX + bow keeps STR to-hit");
+}
+
+#[test]
+fn dex_18_bow_can_miss_club_uses_str() {
+    use sim_core::sheet::AbilitySheet;
+    let mut sim = Simulation::new(tiny(0x55_41)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().sheet.dexterity = 18;
+    sim.agents.get_mut(&b).unwrap().sheet.dexterity = 18;
+    let master = sim.config.master_seed;
+    let tick = (0u64..40)
+        .find(|&t| {
+            AbilitySheet::attack_hits(master, t, a.0, 18, 18)
+                != AbilitySheet::attack_hits(master, t, a.0, 0, 18)
+        })
+        .expect("a tick where DEX offense differs from STR");
+    sim.tick = tick;
+    give_slug(&mut sim, a, "bow");
+    sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+    sim.agents.get_mut(&b).unwrap().health = 10_000;
+    sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+    let bow_hit = AbilitySheet::attack_hits(master, tick, a.0, 18, 18);
+    let miss = last_attack_miss(&sim, b).unwrap();
+    assert_eq!(miss, !bow_hit);
+
+    let mut club = Simulation::new(tiny(0x55_41)).unwrap();
+    club.conflict_enabled = true;
+    club.apply_objects_dir(&shipped_objects()).unwrap();
+    let (ca, cb) = place_adjacent(&mut club);
+    club.agents.get_mut(&ca).unwrap().sheet.dexterity = 18;
+    club.agents.get_mut(&cb).unwrap().sheet.dexterity = 18;
+    club.tick = tick;
+    give_slug(&mut club, ca, "club");
+    club.agents.get_mut(&ca).unwrap().needs.energy = 10_000;
+    club.agents.get_mut(&cb).unwrap().health = 10_000;
+    sim_core::execute::execute_primary(&mut club, ca, &PrimaryAction::Attack { target: cb });
+    let str_hit = AbilitySheet::attack_hits(master, tick, ca.0, 0, 18);
+    assert_eq!(last_attack_miss(&club, cb).unwrap(), !str_hit);
+    assert_ne!(bow_hit, str_hit);
+}
+
+#[test]
+fn defender_dex_0_bow_always_hits() {
+    let mut sim = Simulation::new(tiny(0x55_42)).unwrap();
+    sim.conflict_enabled = true;
+    sim.apply_objects_dir(&shipped_objects()).unwrap();
+    let (a, b) = place_adjacent(&mut sim);
+    sim.agents.get_mut(&a).unwrap().sheet.dexterity = 18;
+    sim.agents.get_mut(&b).unwrap().sheet.dexterity = 0;
+    give_slug(&mut sim, a, "bow");
+    for t in 0..12 {
+        sim.tick = t;
+        sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
+        sim.agents.get_mut(&b).unwrap().health = 10_000;
+        sim.agents.get_mut(&b).unwrap().incapacitated = false;
+        sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
+        assert_eq!(
+            last_attack_miss(&sim, b),
+            Some(false),
+            "defender DEX 0 always hits tick {t}"
+        );
+    }
+}
