@@ -1,6 +1,6 @@
 # M18 test plan — see each new feature
 
-Walkthrough for [`M18-plan.md`](M18-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (council tally, SetCouncil, `/scrub` catch-up). Next slice: [`M57-plan.md`](M57-plan.md).
+Walkthrough for [`M18-plan.md`](M18-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (council tally, SetCouncil, `/scrub` catch-up). Next slice: [`M58-plan.md`](M58-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

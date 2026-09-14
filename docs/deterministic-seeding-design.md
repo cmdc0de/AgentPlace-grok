@@ -1,6 +1,6 @@
 # Deterministic Seeding Design for Multi-Agent Simulation
 
-> **Current slice:** [`M57-plan.md`](M57-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
+> **Current slice:** [`M58-plan.md`](M58-plan.md). Specs are the long-term source of truth; the milestone plan wins on timing.
 
 **Purpose**: Enable fully reproducible experimental runs so that baseline behavior (organic rule / government formation) can be cleanly compared against runs that inject different population-level incentives.
 
