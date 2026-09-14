@@ -128,7 +128,7 @@ Viewer: inspector “Sheet” pane (STR 14 (+2) …). 3D capsule scale from size
 | Score | Remaining / deeper uses (lock in `/spec`) |
 |---|---|
 | Constitution | Already health max. Later: energy max, illness duration/chance. |
-| Dexterity / agility | Already move cost. Later: **defense vs accuracy** — attacker “to-hit” vs defender DEX so a high-DEX agent is **hit less often** when the attack needs a roll. Flee bonus. |
+| Dexterity / agility | Already move cost, melee to-hit vs defender DEX (M41), flee (M43). **M55:** ranged Attack (`attack_range > 1`) uses attacker DEX_mod. |
 | Intelligence | **Invent** chance / quality (PG-5). Soft: memory cap, retrieval_k, plan length. |
 | Strength | Already melee damage. Later: haul / inventory cap, gather/hunt payoff. |
 | Wisdom | Already perception range. Later: toxin detect, board range. |
