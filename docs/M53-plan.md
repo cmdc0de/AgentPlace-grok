@@ -73,8 +73,9 @@ Existing `[agents.sheet]` / `--sheet`. Derived at dawn. CON 0 / unused ⇒ extra
 |---|---|
 | **M54** | Done — [`M54-plan.md`](M54-plan.md) — sleep pickup, household auto-cabin, spear melee + range, extra recipes |
 | **M55** | Done — [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
-| **M56** | [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
-| After M56 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; durability / workstations; non-square footprints; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP; extra invention kinds |
+| **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
+| **M57** | [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
+| After M57 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; durability / workstations; non-square footprints; OTLP protobuf/gRPC; viewer-frame OTLP; extra invention kinds |
 | Not M53 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; PG-9 recipes beyond cabin/house |
 
 ## Key decisions

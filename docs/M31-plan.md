@@ -96,8 +96,9 @@ CLI: `--reproduction` implies `--sheet`.
 | **M53** | Done — [`M53-plan.md`](M53-plan.md) — sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
 | **M54** | Done — [`M54-plan.md`](M54-plan.md) — sleep pickup, household auto-cabin, spear melee + range, extra recipes |
 | **M55** | Done — [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
-| **M56** | [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
-| After M56 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
+| **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
+| **M57** | [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
+| After M57 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
 | Not M31 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml` |
 
 ## Key decisions

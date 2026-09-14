@@ -116,8 +116,9 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 | **M53** | Done — [`M53-plan.md`](M53-plan.md) — sleep places (N×N), night Hunt/Farm gating, CON dawn bonus |
 | **M54** | Done — [`M54-plan.md`](M54-plan.md) — sleep pickup, household auto-cabin, spear melee + range, extra recipes |
 | **M55** | Done — [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
-| **M56** | [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
-| After M56 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; durability / workstations; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP |
+| **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
+| **M57** | [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
+| After M57 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; durability / workstations; OTLP protobuf/gRPC; viewer-frame OTLP |
 | Not M51 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; sqlite as checkpoint store |
 
 ## Key decisions
@@ -127,7 +128,7 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 3. Weapon bonuses are `[sim] attack_bonus`; **max** held, not sum. Spear hunt-only.
 4. New recipes + attack_bonus on existing files change **shipped-objects** idle hash; no-objects hash unchanged.
 5. Do not change shipping `coop.toml`. No TLS. CI never needs the network.
-6. sql.js / ad-hoc SQL are After M56.
+6. sql.js / ad-hoc SQL are After M57.
 
 ## Tests (M51 acceptance bar)
 

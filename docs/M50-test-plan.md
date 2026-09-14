@@ -1,6 +1,6 @@
 # M50 test plan — see each new feature
 
-Walkthrough for [`M50-plan.md`](M50-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (FPS HUD, sqlite columns, extra recipes). Next slice: [`M56-plan.md`](M56-plan.md).
+Walkthrough for [`M50-plan.md`](M50-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (FPS HUD, sqlite columns, extra recipes). Next slice: [`M57-plan.md`](M57-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

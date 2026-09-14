@@ -69,8 +69,9 @@ No tool-use bonuses on these four. Catalog-off / empty catalog / no objects dir 
 
 | Later | What |
 |---|---|
-| **M56** | [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
-| After M56 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; durability / workstations; interiors / non-square footprints; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP; extra invention kinds; ammo / projectile FX |
+| **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
+| **M57** | [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
+| After M57 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; durability / workstations; interiors / non-square footprints; OTLP protobuf/gRPC; viewer-frame OTLP; extra invention kinds; ammo / projectile FX |
 | Not M55 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; changing M41 melee STR-vs-DEX formula |
 
 ## Key decisions
