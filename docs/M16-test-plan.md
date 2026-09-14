@@ -1,6 +1,6 @@
 # M16 test plan — see each new feature
 
-Walkthrough for [`M16-plan.md`](M16-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (board accept vs open, `/set`). Next slice: [`M53-plan.md`](M53-plan.md).
+Walkthrough for [`M16-plan.md`](M16-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (board accept vs open, `/set`). Next slice: [`M54-plan.md`](M54-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

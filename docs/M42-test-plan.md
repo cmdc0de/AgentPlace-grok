@@ -1,6 +1,6 @@
 # M42 test plan — see each new feature
 
-Walkthrough for [`M42-plan.md`](M42-plan.md). Automated tests prove the slice; the `sim-cli` / browser steps below are what you **read** (CON energy/illness, INT memory, page `/ckpt` `/events`). Next slice: [`M53-plan.md`](M53-plan.md).
+Walkthrough for [`M42-plan.md`](M42-plan.md). Automated tests prove the slice; the `sim-cli` / browser steps below are what you **read** (CON energy/illness, INT memory, page `/ckpt` `/events`). Next slice: [`M54-plan.md`](M54-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

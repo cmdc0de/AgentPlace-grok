@@ -552,7 +552,7 @@ Constraints for a later `/spec`:
 - Mock need not pick Place/Craft unless that slice says so.
 - Shipping `default.toml` unchanged. No PROTOCOL bump.
 
-Out of this theme until picked: interiors, multi-room, furniture, seasons (PG-16), PG-1 household auto-cabin.
+Out of this theme until picked: interiors, multi-room, furniture, seasons (PG-16), non-square footprints. Pickup and household auto-cabin are **M54**.
 
 ---
 

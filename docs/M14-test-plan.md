@@ -1,6 +1,6 @@
 # M14 test plan — see each new feature
 
-Walkthrough for [`M14-plan.md`](M14-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (coalition overlay, `--load DIR` scrubber). Next slice: [`M53-plan.md`](M53-plan.md).
+Walkthrough for [`M14-plan.md`](M14-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (coalition overlay, `--load DIR` scrubber). Next slice: [`M54-plan.md`](M54-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -71,7 +71,8 @@ Existing `[agents.sheet]` / `--sheet`. Derived at dawn. CON 0 / unused ⇒ extra
 
 | Later | What |
 |---|---|
-| After M53 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; weapon **range**; spear melee; durability / workstations; interiors / pickup of sleep places; non-square footprints; household auto-cabin; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP; extra invention kinds |
+| **M54** | [`M54-plan.md`](M54-plan.md) — sleep pickup, household auto-cabin, spear melee + range, extra recipes |
+| After M54 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; durability / workstations; non-square footprints; OTLP protobuf/gRPC; process CPU/disk; viewer-frame OTLP; extra invention kinds |
 | Not M53 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; PG-9 recipes beyond cabin/house |
 
 ## Key decisions
