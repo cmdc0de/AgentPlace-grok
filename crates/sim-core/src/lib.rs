@@ -47,7 +47,7 @@ pub use combat_fx::{
     CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role,
 };
 pub use compare::{CompareReport, compare_csv, compare_markdown, compare_runs, load_compare_pair};
-pub use clock::{TimeParams, dawn_refill, day_tod, is_dawn, is_night, light_for_tod};
+pub use clock::{TimeParams, dawn_energy, dawn_refill, day_tod, is_dawn, is_night, light_for_tod};
 pub use config::{
     CheckpointParams, EvictionPolicy, ExperimentConfig, MAX_MAP_SIZE, MIN_MAP_SIZE, SeedSpec,
     SpawnMode,

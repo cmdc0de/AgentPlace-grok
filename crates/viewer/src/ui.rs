@@ -982,6 +982,7 @@ fn event_kind_name(kind: &SimEventKind) -> &'static str {
         SimEventKind::Born { .. } => "born",
         SimEventKind::Invented { .. } => "invented",
         SimEventKind::Pipeline { .. } => "pipeline",
+        SimEventKind::Placed { .. } => "placed",
     }
 }
 

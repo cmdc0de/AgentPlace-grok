@@ -1,7 +1,8 @@
 # M53 — Sleep places, night Hunt/Farm gating, CON dawn bonus
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M52 complete (`docs/M52-plan.md`, git tag `M52`, commit `34e2f62`)  
+**Walkthrough:** [`docs/M53-test-plan.md`](M53-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-17 sleep places, PG-4 CON leftover); M52 later-table night action gating
 
 ## Context
@@ -88,8 +89,8 @@ Existing `[agents.sheet]` / `--sheet`. Derived at dawn. CON 0 / unused ⇒ extra
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash **≠** `04069600…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash **≠** M52 `fed653be…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `6e8b124a…` |
+| default CLI 2 ticks (time on) | hash `3a294816…` |
 | catalog-off | Place illegal; cabin Craft illegal |
 | catalog-on | Craft tent / cabin / house from locked inputs |
 | Place tent | consumes 1; occupies 1 cell; second Place on that cell fails |
@@ -137,7 +138,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M53-test-plan.md` (written on implement).
+Walkthrough: [`docs/M53-test-plan.md`](M53-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -146,7 +147,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `6e8b124a…`; default (time on) `3a294816…`; Hello v5; format_version 3 write.
 
 ## Risks
 

@@ -96,6 +96,12 @@ pub struct SimDef {
     /// Extra Attack damage millipoints when this item is held. Omit = 0.
     #[serde(default)]
     pub attack_bonus: Option<u32>,
+    /// Dawn energy millipoints of `energy_max`. Omit = 0 (not a sleep place).
+    #[serde(default)]
+    pub sleep_bonus: Option<u32>,
+    /// N×N footprint. Omit = 1. Clamped 1..=8.
+    #[serde(default)]
+    pub sleep_size: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -115,6 +121,14 @@ pub struct CatalogEntry {
     pub inputs: Vec<(ItemId, u32)>,
     pub output_qty: u32,
     pub attack_bonus: u32,
+    pub sleep_bonus: u32,
+    pub sleep_size: u32,
+}
+
+pub const MAX_SLEEP_SIZE: u32 = 8;
+
+pub fn clamp_sleep_size(n: u32) -> u32 {
+    n.clamp(1, MAX_SLEEP_SIZE)
 }
 
 pub fn builtin_item(slug: &str) -> Option<ItemId> {
@@ -353,6 +367,8 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 inputs,
                 output_qty,
                 attack_bonus: sim.attack_bonus.unwrap_or(0),
+                sleep_bonus: sim.sleep_bonus.unwrap_or(0),
+                sleep_size: clamp_sleep_size(sim.sleep_size.unwrap_or(1)),
             }
         })
         .collect()
@@ -468,6 +484,7 @@ fn remap_recipe(recipe: Recipe, old_slugs: &[String], entries: &[CatalogEntry]) 
 pub fn remap_catalog_holdings(
     agents: &mut std::collections::BTreeMap<AgentId, Agent>,
     events: &mut [SimEvent],
+    sleep_places: &mut std::collections::BTreeMap<(u32, u32), ItemId>,
     old_slugs: &[String],
     entries: &[CatalogEntry],
 ) {
@@ -493,7 +510,8 @@ pub fn remap_catalog_holdings(
             | SimEventKind::Retrieve { item, .. }
             | SimEventKind::Give { item, .. }
             | SimEventKind::Pack { item, .. }
-            | SimEventKind::Unpack { item, .. } => {
+            | SimEventKind::Unpack { item, .. }
+            | SimEventKind::Placed { item, .. } => {
                 *item = remap_catalog_item(*item, old_slugs, entries);
             }
             SimEventKind::Craft { recipe, .. } => {
@@ -502,6 +520,11 @@ pub fn remap_catalog_holdings(
             _ => {}
         }
     }
+    let remapped: std::collections::BTreeMap<_, _> = sleep_places
+        .iter()
+        .map(|(&(x, y), &item)| ((x, y), remap_catalog_item(item, old_slugs, entries)))
+        .collect();
+    *sleep_places = remapped;
 }
 
 /// Max `[sim] attack_bonus` among items in pockets or pack. 0 if none.
@@ -518,6 +541,71 @@ pub fn max_held_attack_bonus(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
         .unwrap_or(0)
 }
 
+pub fn sleep_entry(catalog: &[CatalogEntry], item: ItemId) -> Option<&CatalogEntry> {
+    catalog.iter().find(|e| e.item == item && e.sleep_bonus > 0)
+}
+
+pub fn sleep_covers(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    x: u32,
+    y: u32,
+) -> Option<ItemId> {
+    for (&(ox, oy), &item) in &world.sleep_places {
+        let n = sleep_entry(catalog, item)
+            .map(|e| e.sleep_size)
+            .unwrap_or(1);
+        if x >= ox && x < ox.saturating_add(n) && y >= oy && y < oy.saturating_add(n) {
+            return Some(item);
+        }
+    }
+    None
+}
+
+pub fn sleep_bonus_at(world: &crate::world::World, catalog: &[CatalogEntry], x: u32, y: u32) -> u32 {
+    let Some(item) = sleep_covers(world, catalog, x, y) else {
+        return 0;
+    };
+    sleep_entry(catalog, item)
+        .map(|e| e.sleep_bonus)
+        .unwrap_or(0)
+}
+
+pub fn can_place(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    ox: u32,
+    oy: u32,
+    item: ItemId,
+) -> bool {
+    let Some(entry) = sleep_entry(catalog, item) else {
+        return false;
+    };
+    let n = entry.sleep_size;
+    for dy in 0..n {
+        for dx in 0..n {
+            let x = match ox.checked_add(dx) {
+                Some(v) => v,
+                None => return false,
+            };
+            let y = match oy.checked_add(dy) {
+                Some(v) => v,
+                None => return false,
+            };
+            if x >= world.width || y >= world.height {
+                return false;
+            }
+            if !world.is_land(x, y) {
+                return false;
+            }
+            if sleep_covers(world, catalog, x, y).is_some() {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
     if entries.is_empty() {
         return;
@@ -528,6 +616,8 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.weight_milli.to_le_bytes());
         hasher.update(e.output_qty.to_le_bytes());
         hasher.update(e.attack_bonus.to_le_bytes());
+        hasher.update(e.sleep_bonus.to_le_bytes());
+        hasher.update(e.sleep_size.to_le_bytes());
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

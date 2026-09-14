@@ -66,6 +66,9 @@ pub enum PrimaryAction {
         with: AgentId,
     },
     Invent,
+    Place {
+        item: ItemId,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

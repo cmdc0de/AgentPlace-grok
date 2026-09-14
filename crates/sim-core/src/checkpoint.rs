@@ -884,6 +884,11 @@ pub fn event_to_jsonl(event: &SimEvent) -> String {
         SimEventKind::Pipeline { stages } => {
             format!("{{\"type\":\"pipeline\",\"stages\":{stages}}}")
         }
+        SimEventKind::Placed { x, y, item } => {
+            format!(
+                "{{\"type\":\"placed\",\"x\":{x},\"y\":{y},\"item\":\"{item:?}\"}}"
+            )
+        }
     };
     format!(
         "{{\"tick\":{},\"agent\":{},\"kind\":{kind}}}",

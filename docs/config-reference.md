@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `fed653be…`; `--no-time` `04069600…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `3a294816…`; `--no-time` shipped-objects `6e8b124a…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,6 +291,8 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item.
+
 ### `[time]` (M52)
 
 Not in shipping `default.toml`. **Omit = enabled.** `--no-time` turns it off.
@@ -300,7 +302,7 @@ Not in shipping `default.toml`. **Omit = enabled.** `--no-time` turns it off.
 | `enabled` | `true` (omit) | Day/night clock. Hashed with `ticks_per_day` when on. |
 | `ticks_per_day` | `240` | `day = tick / N`, `tod = tick % N`. Night is `tod >= N*3/4`. Dawn at `tick > 0 && tod == 0`. |
 
-Dawn refill (millipoints): `refill = max * (200 + remaining_milli * 4 / 10) / 1000` then clamp. Rest `+energy_regen` still applies. Viewer light is hash-neutral.
+Dawn refill (millipoints): tiredness `max * (200 + remaining_milli * 4 / 10) / 1000` plus shelter `max * sleep_bonus / 1000` plus CON extra `CON_mod.max(0)*250`, then clamp. Rest `+energy_regen` still applies. Night: Hunt/Farm illegal. Viewer light is hash-neutral.
 
 ### `[telemetry]` (M46 / M52)
 
@@ -424,7 +426,9 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] attack_bonus = 800`. |
 | `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`. |
 | `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`. |
-| `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. |
+| `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. `[sim] sleep_bonus = 100`, `sleep_size = 1` (1×1). Place on land. |
+| `cabin.toml` | item | Catalog craft 4 wood + 2 stone → 1. `sleep_bonus = 200`, `sleep_size = 2` (2×2). |
+| `house.toml` | item | Catalog craft 6 wood + 3 stone + 2 fiber → 1. `sleep_bonus = 300`, `sleep_size = 4` (4×4). |
 | `millstone.toml` | item | Catalog craft 3 stone → 1. |
 | `stew.toml` | item | Catalog craft 2 food → 1. |
 | `ladder.toml` | item | Catalog craft 3 wood → 1. |

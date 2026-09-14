@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` restores M51 hashes: shipped-objects `04069600…`, no-objects `70e5204d…`. Default (time on) shipped-objects 2-tick is `fed653be…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `6e8b124a…` (M53 tent sleep + cabin/house). Default (time on) shipped-objects is `3a294816…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -98,12 +98,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=fed653be…
+# final_hash=3a294816…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=04069600…
+# final_hash=6e8b124a…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` a tent/cabin/house on land (N×N) for extra dawn energy.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -193,7 +193,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `fed653be…`. `--no-time` shipped-objects is `04069600…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `3a294816…`. `--no-time` shipped-objects is `6e8b124a…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

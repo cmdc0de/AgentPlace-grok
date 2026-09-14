@@ -648,6 +648,13 @@ impl EventRow {
                 r.pipeline_stages = Some(*stages as i64);
                 r
             }
+            SimEventKind::Placed { x, y, item } => {
+                let mut r = Self::blank(tick, agent, "placed");
+                r.x = Some(*x as i64);
+                r.y = Some(*y as i64);
+                r.item = Some(item_label(*item, catalog));
+                r
+            }
         }
     }
 }

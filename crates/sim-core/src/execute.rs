@@ -41,6 +41,7 @@ pub fn execute_primary(sim: &mut Simulation, id: AgentId, action: &PrimaryAction
         PrimaryAction::PairBond { target } => pair_bond(sim, id, *target),
         PrimaryAction::Reproduce { with } => reproduce(sim, id, *with),
         PrimaryAction::Invent => invent(sim, id),
+        PrimaryAction::Place { item } => place(sim, id, *item),
     }
 }
 
@@ -886,6 +887,30 @@ fn skill_roll(
     }
     let chance = chance.clamp(5, 95) as u32;
     rng.random_range(0u32..100) < chance
+}
+
+fn place(sim: &mut Simulation, id: AgentId, item: crate::agent::ItemId) {
+    let Some(agent) = sim.agents.get(&id) else {
+        return;
+    };
+    let (x, y) = (agent.x, agent.y);
+    if !crate::objects::can_place(&sim.world, &sim.catalog, x, y, item) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return;
+    };
+    if !a.take_item(item, 1) && !a.take_pack(item, 1) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
+    sim.world.sleep_places.insert((x, y), item);
+    push(
+        sim,
+        id,
+        SimEventKind::Placed { x, y, item },
+    );
 }
 
 fn rest(sim: &mut Simulation, id: AgentId) {

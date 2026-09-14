@@ -578,7 +578,12 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     if can_drink {
         legal.push(PrimaryAction::Drink);
     }
-    if can_hunt {
+    let night = sim.time_enabled
+        && crate::clock::is_night(
+            crate::clock::day_tod(sim.tick, sim.ticks_per_day).1,
+            sim.ticks_per_day,
+        );
+    if can_hunt && !night {
         legal.push(PrimaryAction::Hunt);
     }
     if can_fish {
@@ -599,7 +604,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
     }
-    if farm_spots {
+    if farm_spots && !night {
         for (item, qty) in &agent.inventory {
             if *qty == 0 {
                 continue;
@@ -865,6 +870,21 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     {
         legal.push(PrimaryAction::Invent);
     }
+    if !agent.incapacitated && !sim.is_child(agent) {
+        for entry in &sim.catalog {
+            if entry.sleep_bonus == 0 {
+                continue;
+            }
+            let have = agent.inventory.get(&entry.item).copied().unwrap_or(0)
+                + agent.pack.get(&entry.item).copied().unwrap_or(0);
+            if have == 0 {
+                continue;
+            }
+            if crate::objects::can_place(&sim.world, &sim.catalog, agent.x, agent.y, entry.item) {
+                legal.push(PrimaryAction::Place { item: entry.item });
+            }
+        }
+    }
     legal
 }
 
@@ -1031,6 +1051,9 @@ pub fn format_primary(action: &PrimaryAction, species: &SpeciesTables) -> String
         PrimaryAction::PairBond { target } => format!("PairBond #{}", target.0),
         PrimaryAction::Reproduce { with } => format!("Reproduce #{}", with.0),
         PrimaryAction::Invent => "Invent".into(),
+        PrimaryAction::Place { item } => {
+            format!("Place {}", item_display_name(*item, species))
+        }
     }
 }
 

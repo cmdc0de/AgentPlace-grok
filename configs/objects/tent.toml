@@ -10,6 +10,8 @@ far  = "assets/models/optimized/low_poly_cloth.glb"
 
 [sim]
 weight_milli = 500
+sleep_bonus = 100
+sleep_size = 1
 [sim.craft]
 inputs = [["fiber", 3], ["wood", 2]]
 output_qty = 1

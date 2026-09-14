@@ -56,6 +56,7 @@ pub fn legal_names(legal: &[PrimaryAction]) -> Vec<String> {
             PrimaryAction::PairBond { .. } => "PairBond".into(),
             PrimaryAction::Reproduce { .. } => "Reproduce".into(),
             PrimaryAction::Invent => "Invent".into(),
+            PrimaryAction::Place { .. } => "Place".into(),
         })
         .collect()
 }
@@ -120,6 +121,7 @@ pub fn mock_branch_for(primary: &PrimaryAction) -> &'static str {
         PrimaryAction::PairBond { .. } => "pair_bond",
         PrimaryAction::Reproduce { .. } => "reproduce",
         PrimaryAction::Invent => "invent",
+        PrimaryAction::Place { .. } => "place",
     }
 }
 

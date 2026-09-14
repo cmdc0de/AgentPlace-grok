@@ -58,6 +58,12 @@ struct StockpileVisual {
 }
 
 #[derive(Component)]
+struct SleepPlaceVisual {
+    x: u32,
+    y: u32,
+}
+
+#[derive(Component)]
 struct SatchelVisual {
     id: AgentId,
     backpack: bool,
@@ -280,6 +286,7 @@ fn main() {
                 sync_combat_tints,
                 sync_combat_fx,
                 sync_stockpile_markers,
+                sync_sleep_places,
                 sync_satchel_markers,
                 reload_changed_glbs,
                 update_day_night_light,
@@ -549,6 +556,17 @@ fn setup_scene(
                     stockpile_scale(world, x, y),
                 );
             }
+            if world.sleep_places.contains_key(&(x, y)) {
+                spawn_sleep_place(
+                    &mut commands,
+                    &assets,
+                    &visuals,
+                    world,
+                    &state.sim.catalog,
+                    x,
+                    y,
+                );
+            }
             if world.has_mineral(x, y) {
                 spawn_marker(
                     &mut commands,
@@ -794,6 +812,71 @@ fn sync_stockpile_markers(
             x,
             y,
             stockpile_scale(&state.sim.world, x, y),
+        );
+    }
+}
+
+fn spawn_sleep_place(
+    commands: &mut Commands,
+    assets: &AssetServer,
+    visuals: &ObjectVisuals,
+    world: &sim_core::World,
+    catalog: &[sim_core::CatalogEntry],
+    x: u32,
+    y: u32,
+) {
+    let Some(item) = world.sleep_places.get(&(x, y)).copied() else {
+        return;
+    };
+    let entry = catalog.iter().find(|e| e.item == item);
+    let n = entry.map(|e| e.sleep_size.max(1)).unwrap_or(1) as f32;
+    let stem = entry.map(|e| e.slug.as_str()).unwrap_or("tent");
+    let pos = resource_world_pos(world, x, y, 0.32);
+    let mut scale = n;
+    if let Some(s) = sim_core::visual_scale_for(&visuals.defs, stem) {
+        scale *= s;
+    }
+    let tf = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+    let extra = (WorldMarker { x, y }, SleepPlaceVisual { x, y });
+    let _ = try_spawn_model(
+        commands,
+        assets,
+        visuals,
+        stem,
+        models::camera_dist_cells(world.width, world.height, x, y),
+        tf,
+        extra,
+    );
+}
+
+fn sync_sleep_places(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
+    existing: Query<(Entity, &SleepPlaceVisual)>,
+) {
+    let live: std::collections::BTreeSet<(u32, u32)> =
+        state.sim.world.sleep_places.keys().copied().collect();
+    let have: std::collections::BTreeSet<(u32, u32)> =
+        existing.iter().map(|(_, v)| (v.x, v.y)).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&(v.x, v.y)) {
+            commands.entity(e).despawn();
+        }
+    }
+    for (x, y) in live {
+        if have.contains(&(x, y)) {
+            continue;
+        }
+        spawn_sleep_place(
+            &mut commands,
+            &assets,
+            &visuals,
+            &state.sim.world,
+            &state.sim.catalog,
+            x,
+            y,
         );
     }
 }

@@ -79,6 +79,9 @@ pub struct World {
     /// Land-cell shared containers. `#[serde(default)]` so M9 checkpoints load.
     #[serde(default)]
     pub stockpiles: BTreeMap<(u32, u32), Container>,
+    /// Sleep structure origins (min x,y). Size comes from the catalog. `#[serde(default)]`.
+    #[serde(default)]
+    pub sleep_places: BTreeMap<(u32, u32), ItemId>,
 }
 
 impl World {
@@ -134,6 +137,7 @@ impl World {
             fish,
             crops: BTreeMap::new(),
             stockpiles: BTreeMap::new(),
+            sleep_places: BTreeMap::new(),
         }
     }
 
@@ -260,6 +264,11 @@ impl World {
                 hasher.update(format!("{item:?}").as_bytes());
                 hasher.update(qty.to_le_bytes());
             }
+        }
+        for ((x, y), item) in &self.sleep_places {
+            hasher.update(x.to_le_bytes());
+            hasher.update(y.to_le_bytes());
+            hasher.update(format!("{item:?}").as_bytes());
         }
         hasher.finalize().into()
     }

@@ -64,12 +64,22 @@ pub fn is_dawn(tick: u64, ticks_per_day: u64) -> bool {
 
 /// Tiredness-scaled dawn refill. Empty leftover ⇒ 20% max; half ⇒ 40%; full ⇒ 60% then clamp.
 pub fn dawn_refill(energy: u32, max: u32) -> u32 {
+    dawn_energy(energy, max, 0, 0)
+}
+
+/// Dawn energy: tiredness refill + shelter (`sleep_bonus` millipoints of max) + CON extra, then clamp.
+pub fn dawn_energy(energy: u32, max: u32, shelter_milli: u32, con_extra: u32) -> u32 {
     if max == 0 {
         return energy;
     }
     let remaining_milli = (u64::from(energy) * 1000) / u64::from(max);
-    let refill = u64::from(max) * (200 + remaining_milli * 4 / 10) / 1000;
-    energy.saturating_add(refill as u32).min(max)
+    let tiredness = u64::from(max) * (200 + remaining_milli * 4 / 10) / 1000;
+    let shelter = u64::from(max) * u64::from(shelter_milli) / 1000;
+    energy
+        .saturating_add(tiredness as u32)
+        .saturating_add(shelter as u32)
+        .saturating_add(con_extra)
+        .min(max)
 }
 
 /// Hash-neutral viewer helper. Day ~1.0, night ~0.15, 10-tick twilight lerp.
@@ -123,6 +133,11 @@ mod tests {
         assert_eq!(dawn_refill(5_000, max), 9_000);
         assert_eq!(dawn_refill(max, max), max);
         assert_eq!(dawn_refill(100, 0), 100);
+        assert_eq!(
+            dawn_energy(5_000, max, 0, 1000) - dawn_energy(5_000, max, 0, 0),
+            1000
+        );
+        assert_eq!(dawn_energy(5_000, max, 100, 0) - dawn_refill(5_000, max), 1_000);
     }
 
     #[test]

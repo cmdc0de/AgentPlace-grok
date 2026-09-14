@@ -346,6 +346,7 @@ impl Simulation {
             crate::objects::remap_catalog_holdings(
                 &mut self.agents,
                 &mut self.events.events,
+                &mut self.world.sleep_places,
                 &self.ckpt_catalog_slugs,
                 &entries,
             );
@@ -1089,12 +1090,31 @@ impl Simulation {
             return;
         }
         let base = self.config.energy_max_milli();
-        for a in self.agents.values_mut() {
+        let catalog = self.catalog.clone();
+        let world = &self.world;
+        let bonuses: Vec<(crate::agent::AgentId, u32, u32)> = self
+            .agents
+            .iter()
+            .map(|(id, a)| {
+                let shelter = crate::objects::sleep_bonus_at(world, &catalog, a.x, a.y);
+                let con_extra = if a.sheet.constitution == 0 {
+                    0
+                } else {
+                    crate::sheet::AbilitySheet::modifier(a.sheet.constitution).max(0) as u32 * 250
+                };
+                (*id, shelter, con_extra)
+            })
+            .collect();
+        for (id, shelter, con_extra) in bonuses {
+            let Some(a) = self.agents.get_mut(&id) else {
+                continue;
+            };
             if a.health == 0 {
                 continue;
             }
             let max = a.sheet.energy_max(base);
-            a.needs.energy = crate::clock::dawn_refill(a.needs.energy, max);
+            a.needs.energy =
+                crate::clock::dawn_energy(a.needs.energy, max, shelter, con_extra);
         }
     }
 

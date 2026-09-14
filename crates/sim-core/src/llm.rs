@@ -590,6 +590,15 @@ pub fn parse_choice_json(
             PrimaryAction::Reproduce { with: AgentId(to) }
         }
         "invent" => PrimaryAction::Invent,
+        "place" => {
+            let item = parsed
+                .item
+                .as_deref()
+                .or_else(|| parsed.target.as_ref().and_then(|v| v.as_str()))
+                .and_then(|s| parse_item(s, species))
+                .unwrap_or(ItemId::Wood);
+            PrimaryAction::Place { item }
+        }
         _ => PrimaryAction::Wait,
     };
     let primary = if crate::observation::is_legal_choice(legal, &primary) {

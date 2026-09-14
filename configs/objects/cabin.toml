@@ -1,0 +1,17 @@
+id = "cabin"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/wood.glb"
+[visual.lod]
+near = "assets/models/optimized/wood.glb"
+mid  = "assets/models/optimized/wood_pile.glb"
+far  = "assets/models/optimized/wood_pile.glb"
+
+[sim]
+weight_milli = 800
+sleep_bonus = 200
+sleep_size = 2
+[sim.craft]
+inputs = [["wood", 4], ["stone", 2]]
+output_qty = 1
