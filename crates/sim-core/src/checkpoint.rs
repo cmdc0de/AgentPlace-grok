@@ -707,6 +707,7 @@ impl Simulation {
             telemetry_cpu_system_ns: None,
             telemetry_disk_read_bytes: None,
             telemetry_disk_write_bytes: None,
+            telemetry_cpu_percent: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         };

@@ -50,11 +50,36 @@ fn telemetry_on_records_and_same_hash() {
     assert_eq!(off.telemetry_ticks.count(), 0);
     assert!(on.telemetry_otlp_endpoint.is_empty());
     assert!(off.telemetry_cpu_user_ns.is_none());
+    assert!(off.telemetry_cpu_percent.is_none());
     assert!(off.telemetry_disk_read_bytes.is_none());
     if cfg!(target_os = "linux") {
         assert!(on.telemetry_cpu_user_ns.is_some());
         assert!(on.telemetry_cpu_system_ns.is_some());
         assert!(on.telemetry_disk_read_bytes.is_some());
         assert!(on.telemetry_disk_write_bytes.is_some());
+        assert!(
+            on.telemetry_cpu_percent.is_some_and(|p| p <= 100),
+            "cpu percent after 4 ticks: {:?}",
+            on.telemetry_cpu_percent
+        );
+    }
+}
+
+#[test]
+fn telemetry_cpu_percent_none_until_second_tick() {
+    let cfg = tiny(0x60_21);
+    let mut sim = Simulation::new(cfg).unwrap();
+    sim.telemetry_enabled = true;
+    assert!(sim.telemetry_cpu_percent.is_none());
+    sim.run_ticks(1);
+    assert!(sim.telemetry_cpu_percent.is_none());
+    sim.run_ticks(1);
+    if cfg!(target_os = "linux") {
+        let p = sim
+            .telemetry_cpu_percent
+            .expect("percent after second telemetry tick");
+        assert!(p <= 100, "percent {p}");
+    } else {
+        assert!(sim.telemetry_cpu_percent.is_none());
     }
 }

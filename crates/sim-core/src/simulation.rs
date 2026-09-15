@@ -151,6 +151,8 @@ pub struct Simulation {
     pub telemetry_cpu_system_ns: Option<u64>,
     pub telemetry_disk_read_bytes: Option<u64>,
     pub telemetry_disk_write_bytes: Option<u64>,
+    /// Δ CPU ns / this tick `wall_ns`, 0..=100. Hash-neutral. None until a previous sample.
+    pub telemetry_cpu_percent: Option<u32>,
     /// Overlay `[time] enabled`. Default **on**. Hashed when true.
     pub time_enabled: bool,
     /// Overlay `[time] ticks_per_day`. Default 240. Hashed when time is on.
@@ -258,6 +260,7 @@ impl Simulation {
             telemetry_cpu_system_ns: None,
             telemetry_disk_read_bytes: None,
             telemetry_disk_write_bytes: None,
+            telemetry_cpu_percent: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         })
@@ -1079,11 +1082,25 @@ impl Simulation {
                 self.telemetry_rss_last = Some(rss);
                 self.telemetry_rss_peak = Some(self.telemetry_rss_peak.unwrap_or(0).max(rss));
             }
+            let prev_user = self.telemetry_cpu_user_ns;
+            let prev_sys = self.telemetry_cpu_system_ns;
             if let Some(v) = timing::process_cpu_user_ns() {
                 self.telemetry_cpu_user_ns = Some(v);
             }
             if let Some(v) = timing::process_cpu_system_ns() {
                 self.telemetry_cpu_system_ns = Some(v);
+            }
+            if wall_ns > 0 {
+                if let (Some(pu), Some(ps), Some(nu), Some(ns)) = (
+                    prev_user,
+                    prev_sys,
+                    self.telemetry_cpu_user_ns,
+                    self.telemetry_cpu_system_ns,
+                ) {
+                    let delta = nu.saturating_sub(pu).saturating_add(ns.saturating_sub(ps));
+                    let pct = (delta.saturating_mul(100) / wall_ns).min(100) as u32;
+                    self.telemetry_cpu_percent = Some(pct);
+                }
             }
             if let Some(v) = timing::process_disk_read_bytes() {
                 self.telemetry_disk_read_bytes = Some(v);

@@ -27,6 +27,7 @@ pub fn metrics_json(sim: &Simulation) -> String {
     let rss = sim.telemetry_rss_last.unwrap_or(0);
     let cpu_user = sim.telemetry_cpu_user_ns.unwrap_or(0);
     let cpu_system = sim.telemetry_cpu_system_ns.unwrap_or(0);
+    let cpu_percent = sim.telemetry_cpu_percent.unwrap_or(0);
     let disk_read = sim.telemetry_disk_read_bytes.unwrap_or(0);
     let disk_write = sim.telemetry_disk_write_bytes.unwrap_or(0);
     serde_json::json!({
@@ -54,6 +55,10 @@ pub fn metrics_json(sim: &Simulation) -> String {
                     {
                         "name": "agentplace.process.cpu_system_ns",
                         "gauge": { "dataPoints": [{ "asInt": cpu_system.to_string() }] }
+                    },
+                    {
+                        "name": "agentplace.process.cpu_percent",
+                        "gauge": { "dataPoints": [{ "asInt": cpu_percent.to_string() }] }
                     },
                     {
                         "name": "agentplace.process.disk_read_bytes",

@@ -7,18 +7,18 @@ use sim_core::objects::{
     fish_skill_bonus, gather_skill_bonus, load_object_defs, lod_band, pick_visual_path,
     stone_gather_skill_bonus,
 };
-use sim_core::observation::legal_actions;
+use sim_core::observation::{legal_actions, neighbors4};
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M59 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "936b663208c4e735d6691fcdda56511f1bd1f92b0173d4f072c1fbdcae23e6bb";
+/// `--no-time` shipped-objects 2-tick (M60 catalog: extra recipes).
+const IDLE_2_NO_TIME: &str = "171a26d292fbbad8d62f54c44f059bbc595c758d70473beea51f0702945fdb57";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "7604969585a15ae5ae2427a6cd2a975b08133244a9acea4db45c41f659c73bb2";
+const IDLE_2: &str = "aacd867dfaafe7a055f194027b0849e286edc5fea24761c889a0948c14592665";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1777,4 +1777,188 @@ fn catalog_on_craft_jerky() {
     let mut sim = Simulation::new(tiny(0x59_14)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "jerky", &[(ItemId::Food(1), 8)]);
+}
+
+fn park_adjacent(sim: &mut Simulation, a: AgentId, b: AgentId) {
+    let land = sim.world.land_cells();
+    let (x, y) = land[0];
+    let neigh = neighbors4(&sim.world, x, y)
+        .into_iter()
+        .find(|&(nx, ny)| (nx != x || ny != y) && sim.world.is_land(nx, ny))
+        .expect("neighbor");
+    if let Some(ag) = sim.agents.get_mut(&a) {
+        ag.x = x;
+        ag.y = y;
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.inventory_cap = 32;
+    }
+    if let Some(ag) = sim.agents.get_mut(&b) {
+        ag.x = neigh.0;
+        ag.y = neigh.1;
+        ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        ag.inventory_cap = 32;
+        ag.inventory.clear();
+    }
+}
+
+#[test]
+fn transfer_moves_freshest_wear_slot() {
+    let mut sim = Simulation::new(tiny(0x60_11)).unwrap();
+    apply_shipped(&mut sim);
+    sim.config.observation.full_information = true;
+    let a = AgentId(0);
+    let b = AgentId(1);
+    park_adjacent(&mut sim, a, b);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    {
+        let ag = sim.agents.get_mut(&a).unwrap();
+        ag.try_add_item(axe, 2);
+        ag.tool_wear.insert(axe, vec![3, 0]);
+    }
+    sim_core::execute::execute_primary(
+        &mut sim,
+        a,
+        &PrimaryAction::Transfer {
+            item: axe,
+            qty: 1,
+            to: b,
+        },
+    );
+    assert_eq!(
+        sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        sim.agents[&a].tool_wear.get(&axe).cloned(),
+        Some(vec![3])
+    );
+    assert_eq!(
+        sim.agents[&b].tool_wear.get(&axe).cloned(),
+        Some(vec![0])
+    );
+}
+
+#[test]
+fn transfer_moves_single_worn_slot() {
+    let mut sim = Simulation::new(tiny(0x60_12)).unwrap();
+    apply_shipped(&mut sim);
+    sim.config.observation.full_information = true;
+    let a = AgentId(0);
+    let b = AgentId(1);
+    park_adjacent(&mut sim, a, b);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    {
+        let ag = sim.agents.get_mut(&a).unwrap();
+        ag.try_add_item(axe, 1);
+        ag.tool_wear.insert(axe, vec![7]);
+    }
+    sim_core::execute::execute_primary(
+        &mut sim,
+        a,
+        &PrimaryAction::Transfer {
+            item: axe,
+            qty: 1,
+            to: b,
+        },
+    );
+    assert_eq!(
+        sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0),
+        0
+    );
+    assert!(sim.agents[&a].tool_wear.get(&axe).is_none());
+    assert_eq!(
+        sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        sim.agents[&b].tool_wear.get(&axe).cloned(),
+        Some(vec![7])
+    );
+}
+
+#[test]
+fn store_still_drops_freshest_wear() {
+    let mut sim = Simulation::new(tiny(0x60_13)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let land = sim.world.land_cells()[0];
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.x = land.0;
+        a.y = land.1;
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.inventory_cap = 32;
+        a.try_add_item(axe, 2);
+        a.tool_wear.insert(axe, vec![3, 0]);
+    }
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Store {
+            item: axe,
+            qty: 1,
+        },
+    );
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![3])
+    );
+    assert!(sim.world.has_stockpile(land.0, land.1));
+}
+
+#[test]
+fn give_item_mints_fresh_wear() {
+    let mut sim = Simulation::new(tiny(0x60_14)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().inventory_cap = 32;
+    assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
+    let added = sim.give_item(id, axe, 1).unwrap();
+    assert_eq!(added, 1);
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+    assert!(
+        sim.agents[&id].tool_wear.get(&axe).is_none(),
+        "minted axe is fresh (no wear map)"
+    );
+}
+
+#[test]
+fn catalog_on_craft_stool() {
+    let mut sim = Simulation::new(tiny(0x60_31)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "stool", &[(ItemId::Wood, 16)]);
+}
+
+#[test]
+fn catalog_on_craft_sash() {
+    let mut sim = Simulation::new(tiny(0x60_32)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "sash", &[(ItemId::Fiber, 16)]);
+}
+
+#[test]
+fn catalog_on_craft_brick() {
+    let mut sim = Simulation::new(tiny(0x60_33)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "brick", &[(ItemId::Stone, 12)]);
+}
+
+#[test]
+fn catalog_on_craft_biscuit() {
+    let mut sim = Simulation::new(tiny(0x60_34)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "biscuit", &[(ItemId::Food(1), 10)]);
 }

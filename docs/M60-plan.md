@@ -1,7 +1,8 @@
 # M60 — Transfer wear on Give, CPU percent, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M59 complete (`docs/M59-plan.md`, git tag `M59`, commit `77cf4d1`)  
+**Walkthrough:** [`docs/M60-test-plan.md`](M60-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes, PG-11 leftover CPU percent); M59 later-table transferring wear on Give
 
 ## Context
@@ -107,8 +108,8 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M59 `936b6632…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M59 `76049695…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `171a26d2…` |
+| default CLI 2 ticks (time on) | hash `aacd867d…` |
 | Transfer wear | giver axe wear `[3,0]` + Transfer 1 ⇒ giver keeps `[3]`; receiver wear `[0]` |
 | Transfer most-worn stays | giver `[7]` Transfer 1 ⇒ receiver `[7]`; giver qty 0 / no wear |
 | Store | still drops freshest; crate has no `tool_wear` |
@@ -153,7 +154,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M60-test-plan.md` (written on implement).
+Walkthrough: [`docs/M60-test-plan.md`](M60-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -162,7 +163,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `171a26d2…`; default (time on) `aacd867d…`; Hello v5; format_version 3 write.
 
 ## Risks
 

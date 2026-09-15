@@ -366,6 +366,37 @@ impl Agent {
         }
     }
 
+    /// Pop `qty` freshest slots (vec end; pad implicit 0s). `None` if this item has no wear map.
+    pub fn take_end_wear(&mut self, item: ItemId, qty: u32) -> Option<Vec<u32>> {
+        if !self.tool_wear.contains_key(&item) {
+            return None;
+        }
+        let held = self.held_qty(item) as usize;
+        let n = qty as usize;
+        let v = self.tool_wear.entry(item).or_default();
+        while v.len() < held {
+            v.push(0);
+        }
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            out.push(v.pop().unwrap_or(0));
+        }
+        if v.is_empty() {
+            self.tool_wear.remove(&item);
+        }
+        Some(out)
+    }
+
+    /// Append slots in original (oldest-first) order. `freshest_first` is vec-end first.
+    pub fn append_wear_oldest_first(&mut self, item: ItemId, freshest_first: &[u32]) {
+        if freshest_first.is_empty() {
+            return;
+        }
+        let v = self.tool_wear.entry(item).or_default();
+        v.extend(freshest_first.iter().rev().copied());
+        self.clamp_tool_wear(item);
+    }
+
     pub fn take_pack(&mut self, item: ItemId, qty: u32) -> bool {
         let Some(have) = self.pack.get_mut(&item) else {
             return false;

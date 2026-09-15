@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `76049695…`; `--no-time` shipped-objects `936b6632…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `aacd867d…`; `--no-time` shipped-objects `171a26d2…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks (per-instance wear; most-worn first). `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft. Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral).
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks (per-instance wear; most-worn first). Transfer moves the freshest wear slots with the item; Store still drops them. `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft. Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral). sim-cli OTLP includes `agentplace.process.cpu_percent`.
 
 ### `[time]` (M52)
 
@@ -308,7 +308,7 @@ Dawn refill (millipoints): tiredness `max * (200 + remaining_milli * 4 / 10) / 1
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `false` | `--telemetry`. In-process tick aggregates + RSS + CPU (user/system ns) + disk (read/write bytes). **Not hashed.** |
+| `enabled` | `false` | `--telemetry`. In-process tick aggregates + RSS + CPU (user/system ns + percent 0..=100) + disk (read/write bytes). **Not hashed.** |
 | `otlp_endpoint` | empty | `--otlp-endpoint URL`. sim-cli POSTs OTLP/JSON tick + process gauges. Viewer same flag POSTs `agentplace.viewer.frame_ns`. Empty ⇒ no POST. |
 
 ### `[llm]` overlay extras (not on ExperimentConfig)
@@ -456,6 +456,10 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `sandals.toml` | item | Catalog craft 7 fiber → 1. |
 | `mortar.toml` | item | Catalog craft 5 stone → 1. |
 | `jerky.toml` | item | Catalog craft 4 food → 1. |
+| `stool.toml` | item | Catalog craft 8 wood → 1. |
+| `sash.toml` | item | Catalog craft 8 fiber → 1. |
+| `brick.toml` | item | Catalog craft 6 stone → 1. |
+| `biscuit.toml` | item | Catalog craft 5 food → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 
