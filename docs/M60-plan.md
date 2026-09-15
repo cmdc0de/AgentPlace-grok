@@ -91,8 +91,9 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 
 | Later | What |
 |---|---|
-| **M61** | [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
-| After M61 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC; ammo / projectile FX; every-recipe stations; household-home / invention / downed meshes |
+| **M61** | Done — [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
+| **M62** | [`M62-plan.md`](M62-plan.md) — stations for bread/stew, Store wear, extra recipes |
+| After M62 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC; ammo / projectile FX; household-home / invention / downed meshes |
 | Not M60 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; transferring wear on Store; researcher `/give` copying wear; CPU percent uncapped / millipoints |
 
 ## Key decisions

@@ -143,8 +143,9 @@ Gate: 40-tick mock with timing on vs off → **same `final_hash`**.
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
 | **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
 | **M60** | Done — [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
-| **M61** | [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
-| After M61 | Protobuf/TLS; sql.js / ad-hoc SQL |
+| **M61** | Done — [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
+| **M62** | [`M62-plan.md`](M62-plan.md) — stations for bread/stew, Store wear, extra recipes |
+| After M62 | Protobuf/TLS; sql.js / ad-hoc SQL |
 | Not M8 | Browser client; time-series charts; per-tick full checkpoints |
 
 ## Key decisions

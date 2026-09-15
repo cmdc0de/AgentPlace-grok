@@ -76,8 +76,9 @@ Existing wire. **No PROTOCOL bump.**
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
 | **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
 | **M60** | Done — [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
-| **M61** | [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
-| After M61 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac; sql.js / ad-hoc SQL |
+| **M61** | Done — [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
+| **M62** | [`M62-plan.md`](M62-plan.md) — stations for bread/stew, Store wear, extra recipes |
+| After M62 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; household-home / invention / downed meshes; wasm32 on Win/mac; sql.js / ad-hoc SQL |
 | Not M38 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions

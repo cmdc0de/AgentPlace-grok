@@ -135,8 +135,9 @@ Kingmaker: 3-person council, `weight = "influence"`, agent 0 is the influence ki
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
 | **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
 | **M60** | Done — [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
-| **M61** | [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
-| After M61 | protobuf/TLS; sql.js / ad-hoc SQL |
+| **M61** | Done — [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
+| **M62** | [`M62-plan.md`](M62-plan.md) — stations for bread/stew, Store wear, extra recipes |
+| After M62 | protobuf/TLS; sql.js / ad-hoc SQL |
 | Not M18 | Browser; combat; CI Win/mac; extra LLM reflection/embeddings; `PROTOCOL_VERSION` bump |
 
 ## Key decisions

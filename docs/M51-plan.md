@@ -121,8 +121,9 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
 | **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
 | **M60** | Done — [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
-| **M61** | [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
-| After M61 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; OTLP protobuf/gRPC |
+| **M61** | Done — [`M61-plan.md`](M61-plan.md) — time-decay wear, out-dir disk walk, extra recipes |
+| **M62** | [`M62-plan.md`](M62-plan.md) — stations for bread/stew, Store wear, extra recipes |
+| After M62 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL in the page; OTLP protobuf/gRPC |
 | Not M51 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; sqlite as checkpoint store |
 
 ## Key decisions
@@ -132,7 +133,7 @@ Catalog-off / empty catalog / no objects dir ⇒ Craft illegal; no-objects hash 
 3. Weapon bonuses are `[sim] attack_bonus`; **max** held, not sum. Spear hunt-only.
 4. New recipes + attack_bonus on existing files change **shipped-objects** idle hash; no-objects hash unchanged.
 5. Do not change shipping `coop.toml`. No TLS. CI never needs the network.
-6. sql.js / ad-hoc SQL are After M61.
+6. sql.js / ad-hoc SQL are After M62.
 
 ## Tests (M51 acceptance bar)
 
