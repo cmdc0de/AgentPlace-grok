@@ -119,8 +119,9 @@ Server apply (host owns the sim):
 | **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
 | **M57** | Done — [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
-| **M59** | [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
-| After M59 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
+| **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
+| **M60** | [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
+| After M60 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
 | Not M21 | Browser; combat; CI Win/mac; Unix sockets |
 
 ## Key decisions

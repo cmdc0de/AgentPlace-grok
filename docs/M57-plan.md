@@ -98,8 +98,9 @@ No tool-use bonuses on these four. Catalog-off / empty catalog / no objects dir 
 | Later | What |
 |---|---|
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
-| **M59** | [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
-| After M59 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC;  ammo / projectile FX;  every-recipe stations; time-decay wear; CPU percent; out-dir disk walk |
+| **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
+| **M60** | [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
+| After M60 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC; ammo / projectile FX; every-recipe stations; time-decay wear; out-dir disk walk |
 | Not M57 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; applying `gather_bonus` to stone or `stone_gather_bonus` to vegetation; CPU percent; out-dir disk walk |
 
 ## Key decisions

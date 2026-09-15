@@ -1,6 +1,6 @@
 # M49 test plan — see each new feature
 
-Walkthrough for [`M49-plan.md`](M49-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (object visual scale, extra recipes, invention flavor). Next slice: [`M59-plan.md`](M59-plan.md).
+Walkthrough for [`M49-plan.md`](M49-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (object visual scale, extra recipes, invention flavor). Next slice: [`M60-plan.md`](M60-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

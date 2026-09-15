@@ -1,6 +1,6 @@
 # M59 test plan — see each new feature
 
-Walkthrough for [`M59-plan.md`](M59-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (CraftBonus/RestBonus, per-instance wear, raft/sandals/mortar/jerky). Next slice: later work at the bottom of [`M59-plan.md`](M59-plan.md).
+Walkthrough for [`M59-plan.md`](M59-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (CraftBonus/RestBonus, per-instance wear, raft/sandals/mortar/jerky). Next slice: [`M60-plan.md`](M60-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

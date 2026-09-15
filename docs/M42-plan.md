@@ -88,8 +88,9 @@ Do not add time-series charts, wasm32 on Win/mac, or `/save` in the page.
 | **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
 | **M57** | Done — [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
 | **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
-| **M59** | [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
-| After M59 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; wasm32 on Win/mac; sql.js / ad-hoc SQL |
+| **M59** | Done — [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
+| **M60** | [`M60-plan.md`](M60-plan.md) — transfer wear on Give, CPU percent, extra recipes |
+| After M60 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; WIS **board** range; CHA proposal support / pair-bond odds; pocket **weight** cap; wasm32 on Win/mac; sql.js / ad-hoc SQL |
 | Not M42 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser |
 
 ## Key decisions
