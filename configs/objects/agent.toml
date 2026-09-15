@@ -3,3 +3,6 @@ kind = "agent"
 
 [visual]
 glb = "assets/models/optimized/low_poly_human_character.glb"
+
+[visual.animations]
+idle = "ArmatureAction.002"

@@ -209,6 +209,7 @@ fn lod_picks_near_mid_far_and_missing_mid() {
             far: Some(far.to_string_lossy().into()),
         },
         scale: None,
+        ..Default::default()
     };
     assert_eq!(
         pick_visual_path(&visual, 0).as_deref(),

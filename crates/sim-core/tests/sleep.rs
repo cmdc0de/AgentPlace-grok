@@ -8,6 +8,7 @@ use sim_core::observation::legal_actions;
 use sim_core::objects::{can_place, sleep_covers};
 use sim_core::sheet::AbilitySheet;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
+use std::fs;
 use std::path::PathBuf;
 
 fn tiny(seed: u64) -> ExperimentConfig {
@@ -725,4 +726,208 @@ fn load_restores_work_place() {
     let bytes = sim.encode_checkpoint().unwrap();
     let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
     assert_eq!(loaded.world.work_places.get(&(x, y)), Some(&mill));
+}
+
+fn land_rect(sim: &Simulation, w: u32, h: u32) -> (u32, u32) {
+    let ww = sim.world.width;
+    let hh = sim.world.height;
+    for y in 0..=hh.saturating_sub(h) {
+        for x in 0..=ww.saturating_sub(w) {
+            let ok = (0..h).all(|dy| (0..w).all(|dx| sim.world.is_land(x + dx, y + dy)));
+            if ok {
+                return (x, y);
+            }
+        }
+    }
+    panic!("no {w}x{h} land");
+}
+
+fn apply_rect_hut(sim: &mut Simulation) {
+    let dir = std::env::temp_dir().join(format!(
+        "agentplace-m64-rect-hut-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("lean_to.toml"),
+        r#"
+id = "lean_to"
+kind = "item"
+[sim]
+sleep_bonus = 50
+sleep_size = 1
+sleep_w = 2
+sleep_h = 3
+"#,
+    )
+    .unwrap();
+    sim.apply_objects_dir(&dir).unwrap();
+}
+
+#[test]
+fn cabin_stays_square_2x2() {
+    let mut sim = Simulation::new(tiny(0x64_10)).unwrap();
+    apply_shipped(&mut sim);
+    let cabin = sim.catalog.iter().find(|e| e.slug == "cabin").unwrap();
+    assert_eq!(cabin.sleep_size, 2);
+    assert_eq!(cabin.sleep_w, 2);
+    assert_eq!(cabin.sleep_h, 2);
+    assert_eq!(sim_core::sleep_dims(cabin), (2, 2));
+}
+
+#[test]
+fn place_2x3_fixture_occupies_six_cells() {
+    let mut sim = Simulation::new(tiny(0x64_11)).unwrap();
+    apply_rect_hut(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_rect(&sim, 2, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "lean_to");
+    let e = sim.catalog.iter().find(|e| e.slug == "lean_to").unwrap();
+    assert_eq!(e.sleep_w, 2);
+    assert_eq!(e.sleep_h, 3);
+    give(&mut sim, id, "lean_to");
+    assert!(can_place(&sim.world, &sim.catalog, x, y, item));
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    assert_eq!(sim.world.sleep_places.get(&(x, y)), Some(&item));
+    for dy in 0..3u32 {
+        for dx in 0..2u32 {
+            assert_eq!(
+                sleep_covers(&sim.world, &sim.catalog, x + dx, y + dy),
+                Some(item),
+                "cell {} {}",
+                x + dx,
+                y + dy
+            );
+        }
+    }
+    assert_eq!(
+        sleep_covers(&sim.world, &sim.catalog, x + 2, y),
+        None
+    );
+}
+
+#[test]
+fn place_2x3_oob_or_water_illegal() {
+    let mut sim = Simulation::new(tiny(0x64_12)).unwrap();
+    apply_rect_hut(&mut sim);
+    let item = catalog_item(&sim, "lean_to");
+    let w = sim.world.width;
+    let h = sim.world.height;
+    assert!(!can_place(&sim.world, &sim.catalog, w - 1, 0, item));
+    assert!(!can_place(&sim.world, &sim.catalog, 0, h - 1, item));
+    let mut mixed = false;
+    for y in 0..h.saturating_sub(2) {
+        for x in 0..w.saturating_sub(1) {
+            let mut any_water = false;
+            for dy in 0..3u32 {
+                for dx in 0..2u32 {
+                    if !sim.world.is_land(x + dx, y + dy) {
+                        any_water = true;
+                    }
+                }
+            }
+            if any_water {
+                assert!(!can_place(&sim.world, &sim.catalog, x, y, item));
+                mixed = true;
+            }
+        }
+    }
+    assert!(mixed, "need a 2x3 that includes water");
+}
+
+#[test]
+fn place_2x3_overlap_illegal() {
+    let mut sim = Simulation::new(tiny(0x64_13)).unwrap();
+    apply_rect_hut(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_rect(&sim, 4, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "lean_to");
+    give(&mut sim, id, "lean_to");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    park(&mut sim, id, x + 1, y);
+    give(&mut sim, id, "lean_to");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    assert_eq!(sim.world.sleep_places.len(), 1);
+}
+
+#[test]
+fn dawn_any_cell_of_2x3() {
+    let cfg = tiny(0x64_14);
+    let mut on = Simulation::new(cfg.clone()).unwrap();
+    let mut off = Simulation::new(cfg).unwrap();
+    apply_rect_hut(&mut on);
+    apply_rect_hut(&mut off);
+    on.time_enabled = true;
+    off.time_enabled = true;
+    on.ticks_per_day = 2;
+    off.ticks_per_day = 2;
+    let id = AgentId(0);
+    let (x, y) = land_rect(&on, 2, 3);
+    park(&mut on, id, x, y);
+    park(&mut off, id, x, y);
+    let item = catalog_item(&on, "lean_to");
+    give(&mut on, id, "lean_to");
+    sim_core::execute::execute_primary(&mut on, id, &PrimaryAction::Place { item });
+    park(&mut on, id, x + 1, y + 2);
+    park(&mut off, id, x + 1, y + 2);
+    let max = on.agents[&id]
+        .sheet
+        .energy_max(on.config.energy_max_milli());
+    let start = max / 2;
+    on.agents.get_mut(&id).unwrap().needs.energy = start;
+    off.agents.get_mut(&id).unwrap().needs.energy = start;
+    on.tick = 1;
+    off.tick = 1;
+    assert!(on.tick());
+    assert!(off.tick());
+    let extra = on.agents[&id]
+        .needs
+        .energy
+        .saturating_sub(off.agents[&id].needs.energy);
+    let want = dawn_energy(start, max, 50, 0) - dawn_refill(start, max);
+    assert_eq!(extra, want);
+}
+
+#[test]
+fn pickup_2x3_from_non_origin() {
+    let mut sim = Simulation::new(tiny(0x64_15)).unwrap();
+    apply_rect_hut(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_rect(&sim, 2, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "lean_to");
+    give(&mut sim, id, "lean_to");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    park(&mut sim, id, x + 1, y + 2);
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Pickup);
+    assert!(sim.world.sleep_places.is_empty());
+    assert_eq!(
+        sim.agents[&id].inventory.get(&item).copied().unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn load_restores_2x3() {
+    let mut sim = Simulation::new(tiny(0x64_16)).unwrap();
+    apply_rect_hut(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_rect(&sim, 2, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "lean_to");
+    give(&mut sim, id, "lean_to");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_rect_hut(&mut loaded);
+    assert_eq!(loaded.world.sleep_places.get(&(x, y)), Some(&item));
+    assert_eq!(
+        sleep_covers(&loaded.world, &loaded.catalog, x + 1, y + 2),
+        Some(item)
+    );
+    sim_core::execute::execute_primary(&mut loaded, id, &PrimaryAction::Place { item });
+    assert_eq!(loaded.world.sleep_places.len(), 1);
 }

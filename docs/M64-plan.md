@@ -1,7 +1,8 @@
 # M64 — Non-square footprints, ranged projectile FX, agent idle clip
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M63 complete (`docs/M63-plan.md`, git tag `M63`, commit `83727f3`)  
+**Walkthrough:** [`docs/M64-test-plan.md`](M64-test-plan.md)  
 **Specs:** [`remaining-features.md`](remaining-features.md) RF-5 / RF-6 / RF-9
 
 ## Context
@@ -138,7 +139,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough on implement: `docs/M64-test-plan.md`.
+Walkthrough: [`docs/M64-test-plan.md`](M64-test-plan.md).
 
 ```bash
 cargo test -p sim-core

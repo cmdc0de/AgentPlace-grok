@@ -116,6 +116,33 @@ pub fn load_viewer_objects(explicit: Option<&Path>) -> (Option<PathBuf>, Vec<sim
     }
 }
 
+/// Animation clip names from a glTF 2 binary (`.glb`) JSON chunk.
+pub fn glb_animation_names(path: &Path) -> Vec<String> {
+    let Ok(data) = std::fs::read(path) else {
+        return Vec::new();
+    };
+    if data.len() < 20 || &data[0..4] != b"glTF" {
+        return Vec::new();
+    }
+    let json_len = u32::from_le_bytes(data[12..16].try_into().unwrap_or([0; 4])) as usize;
+    let start: usize = 20;
+    let end = start.saturating_add(json_len);
+    if end > data.len() {
+        return Vec::new();
+    }
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(&data[start..end]) else {
+        return Vec::new();
+    };
+    v.get("animations")
+        .and_then(|a| a.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|c| c.get("name").and_then(|n| n.as_str()).map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Authored path if the file exists; `None` for primitive **or** sentinel.
 pub fn resolve_visual(defs: &[sim_core::ObjectDef], id: &str, dist_cells: u32) -> Option<PathBuf> {
     match resolve_visual_kind(defs, id, dist_cells) {
@@ -276,6 +303,7 @@ mod tests {
                 glb: Some(String::new()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -308,6 +336,7 @@ mod tests {
                 glb: Some("/nope/agentplace-missing-agent.glb".into()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -469,6 +498,7 @@ count = 2
                 glb: Some(glb.to_string_lossy().into_owned()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -493,6 +523,7 @@ count = 2
                     far: Some(far.to_string_lossy().into_owned()),
                 },
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -599,6 +630,7 @@ count = 2
                 glb: Some(basket.to_string_lossy().into_owned()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -609,6 +641,7 @@ count = 2
                 glb: Some(bush.to_string_lossy().into_owned()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -635,6 +668,7 @@ count = 2
                 glb: Some(String::new()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -664,6 +698,7 @@ count = 2
                 glb: Some("/nope/agentplace-missing-glb.glb".into()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -680,6 +715,7 @@ count = 2
                         glb: Some("/nope/agentplace-missing-glb.glb".into()),
                         lod: Default::default(),
                         scale: None,
+                        ..Default::default()
                     }),
                     sim: None,
                 }],
@@ -704,6 +740,7 @@ count = 2
                 glb: Some(glb.to_string_lossy().into_owned()),
                 lod: Default::default(),
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -726,6 +763,7 @@ count = 2
                     far: Some("/nope/missing-far.glb".into()),
                 },
                 scale: None,
+                ..Default::default()
             }),
             sim: None,
         };
@@ -765,5 +803,47 @@ count = 2
             hash,
             "object visual files must not enter state_hash"
         );
+    }
+
+    #[test]
+    fn agent_glb_has_idle_clip() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects");
+        let defs = sim_core::load_object_defs(&dir).expect("load shipped objects");
+        match resolve_visual_kind(&defs, "agent", 0) {
+            VisualKind::Authored(p) => {
+                let names = glb_animation_names(&p);
+                assert!(
+                    !names.is_empty(),
+                    "agent glb should have ≥1 animation clip {p:?}"
+                );
+                assert!(
+                    names.iter().any(|n| n == "ArmatureAction.002"),
+                    "clips={names:?}"
+                );
+                assert_eq!(
+                    sim_core::idle_clip_name(&defs, "agent"),
+                    Some("ArmatureAction.002")
+                );
+            }
+            other => panic!("expected Authored agent glb, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_clip_visual_is_still_static_kind() {
+        let def = sim_core::ObjectDef {
+            id: "agent".into(),
+            kind: "agent".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some("/nope/agentplace-missing-agent.glb".into()),
+                ..Default::default()
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "agent", 0),
+            VisualKind::Sentinel
+        );
+        assert!(glb_animation_names(Path::new("/nope/missing.glb")).is_empty());
     }
 }

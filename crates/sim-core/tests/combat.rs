@@ -4,6 +4,7 @@ use sim_core::action::PrimaryAction;
 use sim_core::combat_fx::{
     CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role,
 };
+use sim_core::objects::agent_idle_this_tick;
 use sim_core::conflict::{ATTACK_DAMAGE, ATTACK_ENERGY_COST, ConflictParams};
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::observation::legal_actions;
@@ -223,16 +224,20 @@ fn combat_role_helper_distinct() {
     );
 }
 
+fn no_pos(_: AgentId) -> Option<(u32, u32)> {
+    None
+}
+
 #[test]
 fn combat_fx_jobs_empty_without_events() {
-    assert!(combat_fx_jobs(&[], 1).is_empty());
+    assert!(combat_fx_jobs(&[], 1, no_pos).is_empty());
     let events = vec![SimEvent {
         tick: 2,
         agent: AgentId(0),
         kind: SimEventKind::Wait,
     }];
-    assert!(combat_fx_jobs(&events, 2).is_empty());
-    assert!(combat_fx_jobs(&events, 1).is_empty());
+    assert!(combat_fx_jobs(&events, 2, no_pos).is_empty());
+    assert!(combat_fx_jobs(&events, 1, no_pos).is_empty());
 }
 
 #[test]
@@ -272,7 +277,7 @@ fn combat_fx_jobs_from_attack_flee_downed_death() {
             },
         },
     ];
-    let jobs = combat_fx_jobs(&events, 4);
+    let jobs = combat_fx_jobs(&events, 4, no_pos);
     assert_eq!(
         jobs,
         vec![
@@ -282,12 +287,82 @@ fn combat_fx_jobs_from_attack_flee_downed_death() {
             CombatFxJob::Death { agent: b },
         ]
     );
-    let later = combat_fx_jobs(&events, 5);
+    let later = combat_fx_jobs(&events, 5, no_pos);
     assert_eq!(later, vec![CombatFxJob::Strike { from: a, to: b }]);
     assert!(!later.iter().any(|j| matches!(
         j,
         CombatFxJob::Flee { .. } | CombatFxJob::Downed { .. } | CombatFxJob::Death { .. }
     )));
+}
+
+#[test]
+fn combat_fx_jobs_dist_1_is_strike() {
+    let a = AgentId(0);
+    let b = AgentId(1);
+    let events = vec![SimEvent {
+        tick: 3,
+        agent: a,
+        kind: SimEventKind::Attack {
+            target: b,
+            damage: 1,
+        },
+    }];
+    let jobs = combat_fx_jobs(&events, 3, |id| match id {
+        AgentId(0) => Some((4, 4)),
+        AgentId(1) => Some((5, 4)),
+        _ => None,
+    });
+    assert_eq!(jobs, vec![CombatFxJob::Strike { from: a, to: b }]);
+}
+
+#[test]
+fn combat_fx_jobs_dist_2_is_projectile() {
+    let a = AgentId(0);
+    let b = AgentId(1);
+    let events = vec![SimEvent {
+        tick: 3,
+        agent: a,
+        kind: SimEventKind::Attack {
+            target: b,
+            damage: 1,
+        },
+    }];
+    let jobs = combat_fx_jobs(&events, 3, |id| match id {
+        AgentId(0) => Some((4, 4)),
+        AgentId(1) => Some((6, 4)),
+        _ => None,
+    });
+    assert_eq!(jobs, vec![CombatFxJob::Projectile { from: a, to: b }]);
+    assert!(!jobs.iter().any(|j| matches!(j, CombatFxJob::Strike { .. })));
+}
+
+#[test]
+fn agent_idle_this_tick_true_without_move() {
+    let id = AgentId(0);
+    let events = vec![SimEvent {
+        tick: 4,
+        agent: id,
+        kind: SimEventKind::Wait,
+    }];
+    assert!(agent_idle_this_tick(&events, 4, id));
+    assert!(agent_idle_this_tick(&[], 4, id));
+}
+
+#[test]
+fn agent_idle_this_tick_false_on_move() {
+    let id = AgentId(0);
+    let events = vec![SimEvent {
+        tick: 4,
+        agent: id,
+        kind: SimEventKind::Move {
+            from_x: 1,
+            from_y: 1,
+            to_x: 1,
+            to_y: 2,
+        },
+    }];
+    assert!(!agent_idle_this_tick(&events, 4, id));
+    assert!(agent_idle_this_tick(&events, 5, id));
 }
 
 #[test]

@@ -4,7 +4,7 @@
 use crate::action::Recipe;
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::error::SimError;
-use crate::event_log::SimEvent;
+use crate::event_log::{SimEvent, SimEventKind};
 use crate::species::{FaunaSpecies, SpeciesTables, Toxicity, VegYield, VegetationSpecies};
 use serde::Deserialize;
 use sha2::Digest;
@@ -61,6 +61,16 @@ pub struct VisualDef {
     /// Uniform XYZ. `None` / non-finite / `<= 0` ⇒ omitted (not hashed).
     #[serde(default)]
     pub scale: Option<f32>,
+    /// Action → clip names. Not hashed.
+    #[serde(default)]
+    pub animations: AnimDef,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AnimDef {
+    /// Idle clip name. Omit ⇒ first clip in the glb.
+    #[serde(default)]
+    pub idle: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -105,6 +115,12 @@ pub struct SimDef {
     /// N×N footprint. Omit = 1. Clamped 1..=8.
     #[serde(default)]
     pub sleep_size: Option<u32>,
+    /// Footprint width in +x. Omit = `sleep_size`.
+    #[serde(default)]
+    pub sleep_w: Option<u32>,
+    /// Footprint height in +y. Omit = `sleep_size`.
+    #[serde(default)]
+    pub sleep_h: Option<u32>,
     /// Added to Farm skill_roll bonus when held. Omit = 0.
     #[serde(default)]
     pub farm_bonus: Option<u32>,
@@ -148,6 +164,8 @@ pub struct CatalogEntry {
     pub attack_range: u32,
     pub sleep_bonus: u32,
     pub sleep_size: u32,
+    pub sleep_w: u32,
+    pub sleep_h: u32,
     pub farm_bonus: u32,
     pub fish_bonus: u32,
     pub gather_bonus: u32,
@@ -396,6 +414,9 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
             } else {
                 None
             };
+            let sleep_size = clamp_sleep_size(sim.sleep_size.unwrap_or(1));
+            let sleep_w = clamp_sleep_size(sim.sleep_w.unwrap_or(sleep_size));
+            let sleep_h = clamp_sleep_size(sim.sleep_h.unwrap_or(sleep_size));
             CatalogEntry {
                 slug: d.id.clone(),
                 item,
@@ -406,7 +427,9 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 attack_bonus: sim.attack_bonus.unwrap_or(0),
                 attack_range: sim.attack_range.unwrap_or(1).max(1),
                 sleep_bonus: sim.sleep_bonus.unwrap_or(0),
-                sleep_size: clamp_sleep_size(sim.sleep_size.unwrap_or(1)),
+                sleep_size,
+                sleep_w,
+                sleep_h,
                 farm_bonus: sim.farm_bonus.unwrap_or(0),
                 fish_bonus: sim.fish_bonus.unwrap_or(0),
                 gather_bonus: sim.gather_bonus.unwrap_or(0),
@@ -703,6 +726,27 @@ pub fn sleep_entry(catalog: &[CatalogEntry], item: ItemId) -> Option<&CatalogEnt
     catalog.iter().find(|e| e.item == item && e.sleep_bonus > 0)
 }
 
+pub fn sleep_dims(entry: &CatalogEntry) -> (u32, u32) {
+    (entry.sleep_w.max(1), entry.sleep_h.max(1))
+}
+
+/// Named idle clip from `[visual.animations] idle`. `None` ⇒ first glb clip.
+pub fn idle_clip_name<'a>(defs: &'a [ObjectDef], stem: &str) -> Option<&'a str> {
+    let visual = visual_for_id(defs, stem)?;
+    visual
+        .animations
+        .idle
+        .as_deref()
+        .filter(|s| !s.is_empty())
+}
+
+/// True when this agent did not emit `Move` on `tick` (Rest / Wait / Attack-in-place count as idle).
+pub fn agent_idle_this_tick(events: &[SimEvent], tick: u64, id: AgentId) -> bool {
+    !events.iter().any(|e| {
+        e.tick == tick && e.agent == id && matches!(e.kind, SimEventKind::Move { .. })
+    })
+}
+
 pub fn sleep_covers(
     world: &crate::world::World,
     catalog: &[CatalogEntry],
@@ -720,10 +764,10 @@ pub fn sleep_origin_at(
     y: u32,
 ) -> Option<((u32, u32), ItemId)> {
     for (&(ox, oy), &item) in &world.sleep_places {
-        let n = sleep_entry(catalog, item)
-            .map(|e| e.sleep_size)
-            .unwrap_or(1);
-        if x >= ox && x < ox.saturating_add(n) && y >= oy && y < oy.saturating_add(n) {
+        let (w, h) = sleep_entry(catalog, item)
+            .map(sleep_dims)
+            .unwrap_or((1, 1));
+        if x >= ox && x < ox.saturating_add(w) && y >= oy && y < oy.saturating_add(h) {
             return Some(((ox, oy), item));
         }
     }
@@ -863,11 +907,11 @@ pub fn can_place(
     item: ItemId,
 ) -> bool {
     if let Some(entry) = sleep_entry(catalog, item) {
-        let n = entry.sleep_size;
-        return footprint_free(world, catalog, ox, oy, n);
+        let (w, h) = sleep_dims(entry);
+        return footprint_free(world, catalog, ox, oy, w, h);
     }
     if station_entry(catalog, item).is_some() {
-        return footprint_free(world, catalog, ox, oy, 1);
+        return footprint_free(world, catalog, ox, oy, 1, 1);
     }
     false
 }
@@ -877,10 +921,11 @@ fn footprint_free(
     catalog: &[CatalogEntry],
     ox: u32,
     oy: u32,
-    n: u32,
+    w: u32,
+    h: u32,
 ) -> bool {
-    for dy in 0..n {
-        for dx in 0..n {
+    for dy in 0..h {
+        for dx in 0..w {
             let x = match ox.checked_add(dx) {
                 Some(v) => v,
                 None => return false,
@@ -919,6 +964,10 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.attack_range.to_le_bytes());
         hasher.update(e.sleep_bonus.to_le_bytes());
         hasher.update(e.sleep_size.to_le_bytes());
+        if e.sleep_w != e.sleep_size || e.sleep_h != e.sleep_size {
+            hasher.update(e.sleep_w.to_le_bytes());
+            hasher.update(e.sleep_h.to_le_bytes());
+        }
         hasher.update(e.farm_bonus.to_le_bytes());
         hasher.update(e.fish_bonus.to_le_bytes());
         hasher.update(e.gather_bonus.to_le_bytes());

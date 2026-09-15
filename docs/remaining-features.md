@@ -16,7 +16,7 @@ Standing unless a later plan picks a bump: CI `provider = mock`; `format_version
 |---|---|
 | `/spec` locks M{N} | Move picked **Open** rows → **Scheduled** (cite `M{N}-plan.md`). **Standing** rows stay. Add leftovers this slice created to **Open**. |
 | `/implement-m` ships M{N} | Move that slice’s **Scheduled** rows → **Done** with `Done (M{N})` and a link to `M{N}-plan.md`. Add implement-discovered leftovers to **Open**. |
-| User names a leftover in chat | Append an **Open** row. Do not invent backlog otherwise. |
+| User names a leftover in chat | Append an **Open** row (or expand an existing Open id). Do not invent backlog otherwise. |
 
 IDs (`RF-n`) are stable. Do not reuse, including after **Done**. **Standing** (RF-PG9) is never moved to Done; extra-recipe slices still leave it in Standing.
 
@@ -44,9 +44,41 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
 | RF-18 | world | M | hashed | interiors: walls / blocked Move / doors (RF-5 this slice is non-square footprints only) |
 | RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) |
-| RF-20 | PG-6 | M | hash-neutral | walk / attack / downed action→clip pairs (RF-9 this slice is idle only) |
+| RF-20 | PG-6 | M | hash-neutral | Standard animation monikers → glb clip names in `[visual.animations]` (`agent.toml` / object TOML). M64 shipped `idle` only. |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
+
+### RF-20 — animation monikers (hash-neutral)
+
+M64: `[visual.animations] idle` in `configs/objects/agent.toml` maps to glb clip `ArmatureAction.002`. Missing clip / omit ⇒ first clip or static. Move this tick **pauses** idle (no walk clip yet). `[visual]` is not hashed.
+
+Wanted: a **closed set of monikers** the viewer already understands, mapped per object file so a researcher can point each action at a clip name in that glb (or omit = no clip for that action). Same table on `agent.toml` and on any later skinned object TOML.
+
+Sketch (lock keys in `/spec`; do not invent clips this leftover does not name):
+
+```toml
+# configs/objects/agent.toml  (and later other skinned objects)
+[visual.animations]
+idle   = "ArmatureAction.002"   # shipped M64
+walk   = "Walk"                 # Move this tick
+melee  = "Melee"                # Attack Chebyshev == 1
+ranged = "Ranged"               # Attack Chebyshev > 1
+flee   = "Flee"
+downed = "Downed"               # Incapacitated
+death  = "Death"                # CombatDeath
+```
+
+| Moniker | When (native viewer) |
+|---|---|
+| `idle` | no Move this tick (M64) |
+| `walk` | `Move` this tick |
+| `melee` | `Attack` dist 1 |
+| `ranged` | `Attack` dist > 1 |
+| `flee` | `Flee` |
+| `downed` | `Incapacitated` |
+| `death` | `CombatDeath` |
+
+Omit a key ⇒ that action has no clip (idle pause / static, as M64 walk). Unknown monikers ignored. Clip name missing from the glb ⇒ static, not sentinel. No new authored animations required until a later slice adds files. Not hashed. Not browser 3D. Not PROTOCOL. Not extra LLM.
 
 ---
 
@@ -68,18 +100,16 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-Locked in [`M64-plan.md`](M64-plan.md) (planned, not yet implemented).
-
-| ID | Theme | Size | Hash / wire | One-liner |
-|---|---|---|---|---|
-| RF-5 | world | M | hashed | non-square W×H sleep footprints (`sleep_w` / `sleep_h`; square omit-hash) |
-| RF-6 | combat FX | S | hash-neutral | ranged Attack projectile mesh (Chebyshev > 1); melee Strike unchanged |
-| RF-9 | PG-6 | M | hash-neutral | agent glb clip `ArmatureAction.002` is **idle**; pause on Move |
+None. M64 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
 ## Done
 
-Shipped RF rows. `/spec` does not pick from here. Newest first. Keep the same columns as Open, plus **Done** (`M{N}`, link `M{N}-plan.md`).
+Shipped RF rows. `/spec` does not pick from here. Newest first.
 
-None yet. M63 and earlier are in INDEX + `M*-plan.md`; this table starts at M64.
+| ID | Theme | Size | Hash / wire | One-liner | Done |
+|---|---|---|---|---|---|
+| RF-9 | PG-6 | M | hash-neutral | agent glb clip `ArmatureAction.002` is **idle**; pause on Move | [M64](M64-plan.md) |
+| RF-6 | combat FX | S | hash-neutral | ranged Attack projectile mesh (Chebyshev > 1); melee Strike unchanged | [M64](M64-plan.md) |
+| RF-5 | world | M | hashed | non-square W×H sleep footprints (`sleep_w` / `sleep_h`; square omit-hash) | [M64](M64-plan.md) |

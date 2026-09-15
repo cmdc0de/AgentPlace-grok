@@ -13,6 +13,7 @@ use bevy::asset::AssetPlugin;
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy::world_serialization::WorldInstanceReady;
 use commands::{CkptScrubber, crate_fill_scale, pack_fill_scale};
 use render::{agent_world_pos, heightmap_mesh, resource_world_pos};
 use shared::protocol::ClientMessage;
@@ -38,6 +39,12 @@ struct AgentVisual {
     fit: Option<AgentFit>,
     /// Explicit `[visual] scale`. When set, skip capsule auto-fit.
     toml_scale: Option<f32>,
+}
+
+#[derive(Component, Clone)]
+struct IdleClip {
+    graph: Handle<AnimationGraph>,
+    index: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -288,6 +295,7 @@ fn main() {
                 handle_input,
                 sync_combat_tints,
                 sync_combat_fx,
+                sync_agent_idle,
                 sync_stockpile_markers,
                 sync_sleep_places,
                 sync_satchel_markers,
@@ -455,6 +463,7 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
     assets: Res<AssetServer>,
     state: Res<SimState>,
     mut visuals: ResMut<ObjectVisuals>,
@@ -607,12 +616,13 @@ fn setup_scene(
         let hue = (agent.id.0 as f32 * 47.0) % 360.0;
         let color = Color::hsl(hue, 0.7, 0.55);
         let tf = Transform::from_translation(agent_world_pos(world, agent.x, agent.y));
-        if !try_spawn_model(
+        let dist = models::camera_dist_cells(world.width, world.height, agent.x, agent.y);
+        if let Some(e) = try_spawn_model(
             &mut commands,
             &assets,
             &visuals,
             "agent",
-            models::camera_dist_cells(world.width, world.height, agent.x, agent.y),
+            dist,
             tf,
             AgentVisual {
                 id: agent.id,
@@ -620,6 +630,23 @@ fn setup_scene(
                 toml_scale: sim_core::visual_scale_for(&visuals.defs, "agent"),
             },
         ) {
+            if let models::VisualKind::Authored(path) =
+                models::resolve_visual_kind(&visuals.defs, "agent", dist)
+            {
+                let clip = assets
+                    .load_builder()
+                    .override_unapproved()
+                    .load(GltfAssetLabel::Animation(0).from_asset(path));
+                let (graph, index) = AnimationGraph::from_clip(clip);
+                commands
+                    .entity(e)
+                    .insert(IdleClip {
+                        graph: graphs.add(graph),
+                        index,
+                    })
+                    .observe(play_idle_when_ready);
+            }
+        } else {
             commands.spawn((
                 Mesh3d(capsule.clone()),
                 MeshMaterial3d(materials.add(StandardMaterial {
@@ -748,7 +775,9 @@ fn spawn_stockpile(
         models::camera_dist_cells(world.width, world.height, x, y),
         tf,
         (WorldMarker { x, y }, StockpileVisual { x, y }),
-    ) {
+    )
+    .is_some()
+    {
         return;
     }
     let color = {
@@ -842,14 +871,19 @@ fn spawn_sleep_place(
         return;
     };
     let entry = catalog.iter().find(|e| e.item == item);
-    let n = entry.map(|e| e.sleep_size.max(1)).unwrap_or(1) as f32;
+    let (fw, fh) = entry
+        .map(sim_core::sleep_dims)
+        .unwrap_or((1, 1));
     let stem = entry.map(|e| e.slug.as_str()).unwrap_or("tent");
     let pos = resource_world_pos(world, x, y, 0.32);
-    let mut scale = n;
+    let mut sx = fw.max(1) as f32;
+    let mut sz = fh.max(1) as f32;
     if let Some(s) = sim_core::visual_scale_for(&visuals.defs, stem) {
-        scale *= s;
+        sx *= s;
+        sz *= s;
     }
-    let tf = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+    let sy = sx.max(sz);
+    let tf = Transform::from_translation(pos).with_scale(Vec3::new(sx, sy, sz));
     let extra = (WorldMarker { x, y }, SleepPlaceVisual { x, y });
     let _ = try_spawn_model(
         commands,
@@ -943,7 +977,9 @@ fn spawn_satchel(
         models::camera_dist_cells(world.width, world.height, x, y),
         Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
         SatchelVisual { id, backpack },
-    ) {
+    )
+    .is_some()
+    {
         return;
     }
     commands.spawn((
@@ -1024,7 +1060,7 @@ fn try_spawn_model(
     dist_cells: u32,
     transform: Transform,
     extra: impl Bundle,
-) -> bool {
+) -> Option<Entity> {
     match models::resolve_visual_kind(&visuals.defs, stem, dist_cells) {
         models::VisualKind::Authored(path) => {
             let meta = std::fs::metadata(&path).ok();
@@ -1038,7 +1074,7 @@ fn try_spawn_model(
                 .load_builder()
                 .override_unapproved()
                 .load(GltfAssetLabel::Scene(0).from_asset(path.clone()));
-            commands.spawn((
+            Some(commands.spawn((
                 WorldAssetRoot(handle),
                 tf,
                 extra,
@@ -1049,26 +1085,66 @@ fn try_spawn_model(
                     mtime,
                 },
                 Visibility::default(),
-            ));
-            true
+            )).id())
         }
         models::VisualKind::Sentinel => {
             let (Some(mesh), Some(mat)) =
                 (visuals.sentinel_mesh.clone(), visuals.sentinel_mat.clone())
             else {
-                return false;
+                return None;
             };
             log_sentinel_once(stem);
-            commands.spawn((
+            Some(commands.spawn((
                 Mesh3d(mesh),
                 MeshMaterial3d(mat),
                 transform,
                 extra,
                 Visibility::default(),
-            ));
-            true
+            )).id())
         }
-        models::VisualKind::Primitive => false,
+        models::VisualKind::Primitive => None,
+    }
+}
+
+fn play_idle_when_ready(
+    scene_ready: On<WorldInstanceReady>,
+    mut commands: Commands,
+    children: Query<&Children>,
+    clips: Query<&IdleClip>,
+    mut players: Query<&mut AnimationPlayer>,
+) {
+    let Ok(clip) = clips.get(scene_ready.entity) else {
+        return;
+    };
+    for child in children.iter_descendants(scene_ready.entity) {
+        if let Ok(mut player) = players.get_mut(child) {
+            player.play(clip.index).repeat();
+            commands
+                .entity(child)
+                .insert(AnimationGraphHandle(clip.graph.clone()));
+        }
+    }
+}
+
+fn sync_agent_idle(
+    state: Res<SimState>,
+    agents: Query<(Entity, &AgentVisual), With<IdleClip>>,
+    children: Query<&Children>,
+    mut players: Query<&mut AnimationPlayer>,
+) {
+    let tick = state.sim.tick;
+    let events = &state.sim.events.events;
+    for (entity, visual) in &agents {
+        let idle = sim_core::agent_idle_this_tick(events, tick, visual.id);
+        for child in children.iter_descendants(entity) {
+            if let Ok(mut player) = players.get_mut(child) {
+                if idle {
+                    player.resume_all();
+                } else {
+                    player.pause_all();
+                }
+            }
+        }
     }
 }
 
@@ -1265,7 +1341,9 @@ fn spawn_marker(
         dist_cells,
         Transform::from_translation(pos),
         WorldMarker { x, y },
-    ) {
+    )
+    .is_some()
+    {
         return;
     }
     let color = {
@@ -1539,6 +1617,21 @@ fn spawn_combat_fx(
                 from,
             )
         }
+        CombatFxJob::Projectile { from, to } => {
+            let (ax, ay) = last_agent_cell(sim, cache, from);
+            let (bx, by) = last_agent_cell(sim, cache, to);
+            let a = agent_world_pos(world, ax, ay) + Vec3::Y * 0.45;
+            let b = agent_world_pos(world, bx, by) + Vec3::Y * 0.45;
+            let mid = (a + b) * 0.5;
+            (
+                Mesh3d(meshes.add(Sphere::new(0.12))),
+                Color::srgb(0.95, 0.75, 0.15),
+                Transform::from_translation(mid),
+                ax,
+                ay,
+                from,
+            )
+        }
         CombatFxJob::Flee { agent } => {
             let (x, y) = last_agent_cell(sim, cache, agent);
             let pos = agent_world_pos(world, x, y) + Vec3::Y * 0.55;
@@ -1603,9 +1696,11 @@ fn sync_combat_fx(
         last_cell.insert(a.id, (a.x, a.y));
     }
     let live: std::collections::BTreeSet<CombatFxJob> =
-        sim_core::combat_fx_jobs(&state.sim.events.events, state.sim.tick)
-            .into_iter()
-            .collect();
+        sim_core::combat_fx_jobs(&state.sim.events.events, state.sim.tick, |id| {
+            state.sim.agents.get(&id).map(|a| (a.x, a.y))
+        })
+        .into_iter()
+        .collect();
     let have: std::collections::BTreeSet<CombatFxJob> =
         existing.iter().map(|(_, v)| v.job).collect();
     for (e, v) in existing.iter() {

@@ -2,6 +2,7 @@
 
 use crate::agent::AgentId;
 use crate::event_log::{SimEvent, SimEventKind};
+use crate::observation::chebyshev;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CombatRole {
@@ -18,9 +19,14 @@ pub enum CombatFxJob {
     Flee { agent: AgentId },
     Downed { agent: AgentId },
     Death { agent: AgentId },
+    Projectile { from: AgentId, to: AgentId },
 }
 
-pub fn combat_fx_jobs(events: &[SimEvent], tick: u64) -> Vec<CombatFxJob> {
+pub fn combat_fx_jobs(
+    events: &[SimEvent],
+    tick: u64,
+    pos: impl Fn(AgentId) -> Option<(u32, u32)>,
+) -> Vec<CombatFxJob> {
     let mut jobs = Vec::new();
     for e in events {
         if e.tick != tick {
@@ -28,10 +34,21 @@ pub fn combat_fx_jobs(events: &[SimEvent], tick: u64) -> Vec<CombatFxJob> {
         }
         match e.kind {
             SimEventKind::Attack { target, .. } => {
-                jobs.push(CombatFxJob::Strike {
-                    from: e.agent,
-                    to: target,
-                });
+                let dist = match (pos(e.agent), pos(target)) {
+                    (Some((ax, ay)), Some((bx, by))) => chebyshev(ax, ay, bx, by),
+                    _ => 1,
+                };
+                if dist > 1 {
+                    jobs.push(CombatFxJob::Projectile {
+                        from: e.agent,
+                        to: target,
+                    });
+                } else {
+                    jobs.push(CombatFxJob::Strike {
+                        from: e.agent,
+                        to: target,
+                    });
+                }
             }
             SimEventKind::Flee => jobs.push(CombatFxJob::Flee { agent: e.agent }),
             SimEventKind::Incapacitated { .. } => jobs.push(CombatFxJob::Downed { agent: e.agent }),
