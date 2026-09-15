@@ -1,6 +1,6 @@
 # M53 test plan — see each new feature
 
-Walkthrough for [`M53-plan.md`](M53-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (Place tent/cabin/house, night Hunt/Farm, CON dawn). Next slice: [`M62-plan.md`](M62-plan.md).
+Walkthrough for [`M53-plan.md`](M53-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (Place tent/cabin/house, night Hunt/Farm, CON dawn). Next slice: [`M63-plan.md`](M63-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

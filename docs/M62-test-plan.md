@@ -1,6 +1,6 @@
 # M62 test plan — see each new feature
 
-Walkthrough for [`M62-plan.md`](M62-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (spit stations, Store wear, rack/wrap/tile/pie). Next slice: later work at the bottom of [`M62-plan.md`](M62-plan.md).
+Walkthrough for [`M62-plan.md`](M62-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (spit stations, Store wear, rack/wrap/tile/pie). Next slice: [`M63-plan.md`](M63-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

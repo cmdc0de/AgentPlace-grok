@@ -1,6 +1,6 @@
 # M61 test plan — see each new feature
 
-Walkthrough for [`M61-plan.md`](M61-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (dawn wear, out-dir disk walk, bench/shawl/cobble/cake). Next slice: [`M62-plan.md`](M62-plan.md).
+Walkthrough for [`M61-plan.md`](M61-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (dawn wear, out-dir disk walk, bench/shawl/cobble/cake). Next slice: [`M63-plan.md`](M63-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 
