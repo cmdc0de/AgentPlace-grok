@@ -87,7 +87,8 @@ No tool-use bonuses / `uses` / `station` on these four except flour’s craft-st
 
 | Later | What |
 |---|---|
-| After M58 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC; extra invention kinds; ammo / projectile FX; per-instance durability stacks; every-recipe stations; time-decay wear; CPU percent; out-dir disk walk |
+| **M59** | [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
+| After M59 | protobuf/TLS/`wss`; Unix sockets; skeletal animation; wasm32 on Win/mac; Food/Wood as strings; sql.js / ad-hoc SQL; interiors / non-square footprints; OTLP protobuf/gRPC; ammo / projectile FX; transferring wear on Give; time-decay wear; every-recipe stations; CPU percent; out-dir disk walk |
 | Not M58 | PROTOCOL bump; flipping shipping `default.toml` / `coop.toml`; Bevy in the browser; replacing JSONL; requiring a station for bread/stew; mixing work_places into dawn sleep bonus |
 
 ## Key decisions

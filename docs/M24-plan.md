@@ -130,8 +130,9 @@ Hello **v4 vs v5** is Protocol. Old v4 clients cannot talk to a lockstep v5 serv
 | **M55** | Done — [`M55-plan.md`](M55-plan.md) — ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
 | **M56** | Done — [`M56-plan.md`](M56-plan.md) — axe gather bonus, Draco glTF decode, extra recipes |
 | **M57** | Done — [`M57-plan.md`](M57-plan.md) — hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
-| **M58** | [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
-| After M58 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
+| **M58** | Done — [`M58-plan.md`](M58-plan.md) — tool durability + millstone station, viewer-frame OTLP, extra recipes |
+| **M59** | [`M59-plan.md`](M59-plan.md) — extra invention kinds, per-instance tool wear, extra recipes |
+| After M59 | protobuf/TLS; Unix sockets; sql.js / ad-hoc SQL |
 | Not M24 | Browser; combat; CI Win/mac; hashed pipeline events |
 
 ## Key decisions
