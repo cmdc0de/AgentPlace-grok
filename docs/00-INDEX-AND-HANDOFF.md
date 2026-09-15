@@ -12,7 +12,7 @@ Supports Windows, Linux (Debian-based), and macOS. Clients attach via in-process
 
 ## Implementation progress
 
-Read this table first in a new session, then the specs, then the current milestone plan.
+Read this table first in a new session, then the specs, then [`remaining-features.md`](remaining-features.md) for leftovers, then the current milestone plan if one is Planned.
 
 | Milestone | Status | Doc | What it is |
 |-----------|--------|-----|------------|
@@ -79,9 +79,9 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M61** | Done (tag `M61`) | [`M61-plan.md`](M61-plan.md), walkthrough [`M61-test-plan.md`](M61-test-plan.md) | Time-decay wear, out-dir disk walk, extra recipes |
 | **M62** | Done (tag `M62`) | [`M62-plan.md`](M62-plan.md), walkthrough [`M62-test-plan.md`](M62-test-plan.md) | Stations for bread/stew, Store wear, extra recipes |
 | **M63** | Done (tag `M63`) | [`M63-plan.md`](M63-plan.md), walkthrough [`M63-test-plan.md`](M63-test-plan.md) | Crate dawn decay, remaining food stations, extra recipes |
-| After M63 | Not started | listed at the bottom of `M63-plan.md` | protobuf/TLS |
+| After M63 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
 
-Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
+Specs remain the long-term source of truth. Milestone plans record **what we are building now**. The living leftover list is [`remaining-features.md`](remaining-features.md); historical `M*-plan.md` later-tables are snapshots and are not rewritten. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
 ---
 
@@ -99,8 +99,9 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 4e | `config-reference.md` | Every file under `configs/` and every key (M45) |
 | 5 | `decision-observation-llm-economy-metrics-spec.md` | Decision loop, per-agent perceptiveness, LLM contract (local **and** frontier models), resources (vegetation/animal/fish + toxicity), metrics including consumption |
 | 6 | `medium-priority-specs.md` | Communication (free secondary action + length limit), conflict/sanctions (v1 social, v2-ready), checkpoints + Markdown summaries, error handling (timeout = do nothing), testing strategy, when to wire 3D viewer |
-| 6b | `missing-features.md` | Open researcher gaps found in use (not After-M later-table) |
-| 6c | `post-ga-feature-list.md` | Post-GA backlog (sheet leftovers, inventions, 3D, catalog, extra recipes, missing-asset sentinel, OpenTelemetry, viewer camera pan, object visual scale, viewer FPS/frametime HUD, sqlite run log, day/night, sleep places, world-size CLI). Not a milestone plan. |
+| 6b | `missing-features.md` | Open researcher gaps found in use (not `/spec` inventory) |
+| 6c | `post-ga-feature-list.md` | Post-GA theme essays (not `/spec` inventory). Operational leftover list is `remaining-features.md`. |
+| 6c2 | `remaining-features.md` | **`/spec` leftover inventory.** Open + Standing + Scheduled; shipped rows stay as Done (M{N}). Historical M-plan later-tables are frozen snapshots. |
 | 6d | `art-scale.md` | Viewer world units for authored glb (agent capsule = reference) |
 | 7 | `M2-plan.md` | Milestone 2 (done): resources, checkpoints, Markdown summaries |
 | 8 | `M3-plan.md` | Milestone 3 (done): observation, needs, abilities, toxicity, speech, LLM |
@@ -225,9 +226,9 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M63-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M63-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M63 is implemented (`M63-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M63 is implemented (`M63-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -255,14 +256,14 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M63 are done. M63 is implemented ([`M63-plan.md`](M63-plan.md)); later work is at the bottom of that file.
+M1–M63 are done. M63 is implemented ([`M63-plan.md`](M63-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
 
 ```
-Read docs/00-INDEX-AND-HANDOFF.md, then docs/M63-plan.md.
+Read docs/00-INDEX-AND-HANDOFF.md, then docs/remaining-features.md.
 M63 is implemented (crate dawn decay, remaining food stations, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
-Later work is at the bottom of that file.
-Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.
+Leftovers are in remaining-features.md. Do not reconstruct them from M*-plan later-tables.
+Do not add protobuf, TLS, skeletal animation, or Bevy in the browser unless asked.
 CI stays provider=mock with no network.
 ```
 

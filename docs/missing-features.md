@@ -1,6 +1,6 @@
 # Missing features
 
-Researcher-facing gaps found in use. **Not** the After-M later-table (protobuf/TLS, combat, wire `/set`). **Not** the post-GA backlog ([`post-ga-feature-list.md`](post-ga-feature-list.md)). Add a row when something is missing or wrong; when a milestone ships it, mark **Done** and point at that plan.
+Researcher-facing gaps found in use. **Not** `/spec` leftover inventory ([`remaining-features.md`](remaining-features.md)). **Not** the post-GA theme essays ([`post-ga-feature-list.md`](post-ga-feature-list.md)). Add a row when something is missing or wrong; when a milestone ships it, mark **Done** and point at that plan.
 
 | ID | Area | Status | Gap |
 |---|---|---|---|

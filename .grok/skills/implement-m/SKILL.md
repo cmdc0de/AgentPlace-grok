@@ -39,7 +39,7 @@ Write `docs/M{N}-test-plan.md` in the recent shape:
 - §0 safety net (`cargo test -p sim-core`, plus `-p viewer` / `-p sim-cli` if this slice touched them; plus `cargo test -p sim-cli --test net` and `cargo test -p shared` — TCP/WS loopback — every deliver).
 - One numbered section per in-scope item: exact `cargo test` lines, success table, `sim-cli` / viewer commands a researcher can **read**.
 - Live/overnight recipes as copy-paste commands. **Do not run** them unless the user asked.
-- Next-slice line: `M{N+1}-plan.md` if it exists, else later work at the bottom of `M{N}-plan.md`.
+- Next-slice line: leftover inventory at [`docs/remaining-features.md`](docs/remaining-features.md). Do **not** point at `M{N+1}-plan.md` or “the bottom of `M{N}-plan.md`”. Do **not** rewrite Next-slice lines on historical test plans.
 - **Execution record:** every non-GUI walkthrough command actually run, with pass/fail evidence.
 
 **Run every non-GUI line in that walkthrough before you stop.** That means every `cargo test` (package §0, each `--exact` name, `-p sim-cli --test net`, `-p shared`) and every headless `cargo run -p sim-cli` (default hash, `--compare`, inject). `cargo test -- --exact NAME` still takes **one** name — invoke each listed line separately. If a test fails, **fix the code** (do not paper over it in the walkthrough).
@@ -52,9 +52,11 @@ Skip only what cannot run headless or needs a live model: imgui/viewer window, o
 |---|---|
 | `docs/M{N}-plan.md` | Status: `implemented`; add **Walkthrough** link to `M{N}-test-plan.md` |
 | `README.md` | Current slice **M{N}** + walkthrough (spec left this on M{N-1}) |
-| `docs/00-INDEX-AND-HANDOFF.md` | M{N} **Done (tag `M{N}`)** + walkthrough; file-list row for `M{N}-test-plan.md`; suggested next = M{N} implemented, later work at the bottom of `M{N}-plan.md` |
-| Spec `Current slice:` banners | already `M{N}-plan.md` from `/spec`; leave |
-| Later-tables | leave; `/spec` for M{N+1} marks M{N} Done |
+| `docs/00-INDEX-AND-HANDOFF.md` | M{N} **Done (tag `M{N}`)** + walkthrough; file-list row for `M{N}-test-plan.md`; suggested next = M{N} implemented, leftovers in `remaining-features.md` |
+| `docs/remaining-features.md` | move this slice’s **Scheduled** rows → **Done** (newest first) with `M{N}` linking `M{N}-plan.md`; create the Done table if this is the first row. Add implement-discovered leftovers to **Open**. Do **not** delete RF ids. **Standing** stays. |
+| Spec `Current slice:` banners | **do not touch** |
+| Historical `M*-plan.md` later-tables | **do not touch** |
+| Historical `M*-test-plan.md` Next-slice lines | **do not touch** |
 | `docs/incentive-schedule-format.md` | only if this slice changed the shipping format |
 
 Do not invent `docs/M{N+1}-plan.md`.

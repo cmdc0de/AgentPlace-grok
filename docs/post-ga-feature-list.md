@@ -1,8 +1,10 @@
 # Post-GA feature list
 
-Researcher-facing features **after** the current GA line (M1–M28 shipped: world, agents, LLM loop, governance, attach, combat v2-lite). **Not** a milestone plan. **Not** `missing-features.md` (in-use bugs). **Not** the After-M later-table (protobuf/TLS, embeddings, Unix sockets).
+Researcher-facing features **after** the current GA line (M1–M28 shipped: world, agents, LLM loop, governance, attach, combat v2-lite). **Not** a milestone plan. **Not** `missing-features.md` (in-use bugs).
 
-When a theme is scheduled, `/spec` picks 1–3 items into `docs/M{N}-plan.md`. Until then this file is the backlog. Milestone plans still win on timing vs this list and vs long-term specs.
+Operational leftover list for `/spec` is [`remaining-features.md`](remaining-features.md). This file is theme essays, not inventory. Do not reconstruct the next-slice pick list from these essays or from historical M-plan later-tables.
+
+When a theme is scheduled, `/spec` picks 1–3 items into `docs/M{N}-plan.md` from remaining-features. Milestone plans still win on timing vs this list and vs long-term specs.
 
 Standing unless a later plan picks a bump: CI `provider = mock`; `format_version` writes **3** / reads v2+v3; `PROTOCOL_VERSION = 5`; shipping `configs/default.toml` / `coop.toml` unchanged; overlay TOML is not `ExperimentConfig` postcard.
 
@@ -610,4 +612,4 @@ PG-4 applies leftover sheet mods (accuracy, INT→invent, haul, …) on top of t
 
 ## Parking lot
 
-Empty on purpose. Add rows here (or in the Themes table) as they come up: dialects, seasons, embeddings, Unix sockets, protobuf/TLS, etc. Prefer the After-M later-table when the item is already listed there. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, per-object visual scale, viewer FPS/frametime HUD, sqlite run log, day/night, sleep places, and world-size CLI are **PG-4 through PG-18**, not parking-lot one-liners.
+Empty on purpose. Add pickable leftovers to [`remaining-features.md`](remaining-features.md), not here. Theme essays stay in this file. Sheet-effect leftovers, inventions, 3D models, the browser inspector, object definition files, extra recipes, the missing-asset sentinel, OpenTelemetry, viewer camera pan, per-object visual scale, viewer FPS/frametime HUD, sqlite run log, day/night, sleep places, and world-size CLI are **PG-4 through PG-18**, not parking-lot one-liners.
