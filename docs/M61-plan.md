@@ -1,7 +1,8 @@
 # M61 — Time-decay wear, out-dir disk walk, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M60 complete (`docs/M60-plan.md`, git tag `M60`, commit `2ac5a5d`)  
+**Walkthrough:** [`docs/M61-test-plan.md`](M61-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes, PG-11 leftover out-dir disk walk); M60 later-table time-decay wear
 
 ## Context
@@ -104,8 +105,8 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M60 `171a26d2…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M60 `aacd867d…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `16804536…` |
+| default CLI 2 ticks (time on) | hash `3512dde6…` |
 | dawn decay | time on, `ticks_per_day = 2`, hold axe wear `[0]`, run 2 ticks ⇒ wear `[1]` |
 | 8 dawns | `uses = 8` consume 1 axe |
 | `--no-time` hold axe | many ticks, wear unchanged |
@@ -151,7 +152,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M61-test-plan.md` (written on implement).
+Walkthrough: [`docs/M61-test-plan.md`](M61-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -160,7 +161,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `16804536…`; default (time on) `3512dde6…`; Hello v5; format_version 3 write.
 
 ## Risks
 

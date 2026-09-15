@@ -402,6 +402,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if checkpoint_every.is_some() && out_dir.is_none() {
         out_dir = Some(PathBuf::from(&sim.config.checkpoint.directory));
     }
+    if let Some(dir) = &out_dir {
+        sim.telemetry_out_dir = dir.to_string_lossy().into_owned();
+    }
     let write_timing = overlay
         .metrics
         .timing

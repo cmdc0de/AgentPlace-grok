@@ -153,6 +153,10 @@ pub struct Simulation {
     pub telemetry_disk_write_bytes: Option<u64>,
     /// Δ CPU ns / this tick `wall_ns`, 0..=100. Hash-neutral. None until a previous sample.
     pub telemetry_cpu_percent: Option<u32>,
+    /// `--out-dir` path for telemetry walk. Empty ⇒ skip. Not hashed.
+    pub telemetry_out_dir: String,
+    /// Sum of regular-file bytes under `telemetry_out_dir`. Hash-neutral.
+    pub telemetry_out_dir_bytes: Option<u64>,
     /// Overlay `[time] enabled`. Default **on**. Hashed when true.
     pub time_enabled: bool,
     /// Overlay `[time] ticks_per_day`. Default 240. Hashed when time is on.
@@ -261,6 +265,8 @@ impl Simulation {
             telemetry_disk_read_bytes: None,
             telemetry_disk_write_bytes: None,
             telemetry_cpu_percent: None,
+            telemetry_out_dir: String::new(),
+            telemetry_out_dir_bytes: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
         })
@@ -1108,6 +1114,10 @@ impl Simulation {
             if let Some(v) = timing::process_disk_write_bytes() {
                 self.telemetry_disk_write_bytes = Some(v);
             }
+            if !self.telemetry_out_dir.is_empty() {
+                self.telemetry_out_dir_bytes =
+                    timing::dir_size_bytes(&self.telemetry_out_dir);
+            }
         }
         true
     }
@@ -1153,6 +1163,25 @@ impl Simulation {
             let max = a.sheet.energy_max(base);
             a.needs.energy =
                 crate::clock::dawn_energy(a.needs.energy, max, shelter, con_extra);
+        }
+        let decay: Vec<(crate::agent::AgentId, crate::agent::ItemId, u32)> = self
+            .agents
+            .iter()
+            .filter(|(_, a)| a.health != 0)
+            .flat_map(|(id, a)| {
+                catalog.iter().filter_map(|e| {
+                    if e.uses > 0 && a.held_qty(e.item) > 0 {
+                        Some((*id, e.item, e.uses))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+        for (id, item, uses) in decay {
+            if let Some(a) = self.agents.get_mut(&id) {
+                crate::objects::wear_tool(a, item, uses);
+            }
         }
     }
 

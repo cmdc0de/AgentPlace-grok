@@ -83,3 +83,38 @@ fn telemetry_cpu_percent_none_until_second_tick() {
         assert!(sim.telemetry_cpu_percent.is_none());
     }
 }
+
+#[test]
+fn telemetry_out_dir_none_without_path() {
+    let cfg = tiny(0x61_21);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.telemetry_enabled = true;
+    off.run_ticks(2);
+    on.run_ticks(2);
+    assert_eq!(off.state_hash(), on.state_hash());
+    assert!(off.telemetry_out_dir_bytes.is_none());
+    assert!(on.telemetry_out_dir_bytes.is_none());
+}
+
+#[test]
+fn telemetry_out_dir_walks_files_hash_neutral() {
+    let dir = std::env::temp_dir().join(format!("ap-m61-outdir-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("note.txt");
+    std::fs::write(&file, b"0123456789").unwrap();
+    let cfg = tiny(0x61_22);
+    let mut off = Simulation::new(cfg.clone()).unwrap();
+    let mut on = Simulation::new(cfg).unwrap();
+    on.telemetry_enabled = true;
+    on.telemetry_out_dir = dir.to_string_lossy().into_owned();
+    off.run_ticks(2);
+    on.run_ticks(2);
+    assert_eq!(off.state_hash(), on.state_hash(), "out-dir walk must not hash");
+    let n = on
+        .telemetry_out_dir_bytes
+        .expect("walked out-dir");
+    assert!(n >= 10, "expected at least the 10-byte file, got {n}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

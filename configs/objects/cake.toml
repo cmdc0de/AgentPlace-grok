@@ -1,0 +1,15 @@
+id = "cake"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/plants_ready.glb"
+[visual.lod]
+near = "assets/models/optimized/plants_ready.glb"
+mid  = "assets/models/optimized/plants_ready.glb"
+far  = "assets/models/optimized/plants_ready.glb"
+
+[sim]
+weight_milli = 80
+[sim.craft]
+inputs = [["food", 6]]
+output_qty = 1

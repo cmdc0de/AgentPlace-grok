@@ -170,6 +170,56 @@ pub fn process_disk_write_bytes() -> Option<u64> {
     proc_io_field("write_bytes")
 }
 
+/// Sum of regular-file lengths under `path` (recursive). Does not follow symlinks.
+/// `None` if `path` is empty, missing, or unreadable.
+pub fn dir_size_bytes(path: &str) -> Option<u64> {
+    if path.is_empty() {
+        return None;
+    }
+    let root = std::path::Path::new(path);
+    let meta = std::fs::symlink_metadata(root).ok()?;
+    if meta.file_type().is_symlink() {
+        return None;
+    }
+    dir_size_walk(root)
+}
+
+fn dir_size_walk(path: &std::path::Path) -> Option<u64> {
+    let meta = std::fs::symlink_metadata(path).ok()?;
+    if meta.file_type().is_symlink() {
+        return Some(0);
+    }
+    if meta.is_file() {
+        return Some(meta.len());
+    }
+    if !meta.is_dir() {
+        return Some(0);
+    }
+    let rd = std::fs::read_dir(path).ok()?;
+    let mut sum = 0u64;
+    for ent in rd {
+        let Ok(ent) = ent else {
+            continue;
+        };
+        let Ok(ft) = ent.file_type() else {
+            continue;
+        };
+        if ft.is_symlink() {
+            continue;
+        }
+        if ft.is_file() {
+            if let Ok(m) = ent.metadata() {
+                sum = sum.saturating_add(m.len());
+            }
+        } else if ft.is_dir() {
+            if let Some(n) = dir_size_walk(&ent.path()) {
+                sum = sum.saturating_add(n);
+            }
+        }
+    }
+    Some(sum)
+}
+
 impl PipelineParams {
     pub fn from_config_toml(s: &str) -> Self {
         #[derive(Default, Deserialize)]

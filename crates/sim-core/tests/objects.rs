@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M60 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "171a26d292fbbad8d62f54c44f059bbc595c758d70473beea51f0702945fdb57";
+/// `--no-time` shipped-objects 2-tick (M61 catalog: extra recipes).
+const IDLE_2_NO_TIME: &str = "1680453678d57b0e336439e6f9a4f52af34cec8a7abe8ada9ccf2b5bf72c4fd9";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "aacd867dfaafe7a055f194027b0849e286edc5fea24761c889a0948c14592665";
+const IDLE_2: &str = "3512dde61887c6feb81decefce29b2d1123d4ca24ac72eaedcd37a102894ccc0";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1961,4 +1961,104 @@ fn catalog_on_craft_biscuit() {
     let mut sim = Simulation::new(tiny(0x60_34)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "biscuit", &[(ItemId::Food(1), 10)]);
+}
+
+fn give_axe(sim: &mut Simulation, id: AgentId, qty: u32, wear: Vec<u32>) -> sim_core::agent::ItemId {
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    let ag = sim.agents.get_mut(&id).unwrap();
+    ag.inventory_cap = 32;
+    ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+    ag.try_add_item(axe, qty);
+    ag.tool_wear.insert(axe, wear);
+    axe
+}
+
+#[test]
+fn dawn_decays_held_axe() {
+    let mut sim = Simulation::new(tiny(0x61_11)).unwrap();
+    apply_shipped(&mut sim);
+    sim.ticks_per_day = 2;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 1, vec![0]);
+    sim.run_ticks(2);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![1])
+    );
+}
+
+#[test]
+fn eight_dawns_consume_one_axe() {
+    let mut sim = Simulation::new(tiny(0x61_12)).unwrap();
+    apply_shipped(&mut sim);
+    sim.ticks_per_day = 2;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 1, vec![0]);
+    sim.run_ticks(16);
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        0
+    );
+    assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
+}
+
+#[test]
+fn no_time_does_not_decay_held_axe() {
+    let mut sim = Simulation::new(tiny(0x61_13)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.ticks_per_day = 2;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 1, vec![0]);
+    sim.run_ticks(16);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![0])
+    );
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn dawn_decays_most_worn_axe_only() {
+    let mut sim = Simulation::new(tiny(0x61_14)).unwrap();
+    apply_shipped(&mut sim);
+    sim.ticks_per_day = 2;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![3, 0]);
+    sim.run_ticks(2);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 0])
+    );
+}
+
+#[test]
+fn catalog_on_craft_bench() {
+    let mut sim = Simulation::new(tiny(0x61_31)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "bench", &[(ItemId::Wood, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_shawl() {
+    let mut sim = Simulation::new(tiny(0x61_32)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "shawl", &[(ItemId::Fiber, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_cobble() {
+    let mut sim = Simulation::new(tiny(0x61_33)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "cobble", &[(ItemId::Stone, 14)]);
+}
+
+#[test]
+fn catalog_on_craft_cake() {
+    let mut sim = Simulation::new(tiny(0x61_34)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "cake", &[(ItemId::Food(1), 12)]);
 }
