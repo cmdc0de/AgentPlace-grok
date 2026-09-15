@@ -32,11 +32,8 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-2 | durability | M | hashed wear | per-tick decay (not dawn) |
 | RF-3 | durability | M | hashed wear | decay every instance, not just most-worn |
 | RF-4 | stations | S | catalog hash | remaining food crafts using millstone (M63 used spit) |
-| RF-5 | world | M | hashed | interiors / non-square footprints |
-| RF-6 | combat FX | S | hash-neutral | ammo / projectile FX |
 | RF-7 | browser | M | hash-neutral | sql.js / ad-hoc SQL |
 | RF-8 | attach | M | maybe PROTOCOL | Unix sockets |
-| RF-9 | PG-6 | M | hash-neutral | skeletal animation |
 | RF-10 | CI | M | hash-neutral | wasm32 on Win/mac |
 | RF-11 | PG-8 | L | likely format bump | Food/Wood as strings |
 | RF-12 | PG-11 | L | not JSON | OTLP protobuf/gRPC |
@@ -45,6 +42,9 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-15 | viewer | L | n/a | Bevy in the browser |
 | RF-16 | storage | L | n/a | replacing JSONL |
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
+| RF-18 | world | M | hashed | interiors: walls / blocked Move / doors (RF-5 this slice is non-square footprints only) |
+| RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) |
+| RF-20 | PG-6 | M | hash-neutral | walk / attack / downed action→clip pairs (RF-9 this slice is idle only) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
@@ -68,7 +68,13 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M63 is implemented. Next `/spec` picks from Open + Standing into a new `M{N}-plan.md`.
+Locked in [`M64-plan.md`](M64-plan.md) (planned, not yet implemented).
+
+| ID | Theme | Size | Hash / wire | One-liner |
+|---|---|---|---|---|
+| RF-5 | world | M | hashed | non-square W×H sleep footprints (`sleep_w` / `sleep_h`; square omit-hash) |
+| RF-6 | combat FX | S | hash-neutral | ranged Attack projectile mesh (Chebyshev > 1); melee Strike unchanged |
+| RF-9 | PG-6 | M | hash-neutral | agent glb clip `ArmatureAction.002` is **idle**; pause on Move |
 
 ---
 
