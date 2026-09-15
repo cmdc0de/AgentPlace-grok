@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `7f2d52db…`; `--no-time` shipped-objects `3170f273…`.
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `f583c391…`; `--no-time` shipped-objects `1b9117a9…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks (per-instance wear; most-worn first). Held tools also wear +1 on the most-worn instance at **dawn** (`--no-time` does not decay). Transfer and Store move the freshest wear slots with the item (crates keep a wear vec). `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft (flour → millstone; bread/stew → spit). Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral). sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks (per-instance wear; most-worn first). Held tools and **crate** contents also wear +1 on the most-worn instance at **dawn** (`--no-time` does not decay). Transfer and Store move the freshest wear slots with the item (crates keep a wear vec). `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft (flour → millstone; bread/stew/cooked_veg/jerky/biscuit/cake/dried_fish → spit). Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral). sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
 
 ### `[time]` (M52)
 
@@ -417,10 +417,10 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `hammer.toml` | item | Catalog craft 2 stone + 1 wood → 1. `[sim] stone_gather_bonus = 25`, `uses = 8`. |
 | `hoe.toml` | item | Catalog craft stone+wood → 1. `[sim] farm_bonus = 25`, `uses = 8`. |
 | `waterskin.toml` | item | Catalog craft 2 fiber → 1. |
-| `dried_fish.toml` | item | Catalog craft 1 food (`ItemId::Food(1)`) → 1. |
+| `dried_fish.toml` | item | Catalog craft 1 food (`ItemId::Food(1)`) → 1. `[sim.craft] station = "spit"`. |
 | `satchel.toml` | item | Catalog craft 2 fiber + 1 wood → 1. |
 | `rucksack.toml` | item | Catalog craft 3 fiber + 1 wood → 1. |
-| `cooked_veg.toml` | item | Catalog craft 1 food → 1. |
+| `cooked_veg.toml` | item | Catalog craft 1 food → 1. `[sim.craft] station = "spit"`. |
 | `bowl.toml` | item | Catalog craft 1 stone → 1. |
 | `club.toml` | item | Catalog craft 1 wood → 1. `[sim] attack_bonus = 300`. |
 | `pike.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] attack_bonus = 800`. |
@@ -455,19 +455,23 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `raft.toml` | item | Catalog craft 7 wood → 1. |
 | `sandals.toml` | item | Catalog craft 7 fiber → 1. |
 | `mortar.toml` | item | Catalog craft 5 stone → 1. |
-| `jerky.toml` | item | Catalog craft 4 food → 1. |
+| `jerky.toml` | item | Catalog craft 4 food → 1. `[sim.craft] station = "spit"`. |
 | `stool.toml` | item | Catalog craft 8 wood → 1. |
 | `sash.toml` | item | Catalog craft 8 fiber → 1. |
 | `brick.toml` | item | Catalog craft 6 stone → 1. |
-| `biscuit.toml` | item | Catalog craft 5 food → 1. |
+| `biscuit.toml` | item | Catalog craft 5 food → 1. `[sim.craft] station = "spit"`. |
 | `bench.toml` | item | Catalog craft 9 wood → 1. |
 | `shawl.toml` | item | Catalog craft 9 fiber → 1. |
 | `cobble.toml` | item | Catalog craft 7 stone → 1. |
-| `cake.toml` | item | Catalog craft 6 food → 1. |
+| `cake.toml` | item | Catalog craft 6 food → 1. `[sim.craft] station = "spit"`. |
 | `rack.toml` | item | Catalog craft 10 wood → 1. |
 | `wrap.toml` | item | Catalog craft 10 fiber → 1. |
 | `tile.toml` | item | Catalog craft 8 stone → 1. |
 | `pie.toml` | item | Catalog craft 7 food → 1. |
+| `pole.toml` | item | Catalog craft 11 wood → 1. |
+| `cape.toml` | item | Catalog craft 11 fiber → 1. |
+| `paver.toml` | item | Catalog craft 9 stone → 1. |
+| `tart.toml` | item | Catalog craft 8 food → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

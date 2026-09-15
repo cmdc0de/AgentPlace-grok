@@ -1,7 +1,8 @@
 # M63 — Crate dawn decay, remaining food stations, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M62 complete (`docs/M62-plan.md`, git tag `M62`, commit `e850533`)  
+**Walkthrough:** [`docs/M63-test-plan.md`](M63-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes); M62 later-table crate dawn decay + remaining food stations
 
 ## Context
@@ -88,8 +89,8 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M62 `3170f273…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M62 `7f2d52db…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `1b9117a9…` |
+| default CLI 2 ticks (time on) | hash `f583c391…` |
 | crate dawn | time on, `ticks_per_day = 2`, crate axe wear `[0]`, run 2 ticks ⇒ `[1]` |
 | 8 crate dawns | `uses = 8` consume 1 from crate |
 | `--no-time` crate | many ticks, crate wear unchanged |
@@ -133,7 +134,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M63-test-plan.md` (written on implement).
+Walkthrough: [`docs/M63-test-plan.md`](M63-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -142,7 +143,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `1b9117a9…`; default (time on) `f583c391…`; Hello v5; format_version 3 write.
 
 ## Risks
 

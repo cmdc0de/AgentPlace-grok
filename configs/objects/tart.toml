@@ -1,4 +1,4 @@
-id = "cooked_veg"
+id = "tart"
 kind = "item"
 
 [visual]
@@ -11,6 +11,5 @@ far  = "assets/models/optimized/plants_ready.glb"
 [sim]
 weight_milli = 80
 [sim.craft]
-inputs = [["food", 1]]
+inputs = [["food", 8]]
 output_qty = 1
-station = "spit"

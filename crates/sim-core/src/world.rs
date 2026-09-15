@@ -93,6 +93,46 @@ impl Container {
         v.extend(freshest_first.iter().rev().copied());
         self.clamp_tool_wear(item);
     }
+
+    /// Increment the most-worn instance; consume 1 qty when `uses` is reached.
+    pub fn wear_tool(&mut self, item: ItemId, uses: u32) {
+        if uses == 0 {
+            return;
+        }
+        let qty = self.items.get(&item).copied().unwrap_or(0) as usize;
+        if qty == 0 {
+            self.tool_wear.remove(&item);
+            return;
+        }
+        let v = self.tool_wear.entry(item).or_default();
+        while v.len() < qty {
+            v.push(0);
+        }
+        while v.len() > qty {
+            v.pop();
+        }
+        let mut idx = 0usize;
+        let mut max = v[0];
+        for (i, w) in v.iter().enumerate() {
+            if *w > max {
+                max = *w;
+                idx = i;
+            }
+        }
+        v[idx] = v[idx].saturating_add(1);
+        if v[idx] >= uses {
+            v.remove(idx);
+            if v.is_empty() {
+                self.tool_wear.remove(&item);
+            }
+            if let Some(have) = self.items.get_mut(&item) {
+                *have = have.saturating_sub(1);
+                if *have == 0 {
+                    self.items.remove(&item);
+                }
+            }
+        }
+    }
 }
 
 /// Expected resource cells per 1000 map cells at density 1.0.

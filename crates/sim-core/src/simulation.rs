@@ -1183,6 +1183,26 @@ impl Simulation {
                 crate::objects::wear_tool(a, item, uses);
             }
         }
+        let crate_decay: Vec<((u32, u32), crate::agent::ItemId, u32)> = self
+            .world
+            .stockpiles
+            .iter()
+            .flat_map(|(&(x, y), c)| {
+                catalog.iter().filter_map(move |e| {
+                    if e.uses > 0 && c.items.get(&e.item).copied().unwrap_or(0) > 0 {
+                        Some(((x, y), e.item, e.uses))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+        for ((x, y), item, uses) in crate_decay {
+            if let Some(c) = self.world.stockpiles.get_mut(&(x, y)) {
+                c.wear_tool(item, uses);
+            }
+        }
+        self.world.stockpiles.retain(|_, c| !c.is_empty());
     }
 
     fn reap_dead(&mut self) {
