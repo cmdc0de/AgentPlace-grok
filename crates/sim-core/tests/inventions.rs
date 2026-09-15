@@ -5,7 +5,8 @@ use sim_core::action::PrimaryAction;
 use sim_core::agent::ItemId;
 use sim_core::event_log::SimEventKind;
 use sim_core::inventions::{
-    InventionsParams, apply_move_cost, apply_sense_range, invent_chance, inventor_influence,
+    InventionsParams, apply_move_cost, apply_rest_regen, apply_sense_range, craft_skill_bonus,
+    invent_chance, inventor_influence,
 };
 use sim_core::observation::legal_actions;
 use sim_core::{AgentId, ExperimentConfig, InventionKind, Simulation};
@@ -367,17 +368,25 @@ fn execute_invent_move_then_sense() {
 }
 
 #[test]
-fn fourth_invent_waits_all_kinds_present() {
+fn sixth_invent_waits_all_kinds_present() {
     let mut sim = Simulation::new(tiny(0x37_02)).unwrap();
     sim.enable_inventions(8);
     let a = AgentId(0);
     force_invent(&mut sim, a);
     force_invent_kind(&mut sim, a, InventionKind::MoveBonus);
     force_invent_kind(&mut sim, a, InventionKind::SenseBonus);
-    assert_eq!(sim.inventions.len(), 3);
+    force_invent_kind(&mut sim, a, InventionKind::CraftBonus);
+    force_invent_kind(&mut sim, a, InventionKind::RestBonus);
+    assert_eq!(sim.inventions.len(), 5);
+    assert_eq!(craft_skill_bonus(&sim.inventions, a), 15);
+    let regen = sim.config.energy_regen_milli();
+    assert_eq!(
+        apply_rest_regen(regen, &sim.inventions, a),
+        (regen * 1200 / 1000).max(1)
+    );
     let n_events = sim.events.events.len();
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Invent);
-    assert_eq!(sim.inventions.len(), 3);
+    assert_eq!(sim.inventions.len(), 5);
     assert!(
         sim.events.events[n_events..]
             .iter()
@@ -385,6 +394,24 @@ fn fourth_invent_waits_all_kinds_present() {
     );
     let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
     assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+}
+
+#[test]
+fn fourth_invent_is_craft_bonus() {
+    let mut sim = Simulation::new(tiny(0x59_01)).unwrap();
+    sim.enable_inventions(8);
+    let a = AgentId(0);
+    force_invent(&mut sim, a);
+    force_invent_kind(&mut sim, a, InventionKind::MoveBonus);
+    force_invent_kind(&mut sim, a, InventionKind::SenseBonus);
+    force_invent_kind(&mut sim, a, InventionKind::CraftBonus);
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::CraftBonus)
+    );
+    assert_eq!(craft_skill_bonus(&sim.inventions, a), 15);
+    assert_eq!(craft_skill_bonus(&sim.inventions, AgentId(1)), 0);
 }
 
 #[test]
@@ -426,6 +453,59 @@ fn tree_blocks_move_until_gather_shared() {
         sim.inventions
             .values()
             .any(|i| i.kind == InventionKind::MoveBonus)
+    );
+}
+
+#[test]
+fn tree_blocks_craft_until_sense_shared() {
+    let mut sim = Simulation::new(tiny(0x59_02)).unwrap();
+    sim.enable_inventions(1);
+    sim.invention_tree = true;
+    let a = AgentId(0);
+    force_invent(&mut sim, a);
+    let g = sim
+        .inventions
+        .values()
+        .find(|i| i.kind == InventionKind::GatherBonus)
+        .unwrap()
+        .tick;
+    while sim.tick < g.saturating_add(1) {
+        sim.tick();
+    }
+    force_invent_kind(&mut sim, a, InventionKind::MoveBonus);
+    let m = sim
+        .inventions
+        .values()
+        .find(|i| i.kind == InventionKind::MoveBonus)
+        .unwrap()
+        .tick;
+    while sim.tick < m.saturating_add(1) {
+        sim.tick();
+    }
+    force_invent_kind(&mut sim, a, InventionKind::SenseBonus);
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::SenseBonus && !i.shared)
+    );
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+    let s = sim
+        .inventions
+        .values()
+        .find(|i| i.kind == InventionKind::SenseBonus)
+        .unwrap()
+        .tick;
+    while sim.tick < s.saturating_add(1) {
+        sim.tick();
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(legal.iter().any(|x| matches!(x, PrimaryAction::Invent)));
+    force_invent_kind(&mut sim, a, InventionKind::CraftBonus);
+    assert!(
+        sim.inventions
+            .values()
+            .any(|i| i.kind == InventionKind::CraftBonus)
     );
 }
 

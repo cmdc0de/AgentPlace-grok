@@ -1,0 +1,15 @@
+id = "mortar"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/stones_and_grass.glb"
+[visual.lod]
+near = "assets/models/optimized/stones_and_grass.glb"
+mid  = "assets/models/optimized/stones_and_grass.glb"
+far  = "assets/models/optimized/stones_and_grass.glb"
+
+[sim]
+weight_milli = 250
+[sim.craft]
+inputs = [["stone", 5]]
+output_qty = 1

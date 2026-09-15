@@ -988,7 +988,11 @@ fn pickup(sim: &mut Simulation, id: AgentId) {
 }
 
 fn rest(sim: &mut Simulation, id: AgentId) {
-    let regen = sim.config.energy_regen_milli();
+    let regen = crate::inventions::apply_rest_regen(
+        sim.config.energy_regen_milli(),
+        &sim.inventions,
+        id,
+    );
     let base = sim.config.energy_max_milli();
     if let Some(a) = sim.agents.get_mut(&id) {
         let max = a.sheet.energy_max(base);
@@ -1551,7 +1555,7 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
         skill_roll(
             rng,
             agent.abilities.craft,
-            0,
+            crate::inventions::craft_skill_bonus(&sim.inventions, id),
             agent.illness_ticks > 0,
             agent.needs.hunger,
             agent.needs.thirst,

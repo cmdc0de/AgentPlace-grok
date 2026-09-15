@@ -149,9 +149,9 @@ pub struct Agent {
     /// Culture id. 0 = unused; packed in the board blob. Not hashed at 0.
     #[serde(default, skip)]
     pub culture: u8,
-    /// Successful tool bonus-uses since last break. Packed in the board blob.
+    /// Per-instance wear counts (0 = fresh). Packed in the board blob.
     #[serde(default, skip)]
-    pub tool_uses: BTreeMap<ItemId, u32>,
+    pub tool_wear: BTreeMap<ItemId, Vec<u32>>,
 }
 
 impl Default for Needs {
@@ -199,7 +199,7 @@ impl Agent {
             kinship: crate::kinship::Kinship::default(),
             age_ticks: 0,
             culture: 0,
-            tool_uses: BTreeMap::new(),
+            tool_wear: BTreeMap::new(),
         }
     }
 
@@ -348,6 +348,24 @@ impl Agent {
         add
     }
 
+    pub fn held_qty(&self, item: ItemId) -> u32 {
+        self.inventory.get(&item).copied().unwrap_or(0)
+            + self.pack.get(&item).copied().unwrap_or(0)
+    }
+
+    /// Drop freshest wear slots so `tool_wear[item].len() <= held qty`.
+    pub fn clamp_tool_wear(&mut self, item: ItemId) {
+        let qty = self.held_qty(item) as usize;
+        if let Some(v) = self.tool_wear.get_mut(&item) {
+            while v.len() > qty {
+                v.pop();
+            }
+            if v.is_empty() {
+                self.tool_wear.remove(&item);
+            }
+        }
+    }
+
     pub fn take_pack(&mut self, item: ItemId, qty: u32) -> bool {
         let Some(have) = self.pack.get_mut(&item) else {
             return false;
@@ -359,6 +377,7 @@ impl Agent {
         if *have == 0 {
             self.pack.remove(&item);
         }
+        self.clamp_tool_wear(item);
         true
     }
 
@@ -467,6 +486,7 @@ impl Agent {
         if *have == 0 {
             self.inventory.remove(&item);
         }
+        self.clamp_tool_wear(item);
         true
     }
 
@@ -550,10 +570,13 @@ impl Agent {
         if self.culture != 0 {
             hasher.update([self.culture]);
         }
-        if !self.tool_uses.is_empty() {
-            for (item, n) in &self.tool_uses {
+        if !self.tool_wear.is_empty() {
+            for (item, wears) in &self.tool_wear {
                 hash_item_id(hasher, *item, catalog_slugs);
-                hasher.update(n.to_le_bytes());
+                hasher.update((wears.len() as u32).to_le_bytes());
+                for n in wears {
+                    hasher.update(n.to_le_bytes());
+                }
             }
         }
     }

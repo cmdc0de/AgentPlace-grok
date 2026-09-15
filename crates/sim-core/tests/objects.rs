@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M58 catalog: uses/station + recipes).
-const IDLE_2_NO_TIME: &str = "b4e1eac7b6dd3b9f368f1d5268c61c789f9fb582e183dc1acf47743456a52475";
+/// `--no-time` shipped-objects 2-tick (M59 catalog: extra recipes).
+const IDLE_2_NO_TIME: &str = "936b663208c4e735d6691fcdda56511f1bd1f92b0173d4f072c1fbdcae23e6bb";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "aad2121fe9cd21eae365114d05bf50d978d07f131a95a8d199471ae50e565bec";
+const IDLE_2: &str = "7604969585a15ae5ae2427a6cd2a975b08133244a9acea4db45c41f659c73bb2";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1560,7 +1560,12 @@ fn axe_breaks_after_8_successful_gathers() {
                 sim_core::event_log::SimEventKind::Gather { species, qty, .. }
                     if species == tag && qty > 0
             )
-        }) || sim.agents[&id].tool_uses.get(&axe).copied().unwrap_or(0) > ok
+        }) || sim.agents[&id]
+            .tool_wear
+            .get(&axe)
+            .and_then(|v| v.iter().copied().max())
+            .unwrap_or(0)
+            > ok
             || sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0) < before
         {
             ok += 1;
@@ -1668,17 +1673,108 @@ fn catalog_on_craft_table() {
 }
 
 #[test]
-fn load_restores_tool_uses() {
+fn load_restores_tool_wear() {
     let mut sim = Simulation::new(tiny(0x58_23)).unwrap();
     apply_shipped(&mut sim);
     let id = AgentId(0);
     let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
     sim.agents.get_mut(&id).unwrap().try_add_item(axe, 1);
-    sim.agents.get_mut(&id).unwrap().tool_uses.insert(axe, 3);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .tool_wear
+        .insert(axe, vec![3]);
     let bytes = sim.encode_checkpoint().unwrap();
     let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
     assert_eq!(
-        loaded.agents[&id].tool_uses.get(&axe).copied(),
-        Some(3)
+        loaded.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![3])
     );
+}
+
+#[test]
+fn two_axes_wear_separately() {
+    let mut sim = Simulation::new(tiny(0x59_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.abilities.gather = 100;
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.inventory_cap = 32;
+        a.try_add_item(axe, 2);
+    }
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    let mut ok = 0u32;
+    for _ in 0..400 {
+        sim.world.set_vegetation(vx, vy, tag);
+        let qty_before = sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0);
+        let wear_before = sim.agents[&id]
+            .tool_wear
+            .get(&axe)
+            .and_then(|v| v.iter().copied().max())
+            .unwrap_or(0);
+        sim_core::execute::execute_primary(
+            &mut sim,
+            id,
+            &PrimaryAction::Gather { species: tag },
+        );
+        let qty = sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0);
+        let wear_max = sim.agents[&id]
+            .tool_wear
+            .get(&axe)
+            .and_then(|v| v.iter().copied().max())
+            .unwrap_or(0);
+        if qty < qty_before || wear_max > wear_before {
+            ok += 1;
+        }
+        if qty == 1 && ok >= 8 {
+            break;
+        }
+    }
+    assert!(ok >= 8, "need 8 successful gathers, got {ok}");
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        1,
+        "one axe remains"
+    );
+    let leftover = sim.agents[&id]
+        .tool_wear
+        .get(&axe)
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        leftover.iter().all(|&w| w == 0) || leftover.is_empty(),
+        "remaining axe is fresh, got {leftover:?}"
+    );
+}
+
+#[test]
+fn catalog_on_craft_raft() {
+    let mut sim = Simulation::new(tiny(0x59_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "raft", &[(ItemId::Wood, 14)]);
+}
+
+#[test]
+fn catalog_on_craft_sandals() {
+    let mut sim = Simulation::new(tiny(0x59_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "sandals", &[(ItemId::Fiber, 14)]);
+}
+
+#[test]
+fn catalog_on_craft_mortar() {
+    let mut sim = Simulation::new(tiny(0x59_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "mortar", &[(ItemId::Stone, 10)]);
+}
+
+#[test]
+fn catalog_on_craft_jerky() {
+    let mut sim = Simulation::new(tiny(0x59_14)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "jerky", &[(ItemId::Food(1), 8)]);
 }

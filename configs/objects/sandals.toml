@@ -1,0 +1,15 @@
+id = "sandals"
+kind = "item"
+
+[visual]
+glb = "assets/models/optimized/low_poly_cloth.glb"
+[visual.lod]
+near = "assets/models/optimized/low_poly_cloth.glb"
+mid  = "assets/models/optimized/low_poly_cloth.glb"
+far  = "assets/models/optimized/low_poly_cloth.glb"
+
+[sim]
+weight_milli = 40
+[sim.craft]
+inputs = [["fiber", 7]]
+output_qty = 1

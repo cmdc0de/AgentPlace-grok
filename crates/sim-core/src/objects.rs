@@ -546,10 +546,10 @@ pub fn remap_catalog_holdings(
             .iter()
             .map(|(item, qty)| (remap_catalog_item(*item, old_slugs, entries), *qty))
             .collect();
-        a.tool_uses = a
-            .tool_uses
+        a.tool_wear = a
+            .tool_wear
             .iter()
-            .map(|(item, n)| (remap_catalog_item(*item, old_slugs, entries), *n))
+            .map(|(item, n)| (remap_catalog_item(*item, old_slugs, entries), n.clone()))
             .collect();
     }
     for e in events.iter_mut() {
@@ -808,15 +808,37 @@ pub fn max_held_bonus_item(
         .map(|e| e.item)
 }
 
-/// Increment uses; consume 1 qty when `uses` is reached. `uses = 0` is a no-op.
+/// Increment the most-worn instance; consume 1 qty when `uses` is reached.
 pub fn wear_tool(agent: &mut Agent, item: ItemId, uses: u32) {
     if uses == 0 {
         return;
     }
-    let n = agent.tool_uses.entry(item).or_insert(0);
-    *n = n.saturating_add(1);
-    if *n >= uses {
-        agent.tool_uses.remove(&item);
+    let qty = agent.held_qty(item) as usize;
+    if qty == 0 {
+        agent.tool_wear.remove(&item);
+        return;
+    }
+    let v = agent.tool_wear.entry(item).or_default();
+    while v.len() < qty {
+        v.push(0);
+    }
+    while v.len() > qty {
+        v.pop();
+    }
+    let mut idx = 0usize;
+    let mut max = v[0];
+    for (i, w) in v.iter().enumerate() {
+        if *w > max {
+            max = *w;
+            idx = i;
+        }
+    }
+    v[idx] = v[idx].saturating_add(1);
+    if v[idx] >= uses {
+        v.remove(idx);
+        if v.is_empty() {
+            agent.tool_wear.remove(&item);
+        }
         if !agent.take_item(item, 1) {
             let _ = agent.take_pack(item, 1);
         }

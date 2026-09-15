@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 pub const GATHER_BONUS_MILLI: u32 = 1200;
 pub const MOVE_BONUS_MILLI: u32 = 800;
 pub const SENSE_BONUS_CELLS: u32 = 1;
+pub const CRAFT_BONUS: i32 = 15;
+pub const REST_BONUS_MILLI: u32 = 1200;
 pub const INVENTOR_INFLUENCE: u32 = 200;
 pub const INVENT_BASE_CHANCE: i32 = 400;
 pub const INVENT_INT_CHANCE: i32 = 50;
@@ -18,13 +20,17 @@ pub enum InventionKind {
     GatherBonus = 0,
     MoveBonus = 1,
     SenseBonus = 2,
+    CraftBonus = 3,
+    RestBonus = 4,
 }
 
 impl InventionKind {
-    pub const ALL: [InventionKind; 3] = [
+    pub const ALL: [InventionKind; 5] = [
         InventionKind::GatherBonus,
         InventionKind::MoveBonus,
         InventionKind::SenseBonus,
+        InventionKind::CraftBonus,
+        InventionKind::RestBonus,
     ];
 
     pub fn slug(self) -> &'static str {
@@ -32,6 +38,8 @@ impl InventionKind {
             InventionKind::GatherBonus => "gather_bonus",
             InventionKind::MoveBonus => "move_bonus",
             InventionKind::SenseBonus => "sense_bonus",
+            InventionKind::CraftBonus => "craft_bonus",
+            InventionKind::RestBonus => "rest_bonus",
         }
     }
 
@@ -158,6 +166,26 @@ pub fn apply_sense_range(range: u32, table: &BTreeMap<u64, Invention>, id: Agent
     } else {
         range
     }
+}
+
+/// Craft skill_roll bonus after CraftBonus. No stack.
+pub fn craft_skill_bonus(table: &BTreeMap<u64, Invention>, id: AgentId) -> i32 {
+    if entitled(table, id, InventionKind::CraftBonus) {
+        CRAFT_BONUS
+    } else {
+        0
+    }
+}
+
+/// Rest energy regen after RestBonus. Zero stays 0. No stack.
+pub fn apply_rest_regen(regen: u32, table: &BTreeMap<u64, Invention>, id: AgentId) -> u32 {
+    if regen == 0 {
+        return 0;
+    }
+    if !entitled(table, id, InventionKind::RestBonus) {
+        return regen;
+    }
+    (regen * REST_BONUS_MILLI / 1000).max(1)
 }
 
 pub fn observation_lines(table: &BTreeMap<u64, Invention>, id: AgentId) -> Vec<String> {

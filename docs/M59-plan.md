@@ -1,7 +1,8 @@
 # M59 — Extra invention kinds, per-instance tool wear, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M58 complete (`docs/M58-plan.md`, git tag `M58`, commit `56d996f`)  
+**Walkthrough:** [`docs/M59-test-plan.md`](M59-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-5 leftover kinds, PG-9 recipes); M58 later-table per-instance durability stacks
 
 ## Context
@@ -87,8 +88,8 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M58 `b4e1eac7…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M58 `aad2121f…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `936b6632…` |
+| default CLI 2 ticks (time on) | hash `76049695…` |
 | inventions off | Invent illegal; empty table; same hash as no flag |
 | CraftBonus / RestBonus | fourth Invent is CraftBonus (+15 craft); fifth RestBonus (1.2× regen); sixth Waits |
 | tree | CraftBonus blocked until SenseBonus shared |
@@ -131,7 +132,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M59-test-plan.md` (written on implement).
+Walkthrough: [`docs/M59-test-plan.md`](M59-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -140,7 +141,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `936b6632…`; default (time on) `76049695…`; Hello v5; format_version 3 write.
 
 ## Risks
 
