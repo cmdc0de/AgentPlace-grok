@@ -922,7 +922,11 @@ fn place(sim: &mut Simulation, id: AgentId, item: crate::agent::ItemId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    sim.world.sleep_places.insert((x, y), item);
+    if crate::objects::station_entry(&sim.catalog, item).is_some() {
+        sim.world.work_places.insert((x, y), item);
+    } else {
+        sim.world.sleep_places.insert((x, y), item);
+    }
     push(
         sim,
         id,
@@ -934,23 +938,41 @@ fn pickup(sim: &mut Simulation, id: AgentId) {
     let Some(agent) = sim.agents.get(&id) else {
         return;
     };
-    let Some(((ox, oy), item)) =
-        crate::objects::sleep_origin_at(&sim.world, &sim.catalog, agent.x, agent.y)
-    else {
+    let sleep = crate::objects::sleep_origin_at(&sim.world, &sim.catalog, agent.x, agent.y);
+    let work = crate::objects::work_origin_at(&sim.world, agent.x, agent.y);
+    let Some(((ox, oy), item)) = sleep.or(work) else {
         push(sim, id, SimEventKind::Wait);
         return;
     };
+    let is_work = sleep.is_none();
     if !crate::objects::can_stow_one(agent, item, &sim.storage) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    sim.world.sleep_places.remove(&(ox, oy));
-    let Some(a) = sim.agents.get_mut(&id) else {
-        sim.world.sleep_places.insert((ox, oy), item);
+    if is_work {
+        sim.world.work_places.remove(&(ox, oy));
+    } else {
+        sim.world.sleep_places.remove(&(ox, oy));
+    }
+    let params = sim.storage;
+    let stowed = sim
+        .agents
+        .get_mut(&id)
+        .map(|a| a.add_to_pockets_or_pack(item, 1, &params));
+    let Some(n) = stowed else {
+        if is_work {
+            sim.world.work_places.insert((ox, oy), item);
+        } else {
+            sim.world.sleep_places.insert((ox, oy), item);
+        }
         return;
     };
-    if a.add_to_pockets_or_pack(item, 1, &sim.storage) < 1 {
-        sim.world.sleep_places.insert((ox, oy), item);
+    if n < 1 {
+        if is_work {
+            sim.world.work_places.insert((ox, oy), item);
+        } else {
+            sim.world.sleep_places.insert((ox, oy), item);
+        }
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -1108,6 +1130,13 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
             a.gathers_this_tick = a.gathers_this_tick.saturating_add(1);
         }
     }
+    if let Some((item, uses)) =
+        crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.gather_bonus)
+    {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            crate::objects::wear_tool(a, item, uses);
+        }
+    }
     remember_obs(sim, id, species, x, y);
     push(
         sim,
@@ -1153,6 +1182,15 @@ fn gather_stone(sim: &mut Simulation, id: AgentId) {
         let i = (y * sim.world.width + x) as usize;
         if i < sim.world.minerals.len() {
             sim.world.minerals[i] = 0;
+        }
+        if let Some((item, uses)) = crate::objects::held_wear_item(
+            &agent,
+            &sim.catalog,
+            |e| e.stone_gather_bonus,
+        ) {
+            if let Some(a) = sim.agents.get_mut(&id) {
+                crate::objects::wear_tool(a, item, uses);
+            }
         }
     }
     push(
@@ -1395,6 +1433,13 @@ fn fish(sim: &mut Simulation, id: AgentId) {
         if let Some(a) = sim.agents.get_mut(&id) {
             let _ = a.add_to_pockets_or_pack(ItemId::Food(101), 1, &params);
         }
+        if let Some((item, uses)) =
+            crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.fish_bonus)
+        {
+            if let Some(a) = sim.agents.get_mut(&id) {
+                crate::objects::wear_tool(a, item, uses);
+            }
+        }
     }
     push(sim, id, SimEventKind::Fish { success: ok });
 }
@@ -1444,6 +1489,13 @@ fn farm(sim: &mut Simulation, id: AgentId, species: u8) {
             planted_tick: sim.tick,
         },
     );
+    if let Some((item, uses)) =
+        crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.farm_bonus)
+    {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            crate::objects::wear_tool(a, item, uses);
+        }
+    }
     push(sim, id, SimEventKind::Farm { species, x, y });
 }
 
@@ -1462,6 +1514,23 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
         );
         return;
     };
+    if !crate::objects::craft_station_ok(
+        &sim.world,
+        &sim.catalog,
+        agent.x,
+        agent.y,
+        recipe,
+    ) {
+        push(
+            sim,
+            id,
+            SimEventKind::Craft {
+                recipe,
+                success: false,
+            },
+        );
+        return;
+    }
     let has_all = need
         .iter()
         .all(|(item, n)| agent.inventory.get(item).copied().unwrap_or(0) >= *n);

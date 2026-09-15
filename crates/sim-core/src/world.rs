@@ -82,6 +82,9 @@ pub struct World {
     /// Sleep structure origins (min x,y). Size comes from the catalog. `#[serde(default)]`.
     #[serde(default)]
     pub sleep_places: BTreeMap<(u32, u32), ItemId>,
+    /// Workstation origins (1×1). `#[serde(default)]`.
+    #[serde(default)]
+    pub work_places: BTreeMap<(u32, u32), ItemId>,
 }
 
 impl World {
@@ -138,6 +141,7 @@ impl World {
             crops: BTreeMap::new(),
             stockpiles: BTreeMap::new(),
             sleep_places: BTreeMap::new(),
+            work_places: BTreeMap::new(),
         }
     }
 
@@ -266,6 +270,11 @@ impl World {
             }
         }
         for ((x, y), item) in &self.sleep_places {
+            hasher.update(x.to_le_bytes());
+            hasher.update(y.to_le_bytes());
+            hasher.update(format!("{item:?}").as_bytes());
+        }
+        for ((x, y), item) in &self.work_places {
             hasher.update(x.to_le_bytes());
             hasher.update(y.to_le_bytes());
             hasher.update(format!("{item:?}").as_bytes());

@@ -1,7 +1,8 @@
 # M58 — Tool durability + millstone station, viewer-frame OTLP, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M57 complete (`docs/M57-plan.md`, git tag `M57`, commit `f35b302`)  
+**Walkthrough:** [`docs/M58-test-plan.md`](M58-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes, PG-11 leftover viewer-frame OTLP); M57 later-table durability / workstations
 
 ## Context
@@ -103,8 +104,8 @@ No tool-use bonuses / `uses` / `station` on these four except flour’s craft-st
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M57 `e2848016…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M57 `35c79482…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `b4e1eac7…` |
+| default CLI 2 ticks (time on) | hash `aad2121f…` |
 | catalog-off | axe/hammer never break; millstone Place illegal; flour Craft illegal |
 | axe `uses = 8` | 8 successful veg Gathers consume 1 axe; 7 do not |
 | millstone Place / Pickup | 1×1 land; overlap with tent illegal; Pickup returns it |
@@ -147,7 +148,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M58-test-plan.md` (written on implement).
+Walkthrough: [`docs/M58-test-plan.md`](M58-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -156,7 +157,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `b4e1eac7…`; default (time on) `aad2121f…`; Hello v5; format_version 3 write.
 
 ## Risks
 

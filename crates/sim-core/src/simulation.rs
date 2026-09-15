@@ -355,6 +355,7 @@ impl Simulation {
                 &mut self.agents,
                 &mut self.events.events,
                 &mut self.world.sleep_places,
+                &mut self.world.work_places,
                 &self.ckpt_catalog_slugs,
                 &entries,
             );

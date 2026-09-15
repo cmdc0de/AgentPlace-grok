@@ -117,6 +117,12 @@ pub struct SimDef {
     /// Added to stone Gather skill_roll bonus when held. Omit = 0.
     #[serde(default)]
     pub stone_gather_bonus: Option<u32>,
+    /// Successful bonus-uses until one qty is consumed. Omit = 0 (never breaks).
+    #[serde(default)]
+    pub uses: Option<u32>,
+    /// Place-able 1×1 workstation (not a sleep place). Omit = false.
+    #[serde(default)]
+    pub station: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -125,6 +131,9 @@ pub struct CraftDef {
     pub inputs: Vec<(String, u32)>,
     #[serde(default)]
     pub output_qty: Option<u32>,
+    /// Slug of a placed station required for this craft. Omit = none.
+    #[serde(default)]
+    pub station: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -143,6 +152,9 @@ pub struct CatalogEntry {
     pub fish_bonus: u32,
     pub gather_bonus: u32,
     pub stone_gather_bonus: u32,
+    pub uses: u32,
+    pub station: bool,
+    pub craft_station: String,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -359,7 +371,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 let i = extra.iter().position(|s| s == &d.id).unwrap_or(0);
                 ItemId::Catalog(i as u16)
             });
-            let (inputs, output_qty, has_craft) = if let Some(c) = &sim.craft {
+            let (inputs, output_qty, has_craft, craft_station) = if let Some(c) = &sim.craft {
                 let ins = c
                     .inputs
                     .iter()
@@ -367,9 +379,14 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                         parse_catalog_item(s, &extra).map(|item| (item, (*n).max(1)))
                     })
                     .collect();
-                (ins, c.output_qty.unwrap_or(1).max(1), true)
+                (
+                    ins,
+                    c.output_qty.unwrap_or(1).max(1),
+                    true,
+                    c.station.clone().unwrap_or_default(),
+                )
             } else {
-                (Vec::new(), 1, false)
+                (Vec::new(), 1, false, String::new())
             };
             let recipe = if has_craft && !inputs.is_empty() {
                 builtin_recipe(&d.id).or_else(|| match item {
@@ -394,6 +411,9 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 fish_bonus: sim.fish_bonus.unwrap_or(0),
                 gather_bonus: sim.gather_bonus.unwrap_or(0),
                 stone_gather_bonus: sim.stone_gather_bonus.unwrap_or(0),
+                uses: sim.uses.unwrap_or(0),
+                station: sim.station.unwrap_or(false),
+                craft_station,
             }
         })
         .collect()
@@ -510,6 +530,7 @@ pub fn remap_catalog_holdings(
     agents: &mut std::collections::BTreeMap<AgentId, Agent>,
     events: &mut [SimEvent],
     sleep_places: &mut std::collections::BTreeMap<(u32, u32), ItemId>,
+    work_places: &mut std::collections::BTreeMap<(u32, u32), ItemId>,
     old_slugs: &[String],
     entries: &[CatalogEntry],
 ) {
@@ -524,6 +545,11 @@ pub fn remap_catalog_holdings(
             .pack
             .iter()
             .map(|(item, qty)| (remap_catalog_item(*item, old_slugs, entries), *qty))
+            .collect();
+        a.tool_uses = a
+            .tool_uses
+            .iter()
+            .map(|(item, n)| (remap_catalog_item(*item, old_slugs, entries), *n))
             .collect();
     }
     for e in events.iter_mut() {
@@ -551,6 +577,11 @@ pub fn remap_catalog_holdings(
         .map(|(&(x, y), &item)| ((x, y), remap_catalog_item(item, old_slugs, entries)))
         .collect();
     *sleep_places = remapped;
+    let remapped_w: std::collections::BTreeMap<_, _> = work_places
+        .iter()
+        .map(|(&(x, y), &item)| ((x, y), remap_catalog_item(item, old_slugs, entries)))
+        .collect();
+    *work_places = remapped_w;
 }
 
 /// Max `[sim] attack_bonus` among items in pockets or pack. 0 if none.
@@ -708,6 +739,100 @@ pub fn sleep_bonus_at(world: &crate::world::World, catalog: &[CatalogEntry], x: 
         .unwrap_or(0)
 }
 
+pub fn station_entry(catalog: &[CatalogEntry], item: ItemId) -> Option<&CatalogEntry> {
+    catalog.iter().find(|e| e.item == item && e.station)
+}
+
+pub fn work_origin_at(
+    world: &crate::world::World,
+    x: u32,
+    y: u32,
+) -> Option<((u32, u32), ItemId)> {
+    world
+        .work_places
+        .get(&(x, y))
+        .map(|&item| ((x, y), item))
+}
+
+pub fn work_covers(world: &crate::world::World, x: u32, y: u32) -> bool {
+    world.work_places.contains_key(&(x, y))
+}
+
+/// Craft with `[sim.craft] station` is legal only Chebyshev ≤1 of a placed station slug.
+pub fn craft_station_ok(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    x: u32,
+    y: u32,
+    recipe: crate::action::Recipe,
+) -> bool {
+    let Some(entry) = catalog.iter().find(|e| e.recipe == Some(recipe)) else {
+        return true;
+    };
+    if entry.craft_station.is_empty() {
+        return true;
+    }
+    near_placed_station(world, catalog, x, y, &entry.craft_station)
+}
+
+pub fn near_placed_station(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    x: u32,
+    y: u32,
+    slug: &str,
+) -> bool {
+    for (&(ox, oy), &item) in &world.work_places {
+        let Some(e) = catalog.iter().find(|e| e.item == item) else {
+            continue;
+        };
+        if e.slug != slug {
+            continue;
+        }
+        if x.abs_diff(ox).max(y.abs_diff(oy)) <= 1 {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn max_held_bonus_item(
+    agent: &Agent,
+    catalog: &[CatalogEntry],
+    bonus: impl Fn(&CatalogEntry) -> u32,
+) -> Option<ItemId> {
+    catalog
+        .iter()
+        .filter(|e| bonus(e) > 0 && holds(agent, e.item))
+        .max_by_key(|e| bonus(e))
+        .map(|e| e.item)
+}
+
+/// Increment uses; consume 1 qty when `uses` is reached. `uses = 0` is a no-op.
+pub fn wear_tool(agent: &mut Agent, item: ItemId, uses: u32) {
+    if uses == 0 {
+        return;
+    }
+    let n = agent.tool_uses.entry(item).or_insert(0);
+    *n = n.saturating_add(1);
+    if *n >= uses {
+        agent.tool_uses.remove(&item);
+        if !agent.take_item(item, 1) {
+            let _ = agent.take_pack(item, 1);
+        }
+    }
+}
+
+pub fn held_wear_item(
+    agent: &Agent,
+    catalog: &[CatalogEntry],
+    bonus: impl Fn(&CatalogEntry) -> u32,
+) -> Option<(ItemId, u32)> {
+    let item = max_held_bonus_item(agent, catalog, bonus)?;
+    let uses = catalog.iter().find(|e| e.item == item)?.uses;
+    Some((item, uses))
+}
+
 pub fn can_place(
     world: &crate::world::World,
     catalog: &[CatalogEntry],
@@ -715,10 +840,23 @@ pub fn can_place(
     oy: u32,
     item: ItemId,
 ) -> bool {
-    let Some(entry) = sleep_entry(catalog, item) else {
-        return false;
-    };
-    let n = entry.sleep_size;
+    if let Some(entry) = sleep_entry(catalog, item) {
+        let n = entry.sleep_size;
+        return footprint_free(world, catalog, ox, oy, n);
+    }
+    if station_entry(catalog, item).is_some() {
+        return footprint_free(world, catalog, ox, oy, 1);
+    }
+    false
+}
+
+fn footprint_free(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    ox: u32,
+    oy: u32,
+    n: u32,
+) -> bool {
     for dy in 0..n {
         for dx in 0..n {
             let x = match ox.checked_add(dx) {
@@ -736,6 +874,9 @@ pub fn can_place(
                 return false;
             }
             if sleep_covers(world, catalog, x, y).is_some() {
+                return false;
+            }
+            if work_covers(world, x, y) {
                 return false;
             }
         }
@@ -760,6 +901,10 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.fish_bonus.to_le_bytes());
         hasher.update(e.gather_bonus.to_le_bytes());
         hasher.update(e.stone_gather_bonus.to_le_bytes());
+        hasher.update(e.uses.to_le_bytes());
+        hasher.update([u8::from(e.station)]);
+        hasher.update(e.craft_station.as_bytes());
+        hasher.update([0]);
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {
             crate::event_log::hash_item(hasher, *item);

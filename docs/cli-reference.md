@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `e2848016…` (M57 hammer stone-gather + recipes). Default (time on) shipped-objects is `35c79482…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `b4e1eac7…` (M58 uses/station + recipes). Default (time on) shipped-objects is `aad2121f…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -98,12 +98,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=35c79482…
+# final_hash=aad2121f…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=e2848016…
+# final_hash=b4e1eac7…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N). Spear/sling/bow have Attack range. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds. Native viewer registers Draco glTF decode. `--telemetry` records process CPU + disk next to RSS.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone 1×1 station. Spear/sling/bow have Attack range. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses. Flour Craft needs a placed millstone. Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -141,6 +141,7 @@ cargo run -p viewer -- --load checkpoints/….ckpt
 | `--catalog` | off | Enable catalog hashing the same as sim-cli `--catalog`. |
 | `--time` / `--no-time` | clock on | Same as sim-cli. `--no-time` on `--config` / `--load` / `--connect`. |
 | `--width N` / `--height N` | TOML | In-process `--config` only. Ignored with `--load` / `--connect`. 32..=256. |
+| `--otlp-endpoint URL` | off | POST last frame ns as OTLP/JSON `agentplace.viewer.frame_ns` (`service.name=agentplace-viewer`). Hash-neutral. In-process and `--connect`. |
 
 There is no viewer `--listen`, `--start-paused`, or `--pipeline-events`. Put those on `sim-cli`, or in the experiment overlay when the viewer **hosts** the sim (`--config`).
 
@@ -193,7 +194,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `35c79482…`. `--no-time` shipped-objects is `e2848016…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `aad2121f…`. `--no-time` shipped-objects is `b4e1eac7…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

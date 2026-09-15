@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `35c79482…`; `--no-time` shipped-objects `e2848016…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `aad2121f…`; `--no-time` shipped-objects `b4e1eac7…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. Native viewer registers `GltfDracoDecoderPlugin` (hash-neutral).
+Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks. `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft. Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral).
 
 ### `[time]` (M52)
 
@@ -309,7 +309,7 @@ Dawn refill (millipoints): tiredness `max * (200 + remaining_milli * 4 / 10) / 1
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | `--telemetry`. In-process tick aggregates + RSS + CPU (user/system ns) + disk (read/write bytes). **Not hashed.** |
-| `otlp_endpoint` | empty | `--otlp-endpoint URL`. sim-cli POSTs OTLP/JSON to `{url}/v1/metrics`. Empty ⇒ no POST. |
+| `otlp_endpoint` | empty | `--otlp-endpoint URL`. sim-cli POSTs OTLP/JSON tick + process gauges. Viewer same flag POSTs `agentplace.viewer.frame_ns`. Empty ⇒ no POST. |
 
 ### `[llm]` overlay extras (not on ExperimentConfig)
 
@@ -413,9 +413,9 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `plank.toml` | item | Catalog craft 2 wood → 1. |
 | `charcoal.toml` | item | Catalog craft 1 wood → 1. |
 | `knife.toml` | item | Catalog craft stone+fiber → 1. `[sim] attack_bonus = 200`. |
-| `net.toml` | item | Catalog craft 3 fiber → 1. `[sim] fish_bonus = 25`. |
-| `hammer.toml` | item | Catalog craft 2 stone + 1 wood → 1. `[sim] stone_gather_bonus = 25`. |
-| `hoe.toml` | item | Catalog craft stone+wood → 1. `[sim] farm_bonus = 25`. |
+| `net.toml` | item | Catalog craft 3 fiber → 1. `[sim] fish_bonus = 25`, `uses = 8`. |
+| `hammer.toml` | item | Catalog craft 2 stone + 1 wood → 1. `[sim] stone_gather_bonus = 25`, `uses = 8`. |
+| `hoe.toml` | item | Catalog craft stone+wood → 1. `[sim] farm_bonus = 25`, `uses = 8`. |
 | `waterskin.toml` | item | Catalog craft 2 fiber → 1. |
 | `dried_fish.toml` | item | Catalog craft 1 food (`ItemId::Food(1)`) → 1. |
 | `satchel.toml` | item | Catalog craft 2 fiber + 1 wood → 1. |
@@ -427,13 +427,13 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `sling.toml` | item | Catalog craft 2 fiber + 1 stone → 1. `[sim] attack_bonus = 400`, `attack_range = 2`. |
 | `bow.toml` | item | Catalog craft 2 wood + 1 fiber → 1. `[sim] attack_bonus = 600`, `attack_range = 3`. |
 | `torch.toml` | item | Catalog craft 1 wood + 1 fiber → 1. |
-| `axe.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] gather_bonus = 25`. |
+| `axe.toml` | item | Catalog craft 2 wood + 1 stone → 1. `[sim] gather_bonus = 25`, `uses = 8`. |
 | `jar.toml` | item | Catalog craft 2 stone → 1. |
 | `bread.toml` | item | Catalog craft 2 food → 1. |
 | `tent.toml` | item | Catalog craft 3 fiber + 2 wood → 1. `[sim] sleep_bonus = 100`, `sleep_size = 1` (1×1). Place on land. |
 | `cabin.toml` | item | Catalog craft 4 wood + 2 stone → 1. `sleep_bonus = 200`, `sleep_size = 2` (2×2). |
 | `house.toml` | item | Catalog craft 6 wood + 3 stone + 2 fiber → 1. `sleep_bonus = 300`, `sleep_size = 4` (4×4). |
-| `millstone.toml` | item | Catalog craft 3 stone → 1. |
+| `millstone.toml` | item | Catalog craft 3 stone → 1. `[sim] station = true`. Place 1×1. |
 | `stew.toml` | item | Catalog craft 2 food → 1. |
 | `ladder.toml` | item | Catalog craft 3 wood → 1. |
 | `rope.toml` | item | Catalog craft 4 fiber → 1. |
@@ -448,6 +448,10 @@ Builtin item slugs stay Rust `ItemId` tags (Food/Wood/Fiber/Stone/Basket/Spear/F
 | `cloak.toml` | item | Catalog craft 6 fiber → 1. |
 | `pot.toml` | item | Catalog craft 4 stone → 1. |
 | `lantern.toml` | item | Catalog craft 1 wood + 1 fiber + 1 stone → 1. |
+| `flour.toml` | item | Catalog craft 3 food → 1. `[sim.craft] station = "millstone"`. |
+| `cart.toml` | item | Catalog craft 6 wood → 1. |
+| `bellows.toml` | item | Catalog craft 3 fiber + 1 stone → 1. |
+| `table.toml` | item | Catalog craft 3 wood + 1 fiber → 1. |
 | `crate.toml` | crate | Land-cell stockpile mesh. |
 | `crop.toml` | crop | Growing-plant mesh. |
 

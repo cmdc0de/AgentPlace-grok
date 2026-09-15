@@ -73,7 +73,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M55** | Done (tag `M55`) | [`M55-plan.md`](M55-plan.md), walkthrough [`M55-test-plan.md`](M55-test-plan.md) | Ranged DEX to-hit, hoe/net Farm+Fish bonuses, extra recipes |
 | **M56** | Done (tag `M56`) | [`M56-plan.md`](M56-plan.md), walkthrough [`M56-test-plan.md`](M56-test-plan.md) | Axe gather bonus, Draco glTF decode, extra recipes |
 | **M57** | Done (tag `M57`) | [`M57-plan.md`](M57-plan.md), walkthrough [`M57-test-plan.md`](M57-test-plan.md) | Hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
-| **M58** | Planned — next | [`M58-plan.md`](M58-plan.md) | Tool durability + millstone station, viewer-frame OTLP, extra recipes |
+| **M58** | Done (tag `M58`) | [`M58-plan.md`](M58-plan.md), walkthrough [`M58-test-plan.md`](M58-test-plan.md) | Tool durability + millstone station, viewer-frame OTLP, extra recipes |
 | After M58 | Not started | listed at the bottom of `M58-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -202,7 +202,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 61b | `M56-test-plan.md` | M56 walkthrough (axe gather, Draco decode, extra recipes) |
 | 62 | `M57-plan.md` | Milestone 57 (done, tag `M57`): hammer stone-gather bonus, process CPU/disk telemetry, extra recipes |
 | 62b | `M57-test-plan.md` | M57 walkthrough (hammer stone-gather, process CPU/disk, extra recipes) |
-| 63 | `M58-plan.md` | Milestone 58 (planned): tool durability + millstone station, viewer-frame OTLP, extra recipes |
+| 63 | `M58-plan.md` | Milestone 58 (done, tag `M58`): tool durability + millstone station, viewer-frame OTLP, extra recipes |
+| 63b | `M58-test-plan.md` | M58 walkthrough (durability, millstone station, viewer-frame OTLP, extra recipes) |
 
 ---
 
@@ -211,7 +212,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M58-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). Next is M58 (`M58-plan.md`). Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M58 is implemented (`M58-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -239,11 +240,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M57 are done. Next is M58 ([`M58-plan.md`](M58-plan.md)).
+M1–M58 are done. M58 is implemented ([`M58-plan.md`](M58-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M58-plan.md.
-Implement M58 (tool durability + millstone station, viewer-frame OTLP, extra recipes;
+M58 is implemented (tool durability + millstone station, viewer-frame OTLP, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.

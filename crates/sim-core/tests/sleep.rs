@@ -677,3 +677,52 @@ fn household_off_pair_bond_no_cabin() {
     assert!(sim.household_home.is_empty());
     assert!(sim.world.sleep_places.is_empty());
 }
+
+#[test]
+fn millstone_place_then_pickup() {
+    let mut sim = Simulation::new(tiny(0x58_30)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    let mill = catalog_item(&sim, "millstone");
+    give(&mut sim, id, "millstone");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: mill });
+    assert_eq!(sim.world.work_places.get(&(x, y)), Some(&mill));
+    assert!(sim.world.sleep_places.is_empty());
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Pickup);
+    assert!(sim.world.work_places.is_empty());
+    assert_eq!(sim.agents[&id].inventory.get(&mill).copied(), Some(1));
+}
+
+#[test]
+fn millstone_overlap_with_tent_illegal() {
+    let mut sim = Simulation::new(tiny(0x58_31)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    let tent = catalog_item(&sim, "tent");
+    give(&mut sim, id, "tent");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: tent });
+    give(&mut sim, id, "millstone");
+    let mill = catalog_item(&sim, "millstone");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: mill });
+    assert!(sim.world.work_places.is_empty());
+    assert_eq!(sim.world.sleep_places.get(&(x, y)), Some(&tent));
+}
+
+#[test]
+fn load_restores_work_place() {
+    let mut sim = Simulation::new(tiny(0x58_32)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 1);
+    park(&mut sim, id, x, y);
+    let mill = catalog_item(&sim, "millstone");
+    give(&mut sim, id, "millstone");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: mill });
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    assert_eq!(loaded.world.work_places.get(&(x, y)), Some(&mill));
+}

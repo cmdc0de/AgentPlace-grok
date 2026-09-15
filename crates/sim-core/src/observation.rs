@@ -645,7 +645,15 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     for entry in &sim.catalog {
         if let Some(Recipe::Catalog(n)) = entry.recipe {
             let recipe = Recipe::Catalog(n);
-            if can_craft(agent, recipe, &sim.catalog) {
+            if can_craft(agent, recipe, &sim.catalog)
+                && crate::objects::craft_station_ok(
+                    &sim.world,
+                    &sim.catalog,
+                    agent.x,
+                    agent.y,
+                    recipe,
+                )
+            {
                 legal.push(PrimaryAction::Craft { recipe });
             }
         }
@@ -874,7 +882,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
     }
     if !agent.incapacitated && !sim.is_child(agent) {
         for entry in &sim.catalog {
-            if entry.sleep_bonus == 0 {
+            if entry.sleep_bonus == 0 && !entry.station {
                 continue;
             }
             let have = agent.inventory.get(&entry.item).copied().unwrap_or(0)
@@ -887,9 +895,14 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
             }
         }
         if !sim.catalog.is_empty() {
-            if let Some((_, item)) =
-                crate::objects::sleep_origin_at(&sim.world, &sim.catalog, agent.x, agent.y)
-            {
+            let at = crate::objects::sleep_origin_at(
+                &sim.world,
+                &sim.catalog,
+                agent.x,
+                agent.y,
+            )
+            .or_else(|| crate::objects::work_origin_at(&sim.world, agent.x, agent.y));
+            if let Some((_, item)) = at {
                 if crate::objects::can_stow_one(agent, item, &sim.storage) {
                     legal.push(PrimaryAction::Pickup);
                 }

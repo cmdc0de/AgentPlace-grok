@@ -69,6 +69,8 @@ struct BoardBlob {
     next_invention_id: u64,
     #[serde(default)]
     catalog_slugs: Vec<String>,
+    #[serde(default)]
+    tool_uses: BTreeMap<u64, BTreeMap<crate::agent::ItemId, u32>>,
 }
 
 fn board_to_wire(sim: &Simulation) -> PublicBoard {
@@ -148,6 +150,12 @@ fn board_to_wire(sim: &Simulation) -> PublicBoard {
         inventions: sim.inventions.clone(),
         next_invention_id: sim.next_invention_id,
         catalog_slugs: sim.catalog_slugs(),
+        tool_uses: sim
+            .agents
+            .iter()
+            .filter(|(_, a)| !a.tool_uses.is_empty())
+            .map(|(id, a)| (id.0, a.tool_uses.clone()))
+            .collect(),
     };
     match postcard::to_allocvec(&blob) {
         Ok(bytes) => PublicBoard {
@@ -259,6 +267,11 @@ fn board_from_wire(
             agent.culture = culture;
         }
     }
+    for (id, uses) in blob.tool_uses {
+        if let Some(agent) = agents.get_mut(&crate::agent::AgentId(id)) {
+            agent.tool_uses = uses;
+        }
+    }
     (
         blob.board,
         blob.next_agent_id,
@@ -275,6 +288,71 @@ fn board_from_wire(
 fn blob_from_bytes(bytes: &[u8]) -> BoardBlob {
     if let Ok(b) = postcard::from_bytes::<BoardBlob>(bytes) {
         return b;
+    }
+    #[derive(Deserialize)]
+    struct BoardBlobV3 {
+        #[serde(default)]
+        board: RichBoard,
+        #[serde(default)]
+        goals: BTreeMap<u64, Vec<Goal>>,
+        #[serde(default)]
+        relationships: BTreeMap<u64, BTreeMap<u64, RelationshipSummary>>,
+        #[serde(default)]
+        memory_meta: BTreeMap<u64, Vec<MemoryMeta>>,
+        #[serde(default)]
+        next_memory_id: BTreeMap<u64, u64>,
+        #[serde(default)]
+        influence: BTreeMap<u64, u32>,
+        #[serde(default)]
+        plans: BTreeMap<u64, Vec<String>>,
+        #[serde(default)]
+        health: BTreeMap<u64, u32>,
+        #[serde(default)]
+        incapacitated: BTreeMap<u64, bool>,
+        #[serde(default)]
+        sheets: BTreeMap<u64, crate::sheet::AbilitySheet>,
+        #[serde(default)]
+        kinship: BTreeMap<u64, crate::kinship::Kinship>,
+        #[serde(default)]
+        next_agent_id: u64,
+        #[serde(default)]
+        next_household_id: u64,
+        #[serde(default)]
+        ages: BTreeMap<u64, u64>,
+        #[serde(default)]
+        household_home: BTreeMap<u64, (u32, u32)>,
+        #[serde(default)]
+        cultures: BTreeMap<u64, u8>,
+        #[serde(default)]
+        inventions: BTreeMap<u64, crate::inventions::Invention>,
+        #[serde(default)]
+        next_invention_id: u64,
+        #[serde(default)]
+        catalog_slugs: Vec<String>,
+    }
+    if let Ok(old) = postcard::from_bytes::<BoardBlobV3>(bytes) {
+        return BoardBlob {
+            board: old.board,
+            goals: old.goals,
+            relationships: old.relationships,
+            memory_meta: old.memory_meta,
+            next_memory_id: old.next_memory_id,
+            influence: old.influence,
+            plans: old.plans,
+            health: old.health,
+            incapacitated: old.incapacitated,
+            sheets: old.sheets,
+            kinship: old.kinship,
+            next_agent_id: old.next_agent_id,
+            next_household_id: old.next_household_id,
+            ages: old.ages,
+            household_home: old.household_home,
+            cultures: old.cultures,
+            inventions: old.inventions,
+            next_invention_id: old.next_invention_id,
+            catalog_slugs: old.catalog_slugs,
+            tool_uses: BTreeMap::new(),
+        };
     }
     #[derive(Deserialize)]
     struct BoardBlobV2 {
@@ -336,6 +414,7 @@ fn blob_from_bytes(bytes: &[u8]) -> BoardBlob {
             inventions: old.inventions,
             next_invention_id: old.next_invention_id,
             catalog_slugs: Vec::new(),
+            tool_uses: BTreeMap::new(),
         };
     }
     #[derive(Deserialize)]

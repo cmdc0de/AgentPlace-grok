@@ -2,6 +2,7 @@
 
 use crate::charts::{ChartRing, ChartSample};
 use crate::fps::FrameRing;
+use crate::otlp::{self, OtlpEndpoint};
 use crate::commands::{
     CkptScrubber, WindowFlags, help_text, parse_command, remote_control, run_command,
 };
@@ -154,8 +155,13 @@ pub fn imgui_ui(
     net: Option<Res<NetLink>>,
     guard: Res<ClickThroughGuard>,
     time: Res<Time>,
+    otlp_ep: Res<OtlpEndpoint>,
 ) {
     ui.frame_ring.push(time.delta_secs());
+    if !otlp_ep.0.is_empty() {
+        let ns = (time.delta_secs() as f64 * 1_000_000_000.0) as u64;
+        otlp::offer_frame_ns(&otlp_ep.0, ns);
+    }
     record_decisions(&mut state, &mut ui);
     let imgui_ui = context.ui();
     ui.want_keyboard = imgui_ui.io().want_capture_keyboard;

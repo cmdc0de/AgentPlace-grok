@@ -5,6 +5,7 @@ mod fps;
 mod light;
 mod models;
 mod net;
+mod otlp;
 mod render;
 mod ui;
 
@@ -274,7 +275,8 @@ fn main() {
         defs: object_defs,
         ..Default::default()
     })
-    .insert_resource(scrub);
+    .insert_resource(scrub)
+    .insert_resource(otlp::OtlpEndpoint(parsed.otlp_endpoint.clone()));
     if let Some(link) = net_link {
         app.insert_resource(link);
     }
@@ -319,6 +321,7 @@ struct ViewerArgs {
     no_time: bool,
     width: Option<u32>,
     height: Option<u32>,
+    otlp_endpoint: String,
 }
 
 #[derive(Component)]
@@ -337,6 +340,7 @@ fn parse_args() -> ViewerArgs {
     let mut no_time = false;
     let mut width = None;
     let mut height = None;
+    let mut otlp_endpoint = String::new();
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
@@ -403,6 +407,13 @@ fn parse_args() -> ViewerArgs {
                     continue;
                 }
             }
+            "--otlp-endpoint" => {
+                if let Some(v) = args.get(i + 1) {
+                    otlp_endpoint = v.clone();
+                    i += 2;
+                    continue;
+                }
+            }
             _ => {}
         }
         i += 1;
@@ -422,6 +433,7 @@ fn parse_args() -> ViewerArgs {
         no_time,
         width,
         height,
+        otlp_endpoint,
     }
 }
 

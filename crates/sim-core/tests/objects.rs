@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M57 catalog: hammer stone-gather + recipes).
-const IDLE_2_NO_TIME: &str = "e2848016bf0e3c82f7b14cd69f31b25550a066fcebddc541d0b9051be91db0a0";
+/// `--no-time` shipped-objects 2-tick (M58 catalog: uses/station + recipes).
+const IDLE_2_NO_TIME: &str = "b4e1eac7b6dd3b9f368f1d5268c61c789f9fb582e183dc1acf47743456a52475";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "35c794827f5e4744ff9dffd4b49dab04b97e85d5d76fef4fe401e04ba847e44d";
+const IDLE_2: &str = "aad2121fe9cd21eae365114d05bf50d978d07f131a95a8d199471ae50e565bec";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1488,5 +1488,197 @@ fn catalog_on_craft_lantern() {
         &mut sim,
         "lantern",
         &[(ItemId::Wood, 2), (ItemId::Fiber, 2), (ItemId::Stone, 2)],
+    );
+}
+
+fn find_veg(sim: &Simulation) -> (u32, u32, u8) {
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            let t = sim.world.vegetation_species(x, y);
+            if t != 0 {
+                return (x, y, t);
+            }
+        }
+    }
+    panic!("no vegetation");
+}
+
+fn park_adj_land(sim: &mut Simulation, id: AgentId, tx: u32, ty: u32) {
+    for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+        let nx = tx as i32 + dx;
+        let ny = ty as i32 + dy;
+        if nx < 0 || ny < 0 {
+            continue;
+        }
+        let (x, y) = (nx as u32, ny as u32);
+        if sim.world.is_land(x, y) {
+            let a = sim.agents.get_mut(&id).unwrap();
+            a.x = x;
+            a.y = y;
+            return;
+        }
+    }
+    panic!("no land adjacent to veg");
+}
+
+#[test]
+fn catalog_off_millstone_place_illegal() {
+    let sim = Simulation::new(tiny(0x58_20)).unwrap();
+    let a = AgentId(0);
+    let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
+    assert!(!legal
+        .iter()
+        .any(|x| matches!(x, PrimaryAction::Place { .. })));
+}
+
+#[test]
+fn axe_breaks_after_8_successful_gathers() {
+    let mut sim = Simulation::new(tiny(0x58_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.abilities.gather = 100;
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.try_add_item(axe, 1);
+    }
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    let mut ok = 0u32;
+    for _ in 0..400 {
+        sim.world.set_vegetation(vx, vy, tag);
+        let before = sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0);
+        sim_core::execute::execute_primary(
+            &mut sim,
+            id,
+            &PrimaryAction::Gather { species: tag },
+        );
+        if sim.events.events.last().is_some_and(|e| {
+            matches!(
+                e.kind,
+                sim_core::event_log::SimEventKind::Gather { species, qty, .. }
+                    if species == tag && qty > 0
+            )
+        }) || sim.agents[&id].tool_uses.get(&axe).copied().unwrap_or(0) > ok
+            || sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0) < before
+        {
+            ok += 1;
+        }
+        if ok == 7 {
+            assert_eq!(
+                sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+                1,
+                "7 uses keep the axe"
+            );
+        }
+        if ok >= 8 {
+            break;
+        }
+    }
+    assert!(ok >= 8, "need 8 successful gathers, got {ok}");
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        0,
+        "8th use consumes the axe"
+    );
+}
+
+#[test]
+fn flour_needs_placed_millstone() {
+    let mut sim = Simulation::new(tiny(0x58_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let mill = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "millstone")
+        .unwrap()
+        .item;
+    let flour = sim.catalog.iter().find(|e| e.slug == "flour").unwrap().item;
+    let ItemId::Catalog(n) = flour else {
+        panic!("flour catalog");
+    };
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.abilities.craft = 100;
+        a.inventory_cap = 32;
+        a.try_add_item(ItemId::Food(1), 6);
+        a.try_add_item(mill, 1);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    assert!(
+        !legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Catalog(k)
+            } if *k == n
+        )),
+        "pocket millstone is not a station"
+    );
+    let (x, y) = (sim.agents[&id].x, sim.agents[&id].y);
+    if !sim.world.is_land(x, y) {
+        for yy in 0..sim.world.height {
+            for xx in 0..sim.world.width {
+                if sim.world.is_land(xx, yy) {
+                    sim.agents.get_mut(&id).unwrap().x = xx;
+                    sim.agents.get_mut(&id).unwrap().y = yy;
+                    break;
+                }
+            }
+        }
+    }
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Place { item: mill },
+    );
+    assert!(sim.world.work_places.values().any(|i| *i == mill));
+    craft_catalog_slug(&mut sim, "flour", &[(ItemId::Food(1), 6)]);
+}
+
+#[test]
+fn catalog_on_craft_cart() {
+    let mut sim = Simulation::new(tiny(0x58_11)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "cart", &[(ItemId::Wood, 12)]);
+}
+
+#[test]
+fn catalog_on_craft_bellows() {
+    let mut sim = Simulation::new(tiny(0x58_12)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "bellows",
+        &[(ItemId::Fiber, 6), (ItemId::Stone, 2)],
+    );
+}
+
+#[test]
+fn catalog_on_craft_table() {
+    let mut sim = Simulation::new(tiny(0x58_13)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(
+        &mut sim,
+        "table",
+        &[(ItemId::Wood, 6), (ItemId::Fiber, 2)],
+    );
+}
+
+#[test]
+fn load_restores_tool_uses() {
+    let mut sim = Simulation::new(tiny(0x58_23)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
+    sim.agents.get_mut(&id).unwrap().try_add_item(axe, 1);
+    sim.agents.get_mut(&id).unwrap().tool_uses.insert(axe, 3);
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    assert_eq!(
+        loaded.agents[&id].tool_uses.get(&axe).copied(),
+        Some(3)
     );
 }

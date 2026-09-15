@@ -10,6 +10,7 @@ far  = "assets/models/optimized/stones_and_grass.glb"
 
 [sim]
 weight_milli = 800
+station = true
 [sim.craft]
 inputs = [["stone", 3]]
 output_qty = 1

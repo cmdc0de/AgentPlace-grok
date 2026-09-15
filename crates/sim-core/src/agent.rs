@@ -149,6 +149,9 @@ pub struct Agent {
     /// Culture id. 0 = unused; packed in the board blob. Not hashed at 0.
     #[serde(default, skip)]
     pub culture: u8,
+    /// Successful tool bonus-uses since last break. Packed in the board blob.
+    #[serde(default, skip)]
+    pub tool_uses: BTreeMap<ItemId, u32>,
 }
 
 impl Default for Needs {
@@ -196,6 +199,7 @@ impl Agent {
             kinship: crate::kinship::Kinship::default(),
             age_ticks: 0,
             culture: 0,
+            tool_uses: BTreeMap::new(),
         }
     }
 
@@ -545,6 +549,12 @@ impl Agent {
         }
         if self.culture != 0 {
             hasher.update([self.culture]);
+        }
+        if !self.tool_uses.is_empty() {
+            for (item, n) in &self.tool_uses {
+                hash_item_id(hasher, *item, catalog_slugs);
+                hasher.update(n.to_le_bytes());
+            }
         }
     }
 }

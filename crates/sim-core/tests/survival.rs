@@ -243,6 +243,7 @@ fn craft_failure_keeps_ingredients() {
             craft: Some(sim_core::objects::CraftDef {
                 inputs: vec![("wood".into(), 1), ("stone".into(), 1)],
                 output_qty: Some(1),
+                ..Default::default()
             }),
             ..Default::default()
         }),
