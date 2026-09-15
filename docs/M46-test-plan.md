@@ -1,6 +1,6 @@
 # M46 test plan — see each new feature
 
-Walkthrough for [`M46-plan.md`](M46-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry). Next slice: [`M60-plan.md`](M60-plan.md).
+Walkthrough for [`M46-plan.md`](M46-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (CON illness chance, INT plan length, STR gather/hunt, extra recipes, telemetry). Next slice: [`M61-plan.md`](M61-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

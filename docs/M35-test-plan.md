@@ -1,6 +1,6 @@
 # M35 test plan — see each new feature
 
-Walkthrough for [`M35-plan.md`](M35-plan.md). Automated tests prove the slice; the `sim-cli` / viewer / browser steps below are what you **read** (inventions, postcard WS page). Next slice: [`M60-plan.md`](M60-plan.md).
+Walkthrough for [`M35-plan.md`](M35-plan.md). Automated tests prove the slice; the `sim-cli` / viewer / browser steps below are what you **read** (inventions, postcard WS page). Next slice: [`M61-plan.md`](M61-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

@@ -1,6 +1,6 @@
 # M44 test plan — see each new feature
 
-Walkthrough for [`M44-plan.md`](M44-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (WIS board range, CHA Support/PairBond, STR pocket weight). Next slice: [`M60-plan.md`](M60-plan.md).
+Walkthrough for [`M44-plan.md`](M44-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (WIS board range, CHA Support/PairBond, STR pocket weight). Next slice: [`M61-plan.md`](M61-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

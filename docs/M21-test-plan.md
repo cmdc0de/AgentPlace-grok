@@ -1,6 +1,6 @@
 # M21 test plan — see each new feature
 
-Walkthrough for [`M21-plan.md`](M21-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (pack fill scale, `--connect` log tail, remote `/scrub`). Next slice: [`M60-plan.md`](M60-plan.md).
+Walkthrough for [`M21-plan.md`](M21-plan.md). Automated tests prove the slice; the `sim-cli` / viewer steps below are what you **read** (pack fill scale, `--connect` log tail, remote `/scrub`). Next slice: [`M61-plan.md`](M61-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 

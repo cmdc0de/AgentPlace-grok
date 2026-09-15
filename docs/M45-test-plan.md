@@ -1,6 +1,6 @@
 # M45 test plan — see each new feature
 
-Walkthrough for [`M45-plan.md`](M45-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (tech tree/patents, hashed pipeline events, format_version 3 catalog slugs). CLI flags: [`cli-reference.md`](cli-reference.md). Config files: [`config-reference.md`](config-reference.md). Next slice: [`M60-plan.md`](M60-plan.md).
+Walkthrough for [`M45-plan.md`](M45-plan.md). Automated tests prove the slice; the `sim-cli` steps below are what you **read** (tech tree/patents, hashed pipeline events, format_version 3 catalog slugs). CLI flags: [`cli-reference.md`](cli-reference.md). Config files: [`config-reference.md`](config-reference.md). Next slice: [`M61-plan.md`](M61-plan.md).
 
 All commands assume the **repo root**. Mock / `cargo test` never need the network.
 
