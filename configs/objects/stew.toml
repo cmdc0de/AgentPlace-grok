@@ -13,3 +13,4 @@ weight_milli = 120
 [sim.craft]
 inputs = [["food", 2]]
 output_qty = 1
+station = "spit"

@@ -1,4 +1,4 @@
-id = "spit"
+id = "rack"
 kind = "item"
 
 [visual]
@@ -9,8 +9,7 @@ mid  = "assets/models/optimized/wood_pile.glb"
 far  = "assets/models/optimized/wood_pile.glb"
 
 [sim]
-weight_milli = 120
-station = true
+weight_milli = 400
 [sim.craft]
-inputs = [["wood", 2], ["fiber", 1]]
+inputs = [["wood", 10]]
 output_qty = 1

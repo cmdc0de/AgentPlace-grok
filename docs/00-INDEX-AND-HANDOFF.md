@@ -77,7 +77,7 @@ Read this table first in a new session, then the specs, then the current milesto
 | **M59** | Done (tag `M59`) | [`M59-plan.md`](M59-plan.md), walkthrough [`M59-test-plan.md`](M59-test-plan.md) | Extra invention kinds, per-instance tool wear, extra recipes |
 | **M60** | Done (tag `M60`) | [`M60-plan.md`](M60-plan.md), walkthrough [`M60-test-plan.md`](M60-test-plan.md) | Transfer wear on Give, CPU percent, extra recipes |
 | **M61** | Done (tag `M61`) | [`M61-plan.md`](M61-plan.md), walkthrough [`M61-test-plan.md`](M61-test-plan.md) | Time-decay wear, out-dir disk walk, extra recipes |
-| **M62** | Planned — next | [`M62-plan.md`](M62-plan.md) | Stations for bread/stew, Store wear, extra recipes |
+| **M62** | Done (tag `M62`) | [`M62-plan.md`](M62-plan.md), walkthrough [`M62-test-plan.md`](M62-test-plan.md) | Stations for bread/stew, Store wear, extra recipes |
 | After M62 | Not started | listed at the bottom of `M62-plan.md` | protobuf/TLS |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now** and explicitly defer the rest. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -214,7 +214,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 65b | `M60-test-plan.md` | M60 walkthrough (Transfer wear, CPU percent, extra recipes) |
 | 66 | `M61-plan.md` | Milestone 61 (done, tag `M61`): time-decay wear, out-dir disk walk, extra recipes |
 | 66b | `M61-test-plan.md` | M61 walkthrough (dawn wear, out-dir disk walk, extra recipes) |
-| 67 | `M62-plan.md` | Milestone 62 (planned): stations for bread/stew, Store wear, extra recipes |
+| 67 | `M62-plan.md` | Milestone 62 (done, tag `M62`): stations for bread/stew, Store wear, extra recipes |
+| 67b | `M62-test-plan.md` | M62 walkthrough (spit stations, Store wear, extra recipes) |
 
 ---
 
@@ -223,7 +224,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M62-plan.md`) plus this `00-INDEX-AND-HANDOFF.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M62 is next (`M62-plan.md`). Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M62 is implemented (`M62-plan.md`). Later work is at the bottom of that file. Do not expand into items it defers (protobuf/TLS, skeletal animation, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -251,13 +252,13 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M61 are done. Next is M62 ([`M62-plan.md`](M62-plan.md)).
+M1–M62 are done. M62 is implemented ([`M62-plan.md`](M62-plan.md)); later work is at the bottom of that file.
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/M62-plan.md.
-M62 is planned (stations for bread/stew, Store wear, extra recipes;
+M62 is implemented (stations for bread/stew, Store wear, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
-Do not expand into items it defers.
+Later work is at the bottom of that file.
 Do not add protobuf, TLS, skeletal animation, or Bevy in the browser.
 CI stays provider=mock with no network.
 ```

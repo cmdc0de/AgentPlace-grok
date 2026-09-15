@@ -1,4 +1,4 @@
-id = "bread"
+id = "pie"
 kind = "item"
 
 [visual]
@@ -9,8 +9,7 @@ mid  = "assets/models/optimized/plants_ready.glb"
 far  = "assets/models/optimized/plants_ready.glb"
 
 [sim]
-weight_milli = 100
+weight_milli = 80
 [sim.craft]
-inputs = [["food", 2]]
+inputs = [["food", 7]]
 output_qty = 1
-station = "spit"

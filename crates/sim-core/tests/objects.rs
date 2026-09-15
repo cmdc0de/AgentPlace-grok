@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M61 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "1680453678d57b0e336439e6f9a4f52af34cec8a7abe8ada9ccf2b5bf72c4fd9";
+/// `--no-time` shipped-objects 2-tick (M62 catalog: stations + extra recipes).
+const IDLE_2_NO_TIME: &str = "3170f273fe922c5f52d0b6fdd02a3a3918bd7ea3d04185d2f88fa42ed7dbac69";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "3512dde61887c6feb81decefce29b2d1123d4ca24ac72eaedcd37a102894ccc0";
+const IDLE_2: &str = "7f2d52db8a0b3b74f46a9e75ffa3d6c167d21bcd2f24421efe43aa6c75ac4e24";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1065,6 +1065,32 @@ fn catalog_off_hammer_not_legal_same_hash() {
     )));
 }
 
+fn place_station(sim: &mut Simulation, slug: &str) {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug} missing"))
+        .item;
+    let id = AgentId(0);
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.inventory_cap = 32;
+        a.try_add_item(item, 1);
+        if !sim.world.is_land(a.x, a.y) {
+            let land = sim.world.land_cells()[0];
+            a.x = land.0;
+            a.y = land.1;
+        }
+    }
+    sim_core::execute::execute_primary(sim, id, &PrimaryAction::Place { item });
+    assert!(
+        sim.world.work_places.values().any(|i| *i == item),
+        "place {slug}"
+    );
+}
+
 fn craft_catalog_slug(sim: &mut Simulation, slug: &str, stock: &[(ItemId, u32)]) {
     let item = sim
         .catalog
@@ -1175,6 +1201,7 @@ fn catalog_on_craft_tent() {
 fn catalog_on_craft_stew() {
     let mut sim = Simulation::new(tiny(0x51_12)).unwrap();
     apply_shipped(&mut sim);
+    place_station(&mut sim, "spit");
     craft_catalog_slug(&mut sim, "stew", &[(ItemId::Food(1), 4)]);
 }
 
@@ -1233,6 +1260,7 @@ fn catalog_on_craft_jar() {
 fn catalog_on_craft_bread() {
     let mut sim = Simulation::new(tiny(0x54_14)).unwrap();
     apply_shipped(&mut sim);
+    place_station(&mut sim, "spit");
     craft_catalog_slug(&mut sim, "bread", &[(ItemId::Food(1), 4)]);
 }
 
@@ -2061,4 +2089,141 @@ fn catalog_on_craft_cake() {
     let mut sim = Simulation::new(tiny(0x61_34)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "cake", &[(ItemId::Food(1), 12)]);
+}
+
+fn catalog_id(sim: &Simulation, slug: &str) -> u16 {
+    let ItemId::Catalog(n) = sim.catalog.iter().find(|e| e.slug == slug).unwrap().item
+    else {
+        panic!("{slug} catalog");
+    };
+    n
+}
+
+#[test]
+fn bread_needs_placed_spit() {
+    let mut sim = Simulation::new(tiny(0x62_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let spit = sim.catalog.iter().find(|e| e.slug == "spit").unwrap().item;
+    let n = catalog_id(&sim, "bread");
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.abilities.craft = 100;
+        a.inventory_cap = 32;
+        a.try_add_item(ItemId::Food(1), 4);
+        a.try_add_item(spit, 1);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    assert!(
+        !legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Catalog(k)
+            } if *k == n
+        )),
+        "pocket spit is not a station"
+    );
+}
+
+#[test]
+fn stew_needs_placed_spit() {
+    let mut sim = Simulation::new(tiny(0x62_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let n = catalog_id(&sim, "stew");
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.abilities.craft = 100;
+        a.inventory_cap = 32;
+        a.try_add_item(ItemId::Food(1), 4);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    assert!(
+        !legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Catalog(k)
+            } if *k == n
+        )),
+        "stew illegal without placed spit"
+    );
+    place_station(&mut sim, "spit");
+    craft_catalog_slug(&mut sim, "stew", &[(ItemId::Food(1), 4)]);
+}
+
+#[test]
+fn store_then_retrieve_roundtrips_wear() {
+    let mut sim = Simulation::new(tiny(0x62_31)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let land = sim.world.land_cells()[0];
+    let axe = give_axe(&mut sim, id, 2, vec![3, 0]);
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.x = land.0;
+        a.y = land.1;
+    }
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Store {
+            item: axe,
+            qty: 1,
+        },
+    );
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![3])
+    );
+    let crate_wear = sim
+        .world
+        .stockpile_at(land.0, land.1)
+        .and_then(|c| c.tool_wear.get(&axe).cloned());
+    assert_eq!(crate_wear, Some(vec![0]));
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::Retrieve {
+            item: axe,
+            qty: 1,
+        },
+    );
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![3, 0])
+    );
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        2
+    );
+}
+
+#[test]
+fn catalog_on_craft_rack() {
+    let mut sim = Simulation::new(tiny(0x62_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "rack", &[(ItemId::Wood, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_wrap() {
+    let mut sim = Simulation::new(tiny(0x62_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "wrap", &[(ItemId::Fiber, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_tile() {
+    let mut sim = Simulation::new(tiny(0x62_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "tile", &[(ItemId::Stone, 16)]);
+}
+
+#[test]
+fn catalog_on_craft_pie() {
+    let mut sim = Simulation::new(tiny(0x62_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "pie", &[(ItemId::Food(1), 14)]);
 }

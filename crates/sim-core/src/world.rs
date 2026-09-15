@@ -14,6 +14,8 @@ use std::collections::BTreeMap;
 pub struct Container {
     #[serde(default)]
     pub items: BTreeMap<ItemId, u32>,
+    #[serde(default)]
+    pub tool_wear: BTreeMap<ItemId, Vec<u32>>,
 }
 
 impl Container {
@@ -48,6 +50,48 @@ impl Container {
             return;
         }
         *self.items.entry(item).or_insert(0) += qty;
+    }
+
+    pub fn clamp_tool_wear(&mut self, item: ItemId) {
+        let qty = self.items.get(&item).copied().unwrap_or(0) as usize;
+        if let Some(v) = self.tool_wear.get_mut(&item) {
+            while v.len() > qty {
+                v.pop();
+            }
+            if v.is_empty() {
+                self.tool_wear.remove(&item);
+            }
+        }
+    }
+
+    /// Pop `qty` freshest slots (vec end). `None` if this item has no wear map.
+    pub fn take_end_wear(&mut self, item: ItemId, qty: u32) -> Option<Vec<u32>> {
+        if !self.tool_wear.contains_key(&item) {
+            return None;
+        }
+        let have = self.items.get(&item).copied().unwrap_or(0) as usize;
+        let n = qty as usize;
+        let v = self.tool_wear.entry(item).or_default();
+        while v.len() < have {
+            v.push(0);
+        }
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            out.push(v.pop().unwrap_or(0));
+        }
+        if v.is_empty() {
+            self.tool_wear.remove(&item);
+        }
+        Some(out)
+    }
+
+    pub fn append_wear_oldest_first(&mut self, item: ItemId, freshest_first: &[u32]) {
+        if freshest_first.is_empty() {
+            return;
+        }
+        let v = self.tool_wear.entry(item).or_default();
+        v.extend(freshest_first.iter().rev().copied());
+        self.clamp_tool_wear(item);
     }
 }
 
@@ -268,6 +312,15 @@ impl World {
                 hasher.update(format!("{item:?}").as_bytes());
                 hasher.update(qty.to_le_bytes());
             }
+            if !c.tool_wear.is_empty() {
+                for (item, wears) in &c.tool_wear {
+                    hasher.update(format!("{item:?}").as_bytes());
+                    hasher.update((wears.len() as u32).to_le_bytes());
+                    for n in wears {
+                        hasher.update(n.to_le_bytes());
+                    }
+                }
+            }
         }
         for ((x, y), item) in &self.sleep_places {
             hasher.update(x.to_le_bytes());
@@ -361,6 +414,27 @@ impl World {
             self.stockpiles.remove(&(x, y));
         }
         true
+    }
+
+    pub fn take_stockpile_wear(
+        &mut self,
+        x: u32,
+        y: u32,
+        item: ItemId,
+        qty: u32,
+    ) -> Option<Vec<u32>> {
+        self.stockpiles
+            .get_mut(&(x, y))
+            .and_then(|c| c.take_end_wear(item, qty))
+    }
+
+    pub fn append_stockpile_wear(&mut self, x: u32, y: u32, item: ItemId, freshest_first: &[u32]) {
+        if freshest_first.is_empty() {
+            return;
+        }
+        if let Some(c) = self.stockpiles.get_mut(&(x, y)) {
+            c.append_wear_oldest_first(item, freshest_first);
+        }
     }
 }
 

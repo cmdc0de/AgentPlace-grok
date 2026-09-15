@@ -835,12 +835,19 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    let wear = sim
+        .agents
+        .get_mut(&id)
+        .and_then(|a| a.take_end_wear(item, qty));
     if sim
         .agents
         .get_mut(&id)
         .and_then(|a| a.take_from_pack_or_pockets(item, qty))
         .is_none()
     {
+        if let (Some(w), Some(a)) = (wear.as_deref(), sim.agents.get_mut(&id)) {
+            a.append_wear_oldest_first(item, w);
+        }
         sim.world.try_retrieve(x, y, item, qty);
         push(sim, id, SimEventKind::Wait);
         return;
@@ -848,10 +855,16 @@ fn store(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
     if Agent::is_pack_carrier(item) && !unload_pack_after_last_basket(sim, id) {
         if let Some(a) = sim.agents.get_mut(&id) {
             a.try_add_item(item, qty);
+            if let Some(w) = wear.as_deref() {
+                a.append_wear_oldest_first(item, w);
+            }
         }
         sim.world.try_retrieve(x, y, item, qty);
         push(sim, id, SimEventKind::Wait);
         return;
+    }
+    if let Some(w) = wear.as_deref() {
+        sim.world.append_stockpile_wear(x, y, item, w);
     }
     push(sim, id, SimEventKind::Store { item, qty });
 }
@@ -865,12 +878,19 @@ fn retrieve(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         push(sim, id, SimEventKind::Wait);
         return;
     };
+    let wear = sim.world.take_stockpile_wear(x, y, item, qty);
     if !sim.world.try_retrieve(x, y, item, qty) {
+        if let Some(w) = wear.as_deref() {
+            sim.world.append_stockpile_wear(x, y, item, w);
+        }
         push(sim, id, SimEventKind::Wait);
         return;
     }
     if !pay_haul(sim, id, item, qty) {
         sim.world.try_store(x, y, item, qty, &sim.storage);
+        if let Some(w) = wear.as_deref() {
+            sim.world.append_stockpile_wear(x, y, item, w);
+        }
         push(sim, id, SimEventKind::Wait);
         return;
     }
@@ -879,12 +899,20 @@ fn retrieve(sim: &mut Simulation, id: AgentId, item: ItemId, qty: u32) {
         .get_mut(&id)
         .map(|a| a.try_add_item(item, qty))
         .unwrap_or(0);
+    let added_n = added as usize;
     if added < qty {
         sim.world.try_store(x, y, item, qty - added, &sim.storage);
+        if let Some(w) = wear.as_ref() {
+            sim.world
+                .append_stockpile_wear(x, y, item, w.get(added_n..).unwrap_or(&[]));
+        }
     }
     if added == 0 {
         push(sim, id, SimEventKind::Wait);
         return;
+    }
+    if let (Some(w), Some(a)) = (wear.as_ref(), sim.agents.get_mut(&id)) {
+        a.append_wear_oldest_first(item, w.get(..added_n.min(w.len())).unwrap_or(&[]));
     }
     push(sim, id, SimEventKind::Retrieve { item, qty: added });
 }

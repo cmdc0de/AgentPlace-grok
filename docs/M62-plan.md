@@ -1,7 +1,8 @@
 # M62 — Stations for bread/stew, Store wear, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M61 complete (`docs/M61-plan.md`, git tag `M61`, commit `fc26c53`)  
+**Walkthrough:** [`docs/M62-test-plan.md`](M62-test-plan.md)  
 **Specs:** `docs/post-ga-feature-list.md` (PG-9 recipes); M58 later-table stations for bread/stew; M60 later-table Store wear
 
 ## Context
@@ -99,8 +100,8 @@ No `uses` / `station` / tool bonuses on these four. Catalog-off / empty catalog 
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| `--no-time` shipped objects 2 ticks | hash ≠ M61 `16804536…` (lock on implement) |
-| default CLI 2 ticks (time on) | hash ≠ M61 `3512dde6…` (document) |
+| `--no-time` shipped objects 2 ticks | hash `3170f273…` |
+| default CLI 2 ticks (time on) | hash `7f2d52db…` |
 | bread/stew no spit | Craft Wait / illegal without a placed spit |
 | bread/stew + placed spit | Craft from locked inputs (food×2) |
 | pocket spit | bread Craft still illegal |
@@ -143,7 +144,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M62-test-plan.md` (written on implement).
+Walkthrough: [`docs/M62-test-plan.md`](M62-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -152,7 +153,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes **new** (document); Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `3170f273…`; default (time on) `7f2d52db…`; Hello v5; format_version 3 write.
 
 ## Risks
 
