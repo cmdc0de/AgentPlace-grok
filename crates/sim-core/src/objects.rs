@@ -41,6 +41,29 @@ impl CatalogParams {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct WearParams {
+    pub per_tick: bool,
+}
+
+impl WearParams {
+    pub fn from_config_toml(s: &str) -> Self {
+        #[derive(Default, Deserialize)]
+        struct Slice {
+            #[serde(default)]
+            wear: Table,
+        }
+        #[derive(Default, Deserialize)]
+        struct Table {
+            per_tick: Option<bool>,
+        }
+        let slice: Slice = toml::from_str(s).unwrap_or_default();
+        Self {
+            per_tick: slice.wear.per_tick.unwrap_or(false),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct ObjectDef {
     pub id: String,

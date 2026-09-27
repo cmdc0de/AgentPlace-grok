@@ -28,8 +28,6 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 
 | ID | Theme | Size | Hash / wire | One-liner |
 |---|---|---|---|---|
-| RF-1 | meshes | S | hash-neutral | household-home / invention / downed meshes (skipped M62 and M63) |
-| RF-2 | durability | M | hashed wear | per-tick decay (not dawn) |
 | RF-3 | durability | M | hashed wear | decay every instance, not just most-worn |
 | RF-4 | stations | S | catalog hash | remaining food crafts using millstone (M63 used spit) |
 | RF-7 | browser | M | hash-neutral | sql.js / ad-hoc SQL |
@@ -99,7 +97,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M65 is implemented. Next `/spec` picks from Open + Standing.
+None. M66 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -109,6 +107,8 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-2 | durability | M | hashed wear | per-tick wear overlay; skip dawn wear while on | [M66](M66-plan.md) |
+| RF-1 | meshes | S | hash-neutral | household / invention / downed viewer meshes (visual-only TOML) | [M66](M66-plan.md) |
 | RF-20 | PG-6 | M | hash-neutral | Standard `[visual.animations]` monikers (walk/melee/ranged/flee/downed/death); idle already M64 | [M65](M65-plan.md) |
 | RF-18 | world | M | hashed | `interior = true`: Move from outside onto footprint fails except origin door | [M65](M65-plan.md) |
 | RF-9 | PG-6 | M | hash-neutral | agent glb clip `ArmatureAction.002` is **idle**; pause on Move | [M64](M64-plan.md) |

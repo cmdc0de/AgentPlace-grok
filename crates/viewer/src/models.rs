@@ -314,6 +314,31 @@ mod tests {
     }
 
     #[test]
+    fn household_invention_downed_stems_resolve() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects");
+        let defs = sim_core::load_object_defs(&dir).expect("load shipped objects");
+        for stem in ["household", "invention", "downed"] {
+            match resolve_visual_kind(&defs, stem, 0) {
+                VisualKind::Authored(p) => assert!(p.is_file(), "{stem} {}", p.display()),
+                other => panic!("{stem} expected Authored, got {other:?}"),
+            }
+        }
+        let def = sim_core::ObjectDef {
+            id: "downed".into(),
+            kind: "downed".into(),
+            visual: Some(sim_core::VisualDef {
+                glb: Some("/nope/agentplace-missing-downed.glb".into()),
+                ..Default::default()
+            }),
+            sim: None,
+        };
+        assert_eq!(
+            resolve_visual_kind(&[def], "downed", 0),
+            VisualKind::Sentinel
+        );
+    }
+
+    #[test]
     fn agent_toml_authored_human() {
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects");
         let defs = sim_core::load_object_defs(&dir).expect("load shipped objects");

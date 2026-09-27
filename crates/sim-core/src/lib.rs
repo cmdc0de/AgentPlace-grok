@@ -70,7 +70,7 @@ pub use llm::{
     parse_item,
 };
 pub use objects::{
-    AnimDef, AnimMoniker, CatalogEntry, CatalogParams, ObjectDef, VisualDef,
+    AnimDef, AnimMoniker, CatalogEntry, CatalogParams, ObjectDef, VisualDef, WearParams,
     agent_idle_this_tick, animation_moniker_this_tick, apply_species_defs, catalog_entries,
     clip_name_for, idle_clip_name, load_object_defs, move_into_interior_blocked,
     pick_visual_path, sleep_dims, visual_for_id, visual_scale_for,

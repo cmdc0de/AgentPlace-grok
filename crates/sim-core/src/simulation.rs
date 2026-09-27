@@ -161,6 +161,8 @@ pub struct Simulation {
     pub time_enabled: bool,
     /// Overlay `[time] ticks_per_day`. Default 240. Hashed when time is on.
     pub ticks_per_day: u64,
+    /// Overlay `[wear] per_tick`. Omit = false. Hashed when true.
+    pub wear_per_tick: bool,
 }
 
 impl Simulation {
@@ -269,6 +271,7 @@ impl Simulation {
             telemetry_out_dir_bytes: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
+            wear_per_tick: false,
         })
     }
 
@@ -1002,6 +1005,9 @@ impl Simulation {
         let incentive_ns = timing::ns_since(inc0);
         let world0 = Instant::now();
         self.world_step();
+        if self.wear_per_tick {
+            self.apply_tool_wear();
+        }
         self.reap_dead();
         let world_ns = timing::ns_since(world0);
         let board0 = Instant::now();
@@ -1164,6 +1170,14 @@ impl Simulation {
             a.needs.energy =
                 crate::clock::dawn_energy(a.needs.energy, max, shelter, con_extra);
         }
+        if self.wear_per_tick {
+            return;
+        }
+        self.apply_tool_wear();
+    }
+
+    fn apply_tool_wear(&mut self) {
+        let catalog = self.catalog.clone();
         let decay: Vec<(crate::agent::AgentId, crate::agent::ItemId, u32)> = self
             .agents
             .iter()
@@ -1696,6 +1710,9 @@ impl Simulation {
         if self.time_enabled {
             hasher.update([1u8]);
             hasher.update(self.ticks_per_day.to_le_bytes());
+        }
+        if self.wear_per_tick {
+            hasher.update([1u8]);
         }
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());

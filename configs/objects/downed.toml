@@ -1,0 +1,5 @@
+id = "downed"
+kind = "downed"
+
+[visual]
+glb = "assets/models/optimized/low_poly_human_character.glb"

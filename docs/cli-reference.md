@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `ceb0fcc0…` (M65 extra recipes). Default (time on) shipped-objects is `80ae9571…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `155d4492…` (M66 extra recipes). Default (time on) shipped-objects is `bcd36485…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -78,6 +78,7 @@ These are **or** with the same-named overlay table. `[time]` **omit = true** (cl
 | `--inventions` | `[inventions] enabled` | Invent GatherBonus → MoveBonus → SenseBonus → CraftBonus → RestBonus. Does **not** imply `--sheet`. `tree` / `patent_ticks` come from overlay only. |
 | `--pipeline-events` | `[pipeline] hash_events` | One hashed `Pipeline { stages }` per living agent per tick (complete mock = `31`). Does **not** hash wall-clock ns. |
 | `--catalog` | `[catalog] enabled` | Hash `[sim]` catalog items loaded from `--objects`. Does not imply `--sheet`. Empty catalog ≡ off for hash. |
+| `--per-tick-wear` | `[wear] per_tick` | Wear held then crate tools each tick (most-worn). Skips dawn wear while on. Omit = false; hashed only when true. |
 | `--objects DIR` | default `configs/objects` if present | Object-definition TOML directory (visuals + hashed `[sim]` when catalog on). |
 | `--telemetry` | `[telemetry] enabled` | In-process tick aggregates + RSS + CPU ns/percent + disk + optional `--out-dir` bytes. Hash-neutral. |
 | `--time` | `[time] enabled` omit = **true** | Day/night clock (hashed `ticks_per_day`). Redundant with the default. |
@@ -98,12 +99,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=80ae9571…
+# final_hash=bcd36485…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=ceb0fcc0…
+# final_hash=155d4492…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held). Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone; bread/stew/cooked_veg/jerky/biscuit/cake/dried_fish need a placed spit. Crate contents with `uses` also wear at dawn. Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held; `--per-tick-wear` instead wears each tick and skips dawn wear). Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone; bread/stew/cooked_veg/jerky/biscuit/cake/dried_fish need a placed spit. Crate contents with `uses` also wear at dawn (or each tick if `--per-tick-wear`). Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -139,6 +140,7 @@ cargo run -p viewer -- --load checkpoints/….ckpt
 | `--token SECRET` | off | Hello token for `--connect`. |
 | `--objects DIR` | shipped `configs/objects` (cwd, then crate path) | Object TOML for meshes / catalog. Needed for glb; without defs the viewer uses primitives and prints `objects: no configs/objects dir`. |
 | `--catalog` | off | Enable catalog hashing the same as sim-cli `--catalog`. |
+| `--per-tick-wear` | off | Same as sim-cli. Overlay `[wear] per_tick` on `--config`; CLI flag also applies on `--load`. |
 | `--time` / `--no-time` | clock on | Same as sim-cli. `--no-time` on `--config` / `--load` / `--connect`. |
 | `--width N` / `--height N` | TOML | In-process `--config` only. Ignored with `--load` / `--connect`. 32..=256. |
 | `--otlp-endpoint URL` | off | POST last frame ns as OTLP/JSON `agentplace.viewer.frame_ns` (`service.name=agentplace-viewer`). Hash-neutral. In-process and `--connect`. |
@@ -194,7 +196,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `80ae9571…`. `--no-time` shipped-objects is `ceb0fcc0…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `bcd36485…`. `--no-time` shipped-objects is `155d4492…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

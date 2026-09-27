@@ -72,6 +72,22 @@ struct SleepPlaceVisual {
 }
 
 #[derive(Component)]
+struct HouseholdVisual {
+    x: u32,
+    y: u32,
+}
+
+#[derive(Component)]
+struct InventionVisual {
+    id: u64,
+}
+
+#[derive(Component)]
+struct DownedMeshVisual {
+    id: AgentId,
+}
+
+#[derive(Component)]
 struct SatchelVisual {
     id: AgentId,
     backpack: bool,
@@ -218,6 +234,8 @@ fn main() {
             sim.telemetry_enabled = tel.enabled;
             sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
             apply_viewer_time(&mut sim, &text, parsed.time_on, parsed.no_time);
+            sim.wear_per_tick =
+                parsed.per_tick_wear || sim_core::WearParams::from_config_toml(&text).per_tick;
             let defs = apply_viewer_objects(
                 &mut sim,
                 parsed.objects.as_deref(),
@@ -236,6 +254,7 @@ fn main() {
             let defs =
                 apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
             apply_viewer_time(&mut sim, "", parsed.time_on, parsed.no_time);
+            sim.wear_per_tick = parsed.per_tick_wear;
             scrub = CkptScrubber::discover(&path);
             (SimPlugin::from_simulation(sim), defs)
         }
@@ -298,6 +317,9 @@ fn main() {
                 sync_agent_idle,
                 sync_stockpile_markers,
                 sync_sleep_places,
+                sync_household_homes,
+                sync_invention_markers,
+                sync_downed_meshes,
                 sync_satchel_markers,
                 reload_changed_glbs,
                 update_day_night_light,
@@ -325,6 +347,7 @@ struct ViewerArgs {
     source: ViewerSource,
     objects: Option<PathBuf>,
     catalog: bool,
+    per_tick_wear: bool,
     time_on: bool,
     no_time: bool,
     width: Option<u32>,
@@ -344,6 +367,7 @@ fn parse_args() -> ViewerArgs {
     let mut token = None;
     let mut objects = None;
     let mut catalog = false;
+    let mut per_tick_wear = false;
     let mut time_on = false;
     let mut no_time = false;
     let mut width = None;
@@ -388,6 +412,11 @@ fn parse_args() -> ViewerArgs {
             }
             "--catalog" => {
                 catalog = true;
+                i += 1;
+                continue;
+            }
+            "--per-tick-wear" => {
+                per_tick_wear = true;
                 i += 1;
                 continue;
             }
@@ -437,6 +466,7 @@ fn parse_args() -> ViewerArgs {
         source,
         objects,
         catalog,
+        per_tick_wear,
         time_on,
         no_time,
         width,
@@ -924,6 +954,152 @@ fn sync_sleep_places(
             &state.sim.catalog,
             x,
             y,
+        );
+    }
+}
+
+fn spawn_stem_at(
+    commands: &mut Commands,
+    assets: &AssetServer,
+    visuals: &ObjectVisuals,
+    world: &sim_core::World,
+    stem: &str,
+    x: u32,
+    y: u32,
+    extra: impl Bundle,
+) {
+    let pos = agent_world_pos(world, x, y);
+    let _ = try_spawn_model(
+        commands,
+        assets,
+        visuals,
+        stem,
+        models::camera_dist_cells(world.width, world.height, x, y),
+        Transform::from_translation(pos),
+        extra,
+    );
+}
+
+fn sync_household_homes(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
+    existing: Query<(Entity, &HouseholdVisual)>,
+) {
+    let live: std::collections::BTreeSet<(u32, u32)> =
+        state.sim.household_home.values().copied().collect();
+    let have: std::collections::BTreeSet<(u32, u32)> =
+        existing.iter().map(|(_, v)| (v.x, v.y)).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&(v.x, v.y)) {
+            commands.entity(e).despawn();
+        }
+    }
+    for (x, y) in live {
+        if have.contains(&(x, y)) {
+            continue;
+        }
+        spawn_stem_at(
+            &mut commands,
+            &assets,
+            &visuals,
+            &state.sim.world,
+            "household",
+            x,
+            y,
+            HouseholdVisual { x, y },
+        );
+    }
+}
+
+fn sync_invention_markers(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
+    existing: Query<(Entity, &InventionVisual)>,
+) {
+    let live: std::collections::BTreeSet<u64> = state
+        .sim
+        .inventions
+        .values()
+        .filter_map(|inv| {
+            let a = state.sim.agents.get(&inv.inventor)?;
+            if a.health == 0 {
+                None
+            } else {
+                Some(inv.id)
+            }
+        })
+        .collect();
+    let have: std::collections::BTreeSet<u64> =
+        existing.iter().map(|(_, v)| v.id).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&v.id) {
+            commands.entity(e).despawn();
+        }
+    }
+    for id in live {
+        if have.contains(&id) {
+            continue;
+        }
+        let Some(inv) = state.sim.inventions.get(&id) else {
+            continue;
+        };
+        let Some(a) = state.sim.agents.get(&inv.inventor) else {
+            continue;
+        };
+        spawn_stem_at(
+            &mut commands,
+            &assets,
+            &visuals,
+            &state.sim.world,
+            "invention",
+            a.x,
+            a.y,
+            InventionVisual { id },
+        );
+    }
+}
+
+fn sync_downed_meshes(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
+    existing: Query<(Entity, &DownedMeshVisual)>,
+) {
+    let live: std::collections::BTreeSet<AgentId> = state
+        .sim
+        .agents
+        .values()
+        .filter(|a| a.incapacitated && a.health > 0)
+        .map(|a| a.id)
+        .collect();
+    let have: std::collections::BTreeSet<AgentId> =
+        existing.iter().map(|(_, v)| v.id).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&v.id) {
+            commands.entity(e).despawn();
+        }
+    }
+    for id in live {
+        if have.contains(&id) {
+            continue;
+        }
+        let Some(a) = state.sim.agents.get(&id) else {
+            continue;
+        };
+        spawn_stem_at(
+            &mut commands,
+            &assets,
+            &visuals,
+            &state.sim.world,
+            "downed",
+            a.x,
+            a.y,
+            DownedMeshVisual { id },
         );
     }
 }
@@ -1698,17 +1874,23 @@ fn sync_combat_fx(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
     existing: Query<(Entity, &CombatFxVisual)>,
     mut last_cell: Local<std::collections::BTreeMap<AgentId, (u32, u32)>>,
 ) {
     for a in state.sim.agents.values() {
         last_cell.insert(a.id, (a.x, a.y));
     }
+    let skip_downed = !matches!(
+        models::resolve_visual_kind(&visuals.defs, "downed", 0),
+        models::VisualKind::Primitive
+    );
     let live: std::collections::BTreeSet<CombatFxJob> =
         sim_core::combat_fx_jobs(&state.sim.events.events, state.sim.tick, |id| {
             state.sim.agents.get(&id).map(|a| (a.x, a.y))
         })
         .into_iter()
+        .filter(|j| !(skip_downed && matches!(j, CombatFxJob::Downed { .. })))
         .collect();
     let have: std::collections::BTreeSet<CombatFxJob> =
         existing.iter().map(|(_, v)| v.job).collect();
@@ -1759,6 +1941,18 @@ fn sync_agent_transforms(
     state: Res<SimState>,
     mut agents: Query<(&AgentVisual, &mut Transform)>,
     mut satchels: Query<(&SatchelVisual, &mut Transform), Without<AgentVisual>>,
+    mut inventions: Query<
+        (&InventionVisual, &mut Transform),
+        (Without<AgentVisual>, Without<SatchelVisual>),
+    >,
+    mut downed: Query<
+        (&DownedMeshVisual, &mut Transform),
+        (
+            Without<AgentVisual>,
+            Without<SatchelVisual>,
+            Without<InventionVisual>,
+        ),
+    >,
 ) {
     for (visual, mut transform) in &mut agents {
         if let Some(agent) = state.sim.agents.get(&visual.id) {
@@ -1785,6 +1979,21 @@ fn sync_agent_transforms(
                 };
             transform.scale = Vec3::splat(satchel_scale(agent, &state.sim.storage));
         }
+    }
+    for (visual, mut transform) in &mut inventions {
+        let Some(inv) = state.sim.inventions.get(&visual.id) else {
+            continue;
+        };
+        let Some(a) = state.sim.agents.get(&inv.inventor) else {
+            continue;
+        };
+        transform.translation = agent_world_pos(&state.sim.world, a.x, a.y);
+    }
+    for (visual, mut transform) in &mut downed {
+        let Some(a) = state.sim.agents.get(&visual.id) else {
+            continue;
+        };
+        transform.translation = agent_world_pos(&state.sim.world, a.x, a.y);
     }
 }
 

@@ -712,6 +712,7 @@ impl Simulation {
             telemetry_out_dir_bytes: None,
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
+            wear_per_tick: false,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;
