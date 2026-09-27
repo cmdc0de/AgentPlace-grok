@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M67 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "9916abd1ddab9c8a126d0e987bb085068cd3bce7c39be7092cae7f5c7a3f1198";
+/// `--no-time` shipped-objects 2-tick (M68 catalog: millstone foods + extra recipes).
+const IDLE_2_NO_TIME: &str = "979771cc93bc9ea26287608cf83b278a2ce3dab9859cabc9007103519f75e0ff";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "092c3b9ec73ffa87ffa418fc52242ddc26b0040ef5c919db459f4777fed1aac2";
+const IDLE_2: &str = "2e3ed5ab4bf70257defa0b807e16376f9305a36164fb8705073d8e171ce51bb6";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -1156,7 +1156,7 @@ fn catalog_on_craft_hammer() {
 fn catalog_on_craft_dried_fish() {
     let mut sim = Simulation::new(tiny(0x49_12)).unwrap();
     apply_shipped(&mut sim);
-    place_station(&mut sim, "spit");
+    place_station(&mut sim, "millstone");
     craft_catalog_slug(&mut sim, "dried_fish", &[(ItemId::Food(1), 4)]);
 }
 
@@ -1819,7 +1819,7 @@ fn catalog_on_craft_mortar() {
 fn catalog_on_craft_jerky() {
     let mut sim = Simulation::new(tiny(0x59_14)).unwrap();
     apply_shipped(&mut sim);
-    place_station(&mut sim, "spit");
+    place_station(&mut sim, "millstone");
     craft_catalog_slug(&mut sim, "jerky", &[(ItemId::Food(1), 8)]);
 }
 
@@ -2004,7 +2004,7 @@ fn catalog_on_craft_brick() {
 fn catalog_on_craft_biscuit() {
     let mut sim = Simulation::new(tiny(0x60_34)).unwrap();
     apply_shipped(&mut sim);
-    place_station(&mut sim, "spit");
+    place_station(&mut sim, "millstone");
     craft_catalog_slug(&mut sim, "biscuit", &[(ItemId::Food(1), 10)]);
 }
 
@@ -2105,7 +2105,7 @@ fn catalog_on_craft_cobble() {
 fn catalog_on_craft_cake() {
     let mut sim = Simulation::new(tiny(0x61_34)).unwrap();
     apply_shipped(&mut sim);
-    place_station(&mut sim, "spit");
+    place_station(&mut sim, "millstone");
     craft_catalog_slug(&mut sim, "cake", &[(ItemId::Food(1), 12)]);
 }
 
@@ -2321,7 +2321,7 @@ fn no_time_does_not_decay_crate_axe() {
 }
 
 #[test]
-fn remaining_food_crafts_need_placed_spit() {
+fn remaining_food_crafts_need_placed_millstone() {
     let mut sim = Simulation::new(tiny(0x63_20)).unwrap();
     apply_shipped(&mut sim);
     let id = AgentId(0);
@@ -2342,13 +2342,73 @@ fn remaining_food_crafts_need_placed_spit() {
                     recipe: Recipe::Catalog(k)
                 } if *k == n
             )),
-            "{slug} illegal without placed spit"
+            "{slug} illegal without placed millstone"
         );
     }
 }
 
 #[test]
-fn cooked_veg_needs_placed_spit() {
+fn remaining_food_illegal_with_only_spit() {
+    let mut sim = Simulation::new(tiny(0x68_21)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.abilities.craft = 100;
+        a.inventory_cap = 32;
+        a.try_add_item(ItemId::Food(1), 16);
+    }
+    place_station(&mut sim, "spit");
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    for slug in ["cooked_veg", "jerky", "biscuit", "cake", "dried_fish"] {
+        let n = catalog_id(&sim, slug);
+        assert!(
+            !legal.iter().any(|x| matches!(
+                x,
+                PrimaryAction::Craft {
+                    recipe: Recipe::Catalog(k)
+                } if *k == n
+            )),
+            "{slug} still illegal with only placed spit"
+        );
+    }
+}
+
+#[test]
+fn remaining_food_pocket_millstone_not_station() {
+    let mut sim = Simulation::new(tiny(0x68_22)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let mill = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "millstone")
+        .unwrap()
+        .item;
+    let n = catalog_id(&sim, "cooked_veg");
+    {
+        let a = sim.agents.get_mut(&id).unwrap();
+        a.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+        a.abilities.craft = 100;
+        a.inventory_cap = 32;
+        a.try_add_item(ItemId::Food(1), 2);
+        a.try_add_item(mill, 1);
+    }
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    assert!(
+        !legal.iter().any(|x| matches!(
+            x,
+            PrimaryAction::Craft {
+                recipe: Recipe::Catalog(k)
+            } if *k == n
+        )),
+        "pocket millstone is not a station"
+    );
+}
+
+#[test]
+fn cooked_veg_needs_placed_millstone() {
     let mut sim = Simulation::new(tiny(0x63_21)).unwrap();
     apply_shipped(&mut sim);
     let n = catalog_id(&sim, "cooked_veg");
@@ -2367,9 +2427,9 @@ fn cooked_veg_needs_placed_spit() {
                 recipe: Recipe::Catalog(k)
             } if *k == n
         )),
-        "cooked_veg illegal without placed spit"
+        "cooked_veg illegal without placed millstone"
     );
-    place_station(&mut sim, "spit");
+    place_station(&mut sim, "millstone");
     craft_catalog_slug(&mut sim, "cooked_veg", &[(ItemId::Food(1), 2)]);
 }
 
@@ -2721,4 +2781,32 @@ fn catalog_on_craft_muffin() {
     let mut sim = Simulation::new(tiny(0x67_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "muffin", &[(ItemId::Food(1), 22)]);
+}
+
+#[test]
+fn catalog_on_craft_rail() {
+    let mut sim = Simulation::new(tiny(0x68_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "rail", &[(ItemId::Wood, 30)]);
+}
+
+#[test]
+fn catalog_on_craft_mitten() {
+    let mut sim = Simulation::new(tiny(0x68_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "mitten", &[(ItemId::Fiber, 30)]);
+}
+
+#[test]
+fn catalog_on_craft_quoin() {
+    let mut sim = Simulation::new(tiny(0x68_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "quoin", &[(ItemId::Stone, 26)]);
+}
+
+#[test]
+fn catalog_on_craft_roll() {
+    let mut sim = Simulation::new(tiny(0x68_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "roll", &[(ItemId::Food(1), 24)]);
 }

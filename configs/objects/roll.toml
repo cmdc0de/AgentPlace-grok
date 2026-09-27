@@ -1,4 +1,4 @@
-id = "biscuit"
+id = "roll"
 kind = "item"
 
 [visual]
@@ -11,6 +11,5 @@ far  = "assets/models/optimized/plants_ready.glb"
 [sim]
 weight_milli = 80
 [sim.craft]
-inputs = [["food", 5]]
+inputs = [["food", 12]]
 output_qty = 1
-station = "millstone"
