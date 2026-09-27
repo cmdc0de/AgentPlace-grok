@@ -824,6 +824,10 @@ count = 2
                     sim_core::idle_clip_name(&defs, "agent"),
                     Some("ArmatureAction.002")
                 );
+                assert_eq!(
+                    sim_core::clip_name_for(&defs, "agent", sim_core::AnimMoniker::Walk),
+                    None
+                );
             }
             other => panic!("expected Authored agent glb, got {other:?}"),
         }

@@ -4,7 +4,9 @@ use sim_core::action::PrimaryAction;
 use sim_core::combat_fx::{
     CombatFxJob, CombatRole, combat_fx_jobs, combat_hud_line, combat_hud_lines, combat_role,
 };
-use sim_core::objects::agent_idle_this_tick;
+use sim_core::objects::{
+    AnimMoniker, agent_idle_this_tick, animation_moniker_this_tick, clip_name_for,
+};
 use sim_core::conflict::{ATTACK_DAMAGE, ATTACK_ENERGY_COST, ConflictParams};
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::observation::legal_actions;
@@ -363,6 +365,77 @@ fn agent_idle_this_tick_false_on_move() {
     }];
     assert!(!agent_idle_this_tick(&events, 4, id));
     assert!(agent_idle_this_tick(&events, 5, id));
+}
+
+#[test]
+fn animation_moniker_priority_and_omit() {
+    let id = AgentId(0);
+    let wait = vec![SimEvent {
+        tick: 1,
+        agent: id,
+        kind: SimEventKind::Wait,
+    }];
+    assert_eq!(
+        animation_moniker_this_tick(&wait, 1, id, |_| None),
+        AnimMoniker::Idle
+    );
+    let mv = vec![SimEvent {
+        tick: 1,
+        agent: id,
+        kind: SimEventKind::Move {
+            from_x: 0,
+            from_y: 0,
+            to_x: 1,
+            to_y: 0,
+        },
+    }];
+    assert_eq!(
+        animation_moniker_this_tick(&mv, 1, id, |_| None),
+        AnimMoniker::Walk
+    );
+    let death = vec![
+        SimEvent {
+            tick: 1,
+            agent: id,
+            kind: SimEventKind::Move {
+                from_x: 0,
+                from_y: 0,
+                to_x: 1,
+                to_y: 0,
+            },
+        },
+        SimEvent {
+            tick: 1,
+            agent: id,
+            kind: SimEventKind::CombatDeath { by: AgentId(1) },
+        },
+    ];
+    assert_eq!(
+        animation_moniker_this_tick(&death, 1, id, |_| None),
+        AnimMoniker::Death
+    );
+    let defs = [sim_core::ObjectDef {
+        id: "agent".into(),
+        kind: "agent".into(),
+        visual: Some(sim_core::VisualDef {
+            animations: sim_core::AnimDef {
+                idle: Some("ArmatureAction.002".into()),
+                melee: Some("Melee".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        sim: None,
+    }];
+    assert_eq!(
+        clip_name_for(&defs, "agent", AnimMoniker::Idle),
+        Some("ArmatureAction.002")
+    );
+    assert_eq!(clip_name_for(&defs, "agent", AnimMoniker::Walk), None);
+    assert_eq!(
+        clip_name_for(&defs, "agent", AnimMoniker::Melee),
+        Some("Melee")
+    );
 }
 
 #[test]

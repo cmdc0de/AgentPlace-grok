@@ -71,6 +71,30 @@ pub struct AnimDef {
     /// Idle clip name. Omit ⇒ first clip in the glb.
     #[serde(default)]
     pub idle: Option<String>,
+    #[serde(default)]
+    pub walk: Option<String>,
+    #[serde(default)]
+    pub melee: Option<String>,
+    #[serde(default)]
+    pub ranged: Option<String>,
+    #[serde(default)]
+    pub flee: Option<String>,
+    #[serde(default)]
+    pub downed: Option<String>,
+    #[serde(default)]
+    pub death: Option<String>,
+}
+
+/// Viewer action clip to play this tick. Not hashed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnimMoniker {
+    Idle,
+    Walk,
+    Melee,
+    Ranged,
+    Flee,
+    Downed,
+    Death,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -139,6 +163,9 @@ pub struct SimDef {
     /// Place-able 1×1 workstation (not a sleep place). Omit = false.
     #[serde(default)]
     pub station: Option<bool>,
+    /// Sleep footprint blocks Move from outside except the origin door. Omit = false.
+    #[serde(default)]
+    pub interior: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -173,6 +200,7 @@ pub struct CatalogEntry {
     pub uses: u32,
     pub station: bool,
     pub craft_station: String,
+    pub interior: bool,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -437,6 +465,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 uses: sim.uses.unwrap_or(0),
                 station: sim.station.unwrap_or(false),
                 craft_station,
+                interior: sim.interior.unwrap_or(false),
             }
         })
         .collect()
@@ -747,6 +776,107 @@ pub fn agent_idle_this_tick(events: &[SimEvent], tick: u64, id: AgentId) -> bool
     })
 }
 
+/// Highest-priority animation moniker for this agent this tick.
+pub fn animation_moniker_this_tick(
+    events: &[SimEvent],
+    tick: u64,
+    id: AgentId,
+    pos: impl Fn(AgentId) -> Option<(u32, u32)>,
+) -> AnimMoniker {
+    let mut walk = false;
+    let mut melee = false;
+    let mut ranged = false;
+    let mut flee = false;
+    let mut downed = false;
+    let mut death = false;
+    for e in events {
+        if e.tick != tick {
+            continue;
+        }
+        match e.kind {
+            SimEventKind::CombatDeath { .. } if e.agent == id => death = true,
+            SimEventKind::Incapacitated { .. } if e.agent == id => downed = true,
+            SimEventKind::Flee if e.agent == id => flee = true,
+            SimEventKind::Attack { target, .. } if e.agent == id => {
+                let dist = match (pos(id), pos(target)) {
+                    (Some((ax, ay)), Some((bx, by))) => ax.abs_diff(bx).max(ay.abs_diff(by)),
+                    _ => 1,
+                };
+                if dist > 1 {
+                    ranged = true;
+                } else {
+                    melee = true;
+                }
+            }
+            SimEventKind::Move { .. } if e.agent == id => walk = true,
+            _ => {}
+        }
+    }
+    if death {
+        AnimMoniker::Death
+    } else if downed {
+        AnimMoniker::Downed
+    } else if flee {
+        AnimMoniker::Flee
+    } else if melee {
+        AnimMoniker::Melee
+    } else if ranged {
+        AnimMoniker::Ranged
+    } else if walk {
+        AnimMoniker::Walk
+    } else {
+        AnimMoniker::Idle
+    }
+}
+
+pub fn clip_name_for<'a>(
+    defs: &'a [ObjectDef],
+    stem: &str,
+    moniker: AnimMoniker,
+) -> Option<&'a str> {
+    let visual = visual_for_id(defs, stem)?;
+    let a = &visual.animations;
+    let name = match moniker {
+        AnimMoniker::Idle => a.idle.as_deref(),
+        AnimMoniker::Walk => a.walk.as_deref(),
+        AnimMoniker::Melee => a.melee.as_deref(),
+        AnimMoniker::Ranged => a.ranged.as_deref(),
+        AnimMoniker::Flee => a.flee.as_deref(),
+        AnimMoniker::Downed => a.downed.as_deref(),
+        AnimMoniker::Death => a.death.as_deref(),
+    };
+    name.filter(|s| !s.is_empty())
+}
+
+/// True when Move from `(fx,fy)` to `(tx,ty)` must Wait (interior, not door, not already inside).
+pub fn move_into_interior_blocked(
+    world: &crate::world::World,
+    catalog: &[CatalogEntry],
+    fx: u32,
+    fy: u32,
+    tx: u32,
+    ty: u32,
+) -> bool {
+    let Some((dest_origin, dest_item)) = sleep_origin_at(world, catalog, tx, ty) else {
+        return false;
+    };
+    let Some(entry) = sleep_entry(catalog, dest_item) else {
+        return false;
+    };
+    if !entry.interior {
+        return false;
+    }
+    if (tx, ty) == dest_origin {
+        return false;
+    }
+    match sleep_origin_at(world, catalog, fx, fy) {
+        Some((from_origin, from_item)) if from_origin == dest_origin && from_item == dest_item => {
+            false
+        }
+        _ => true,
+    }
+}
+
 pub fn sleep_covers(
     world: &crate::world::World,
     catalog: &[CatalogEntry],
@@ -975,6 +1105,9 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.uses.to_le_bytes());
         hasher.update([u8::from(e.station)]);
         hasher.update(e.craft_station.as_bytes());
+        if e.interior {
+            hasher.update([1]);
+        }
         hasher.update([0]);
         hasher.update((e.inputs.len() as u32).to_le_bytes());
         for (item, n) in &e.inputs {

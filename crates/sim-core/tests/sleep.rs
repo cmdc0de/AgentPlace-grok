@@ -728,6 +728,36 @@ fn load_restores_work_place() {
     assert_eq!(loaded.world.work_places.get(&(x, y)), Some(&mill));
 }
 
+fn land_rect_open(sim: &Simulation, w: u32, h: u32) -> (u32, u32) {
+    let ww = sim.world.width;
+    let hh = sim.world.height;
+    for y in 1..=hh.saturating_sub(h + 1) {
+        for x in 1..=ww.saturating_sub(w + 1) {
+            let ok = (0..h).all(|dy| (0..w).all(|dx| sim.world.is_land(x + dx, y + dy)));
+            if !ok {
+                continue;
+            }
+            let door_out = [(x as i32 - 1, y as i32), (x as i32, y as i32 - 1)]
+                .into_iter()
+                .any(|(nx, ny)| {
+                    sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32)
+                });
+            let side_out = [
+                (x as i32 + 1, y as i32 - 1),
+                (x as i32 + w as i32, y as i32),
+            ]
+            .into_iter()
+            .any(|(nx, ny)| {
+                sim.world.in_bounds(nx, ny) && sim.world.is_land(nx as u32, ny as u32)
+            });
+            if door_out && side_out {
+                return (x, y);
+            }
+        }
+    }
+    panic!("no {w}x{h} land with outside neighbors");
+}
+
 fn land_rect(sim: &Simulation, w: u32, h: u32) -> (u32, u32) {
     let ww = sim.world.width;
     let hh = sim.world.height;
@@ -930,4 +960,226 @@ fn load_restores_2x3() {
     );
     sim_core::execute::execute_primary(&mut loaded, id, &PrimaryAction::Place { item });
     assert_eq!(loaded.world.sleep_places.len(), 1);
+}
+
+fn apply_interior_hall(sim: &mut Simulation, tag: &str) {
+    let dir = std::env::temp_dir().join(format!(
+        "agentplace-m65-interior-{}-{tag}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("hall.toml"),
+        r#"
+id = "hall"
+kind = "item"
+[sim]
+sleep_bonus = 50
+sleep_size = 3
+interior = true
+"#,
+    )
+    .unwrap();
+    sim.apply_objects_dir(&dir).unwrap();
+}
+
+fn adj_uncovered(sim: &Simulation, x: u32, y: u32) -> (u32, u32) {
+    for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+        let nx = x as i32 + dx;
+        let ny = y as i32 + dy;
+        if sim.world.in_bounds(nx, ny)
+            && sim.world.is_land(nx as u32, ny as u32)
+            && sleep_covers(&sim.world, &sim.catalog, nx as u32, ny as u32).is_none()
+        {
+            return (nx as u32, ny as u32);
+        }
+    }
+    panic!("no uncovered land adjacent to {x},{y}");
+}
+
+fn fill_energy(sim: &mut Simulation, id: AgentId) {
+    let max = sim.agents[&id]
+        .sheet
+        .energy_max(sim.config.energy_max_milli());
+    sim.agents.get_mut(&id).unwrap().needs.energy = max;
+}
+
+#[test]
+fn cabin_still_enter_anywhere() {
+    let mut sim = Simulation::new(tiny(0x65_10)).unwrap();
+    apply_shipped(&mut sim);
+    let id = AgentId(0);
+    let (x, y) = land_square(&sim, 2);
+    park(&mut sim, id, x, y);
+    let cabin = catalog_item(&sim, "cabin");
+    give(&mut sim, id, "cabin");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: cabin });
+    let (ox, oy) = adj_uncovered(&sim, x + 1, y);
+    park(&mut sim, id, ox, oy);
+    fill_energy(&mut sim, id);
+    let dx = (x + 1) as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!(sim.agents[&id].x, x + 1);
+    assert_eq!(sim.agents[&id].y, y);
+    assert!(!sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
+}
+
+#[test]
+fn interior_blocks_outside_non_origin() {
+    let mut sim = Simulation::new(tiny(0x65_11)).unwrap();
+    apply_interior_hall(&mut sim, "block");
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let (ox, oy) = adj_uncovered(&sim, x + 1, y);
+    assert!(
+        ox != x || oy != y,
+        "need an outside cell"
+    );
+    park(&mut sim, id, ox, oy);
+    fill_energy(&mut sim, id);
+    let dx = (x + 1) as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (ox, oy));
+    assert!(sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
+}
+
+#[test]
+fn interior_door_origin_from_outside() {
+    let mut sim = Simulation::new(tiny(0x65_12)).unwrap();
+    apply_interior_hall(&mut sim, "door");
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let (ox, oy) = adj_uncovered(&sim, x, y);
+    park(&mut sim, id, ox, oy);
+    fill_energy(&mut sim, id);
+    let dx = x as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x, y));
+}
+
+#[test]
+fn interior_inside_and_exit() {
+    let mut sim = Simulation::new(tiny(0x65_13)).unwrap();
+    apply_interior_hall(&mut sim, "inside");
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    fill_energy(&mut sim, id);
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx: 1, dy: 0 },
+    );
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 1, y));
+    fill_energy(&mut sim, id);
+    let (ex, ey) = adj_uncovered(&sim, x + 1, y);
+    let dx = ex as i32 - (x + 1) as i32;
+    let dy = ey as i32 - y as i32;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (ex, ey));
+}
+
+#[test]
+fn interior_legal_actions_omits_blocked() {
+    let mut sim = Simulation::new(tiny(0x65_14)).unwrap();
+    apply_interior_hall(&mut sim, "legal");
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let (ox, oy) = adj_uncovered(&sim, x + 1, y);
+    park(&mut sim, id, ox, oy);
+    fill_energy(&mut sim, id);
+    let legal = legal_actions(&sim, sim.agents.get(&id).unwrap());
+    let dx = (x + 1) as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    assert!(
+        !legal
+            .iter()
+            .any(|a| matches!(a, PrimaryAction::MoveRelative { dx: ddx, dy: ddy } if *ddx == dx && *ddy == dy)),
+        "blocked dest must not be legal"
+    );
+}
+
+#[test]
+fn load_restores_interior_block() {
+    let mut sim = Simulation::new(tiny(0x65_15)).unwrap();
+    apply_interior_hall(&mut sim, "load");
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_interior_hall(&mut loaded, "load2");
+    assert_eq!(loaded.world.sleep_places.get(&(x, y)), Some(&item));
+    let (ox, oy) = adj_uncovered(&loaded, x + 1, y);
+    park(&mut loaded, id, ox, oy);
+    fill_energy(&mut loaded, id);
+    let dx = (x + 1) as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    sim_core::execute::execute_primary(
+        &mut loaded,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!((loaded.agents[&id].x, loaded.agents[&id].y), (ox, oy));
+}
+
+#[test]
+fn no_time_interior_still_blocks() {
+    let mut sim = Simulation::new(tiny(0x65_16)).unwrap();
+    apply_interior_hall(&mut sim, "notime");
+    sim.time_enabled = false;
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(&sim, 3, 3);
+    park(&mut sim, id, x, y);
+    let item = catalog_item(&sim, "hall");
+    give(&mut sim, id, "hall");
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item });
+    let (ox, oy) = adj_uncovered(&sim, x + 1, y);
+    park(&mut sim, id, ox, oy);
+    fill_energy(&mut sim, id);
+    let dx = (x + 1) as i32 - ox as i32;
+    let dy = y as i32 - oy as i32;
+    sim_core::execute::execute_primary(
+        &mut sim,
+        id,
+        &PrimaryAction::MoveRelative { dx, dy },
+    );
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (ox, oy));
 }

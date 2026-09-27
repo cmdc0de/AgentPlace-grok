@@ -42,15 +42,14 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-15 | viewer | L | n/a | Bevy in the browser |
 | RF-16 | storage | L | n/a | replacing JSONL |
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
-| RF-18 | world | M | hashed | interiors: walls / blocked Move / doors (RF-5 this slice is non-square footprints only) |
 | RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) |
-| RF-20 | PG-6 | M | hash-neutral | Standard animation monikers → glb clip names in `[visual.animations]` (`agent.toml` / object TOML). M64 shipped `idle` only. |
+| RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
 ### RF-20 — animation monikers (hash-neutral)
 
-M64: `[visual.animations] idle` in `configs/objects/agent.toml` maps to glb clip `ArmatureAction.002`. Missing clip / omit ⇒ first clip or static. Move this tick **pauses** idle (no walk clip yet). `[visual]` is not hashed.
+**Done** [`M65-plan.md`](M65-plan.md). M64 idle + M65 moniker keys. Shipping `agent.toml` still maps idle only (no fake walk clip). Missing clip / omit ⇒ first clip or static. Move this tick **pauses** idle (no walk clip yet). `[visual]` is not hashed.
 
 Wanted: a **closed set of monikers** the viewer already understands, mapped per object file so a researcher can point each action at a clip name in that glb (or omit = no clip for that action). Same table on `agent.toml` and on any later skinned object TOML.
 
@@ -100,7 +99,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M64 is implemented. Next `/spec` picks from Open + Standing.
+None. M65 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -110,6 +109,8 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-20 | PG-6 | M | hash-neutral | Standard `[visual.animations]` monikers (walk/melee/ranged/flee/downed/death); idle already M64 | [M65](M65-plan.md) |
+| RF-18 | world | M | hashed | `interior = true`: Move from outside onto footprint fails except origin door | [M65](M65-plan.md) |
 | RF-9 | PG-6 | M | hash-neutral | agent glb clip `ArmatureAction.002` is **idle**; pause on Move | [M64](M64-plan.md) |
 | RF-6 | combat FX | S | hash-neutral | ranged Attack projectile mesh (Chebyshev > 1); melee Strike unchanged | [M64](M64-plan.md) |
 | RF-5 | world | M | hashed | non-square W×H sleep footprints (`sleep_w` / `sleep_h`; square omit-hash) | [M64](M64-plan.md) |

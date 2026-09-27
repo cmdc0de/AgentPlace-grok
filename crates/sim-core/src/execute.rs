@@ -1058,6 +1058,17 @@ fn move_rel(sim: &mut Simulation, id: AgentId, dx: i32, dy: i32) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    if crate::objects::move_into_interior_blocked(
+        &sim.world,
+        &sim.catalog,
+        from_x,
+        from_y,
+        nx as u32,
+        ny as u32,
+    ) {
+        push(sim, id, SimEventKind::Wait);
+        return;
+    }
     let cost = crate::inventions::apply_move_cost(
         agent.move_cost_milli(&sim.storage),
         &sim.inventions,

@@ -80,7 +80,8 @@ Read this table first in a new session, then the specs, then [`remaining-feature
 | **M62** | Done (tag `M62`) | [`M62-plan.md`](M62-plan.md), walkthrough [`M62-test-plan.md`](M62-test-plan.md) | Stations for bread/stew, Store wear, extra recipes |
 | **M63** | Done (tag `M63`) | [`M63-plan.md`](M63-plan.md), walkthrough [`M63-test-plan.md`](M63-test-plan.md) | Crate dawn decay, remaining food stations, extra recipes |
 | **M64** | Done (tag `M64`) | [`M64-plan.md`](M64-plan.md), walkthrough [`M64-test-plan.md`](M64-test-plan.md) | Non-square footprints, ranged projectile FX, agent idle clip |
-| After M64 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
+| **M65** | Done (tag `M65`) | [`M65-plan.md`](M65-plan.md), walkthrough [`M65-test-plan.md`](M65-test-plan.md) | Interior blocked Move, animation monikers, extra recipes |
+| After M65 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now**. The living leftover list is [`remaining-features.md`](remaining-features.md); historical `M*-plan.md` later-tables are snapshots and are not rewritten. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -223,15 +224,17 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 68b | `M63-test-plan.md` | M63 walkthrough (crate dawn decay, remaining food stations, extra recipes) |
 | 69 | `M64-plan.md` | Milestone 64 (done, tag `M64`): non-square footprints, ranged projectile FX, agent idle clip |
 | 69b | `M64-test-plan.md` | M64 walkthrough (non-square footprints, projectile FX, agent idle clip) |
+| 70 | `M65-plan.md` | Milestone 65 (done, tag `M65`): interior blocked Move, animation monikers, extra recipes |
+| 70b | `M65-test-plan.md` | M65 walkthrough (interior blocked Move, animation monikers, extra recipes) |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M64-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M65-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M64 is implemented (`M64-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M65 is implemented (`M65-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -259,11 +262,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M64 are done. M64 is implemented ([`M64-plan.md`](M64-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
+M1–M65 are done. M65 is implemented ([`M65-plan.md`](M65-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/remaining-features.md.
-M64 is implemented (non-square footprints, ranged projectile FX, agent idle clip;
+M65 is implemented (interior blocked Move, animation monikers, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Leftovers are in remaining-features.md. Do not reconstruct them from M*-plan later-tables.
 Do not add protobuf, TLS, or Bevy in the browser unless asked.

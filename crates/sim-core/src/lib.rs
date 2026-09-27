@@ -70,9 +70,10 @@ pub use llm::{
     parse_item,
 };
 pub use objects::{
-    AnimDef, CatalogEntry, CatalogParams, ObjectDef, VisualDef, agent_idle_this_tick,
-    apply_species_defs, catalog_entries, idle_clip_name, load_object_defs, pick_visual_path,
-    sleep_dims, visual_for_id, visual_scale_for,
+    AnimDef, AnimMoniker, CatalogEntry, CatalogParams, ObjectDef, VisualDef,
+    agent_idle_this_tick, animation_moniker_this_tick, apply_species_defs, catalog_entries,
+    clip_name_for, idle_clip_name, load_object_defs, move_into_interior_blocked,
+    pick_visual_path, sleep_dims, visual_for_id, visual_scale_for,
 };
 pub use observation::{IncentiveView, InventoryView};
 pub use report::{build_report, report_csv, report_markdown, write_report};

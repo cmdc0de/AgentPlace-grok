@@ -532,6 +532,14 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
         if sim.world.in_bounds(nx, ny)
             && sim.world.is_land(nx as u32, ny as u32)
             && energy >= move_cost
+            && !crate::objects::move_into_interior_blocked(
+                &sim.world,
+                &sim.catalog,
+                agent.x,
+                agent.y,
+                nx as u32,
+                ny as u32,
+            )
         {
             legal.push(PrimaryAction::MoveRelative { dx, dy });
         }

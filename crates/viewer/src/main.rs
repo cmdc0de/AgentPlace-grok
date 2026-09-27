@@ -1128,6 +1128,7 @@ fn play_idle_when_ready(
 
 fn sync_agent_idle(
     state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
     agents: Query<(Entity, &AgentVisual), With<IdleClip>>,
     children: Query<&Children>,
     mut players: Query<&mut AnimationPlayer>,
@@ -1135,10 +1136,18 @@ fn sync_agent_idle(
     let tick = state.sim.tick;
     let events = &state.sim.events.events;
     for (entity, visual) in &agents {
-        let idle = sim_core::agent_idle_this_tick(events, tick, visual.id);
+        let moniker = sim_core::animation_moniker_this_tick(events, tick, visual.id, |id| {
+            state.sim.agents.get(&id).map(|a| (a.x, a.y))
+        });
+        let want = sim_core::clip_name_for(&visuals.defs, "agent", moniker);
+        let idle_name = sim_core::idle_clip_name(&visuals.defs, "agent");
+        let play = match moniker {
+            sim_core::AnimMoniker::Idle => true,
+            _ => want.is_some() && want == idle_name,
+        };
         for child in children.iter_descendants(entity) {
             if let Ok(mut player) = players.get_mut(child) {
-                if idle {
+                if play {
                     player.resume_all();
                 } else {
                     player.pause_all();
