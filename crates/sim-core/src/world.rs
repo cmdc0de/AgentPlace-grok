@@ -96,6 +96,15 @@ impl Container {
 
     /// Increment the most-worn instance; consume 1 qty when `uses` is reached.
     pub fn wear_tool(&mut self, item: ItemId, uses: u32) {
+        self.wear_tool_impl(item, uses, false);
+    }
+
+    /// Increment every wear slot; consume each that reaches `uses` (high index first).
+    pub fn wear_all_tools(&mut self, item: ItemId, uses: u32) {
+        self.wear_tool_impl(item, uses, true);
+    }
+
+    fn wear_tool_impl(&mut self, item: ItemId, uses: u32, every: bool) {
         if uses == 0 {
             return;
         }
@@ -110,6 +119,26 @@ impl Container {
         }
         while v.len() > qty {
             v.pop();
+        }
+        if every {
+            for w in v.iter_mut() {
+                *w = w.saturating_add(1);
+            }
+            for i in (0..v.len()).rev() {
+                if v[i] >= uses {
+                    v.remove(i);
+                    if let Some(have) = self.items.get_mut(&item) {
+                        *have = have.saturating_sub(1);
+                        if *have == 0 {
+                            self.items.remove(&item);
+                        }
+                    }
+                }
+            }
+            if v.is_empty() {
+                self.tool_wear.remove(&item);
+            }
+            return;
         }
         let mut idx = 0usize;
         let mut max = v[0];

@@ -65,6 +65,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut pipeline_events = false;
     let mut catalog = false;
     let mut per_tick_wear = false;
+    let mut every_instance_wear = false;
     let mut telemetry = false;
     let mut time_on = false;
     let mut no_time = false;
@@ -189,6 +190,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--pipeline-events" => pipeline_events = true,
             "--catalog" => catalog = true,
             "--per-tick-wear" => per_tick_wear = true,
+            "--every-instance-wear" => every_instance_wear = true,
             "--telemetry" => telemetry = true,
             "--time" => time_on = true,
             "--no-time" => no_time = true,
@@ -393,6 +395,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.ticks_per_day = tp.ticks_per_day;
         let wear = sim_core::WearParams::from_config_toml(&text);
         sim.wear_per_tick = per_tick_wear || wear.per_tick;
+        sim.wear_every_instance = every_instance_wear || wear.every_instance;
     }
     if incentives_path.is_none() && !overlay.incentives.schedule.is_empty() {
         incentives_path = Some(PathBuf::from(overlay.incentives.schedule.clone()));
@@ -616,7 +619,7 @@ Usage:
           [--sheet] [--reproduction] [--aging]
           [--household-crates] [--culture] [--inventions]
           [--pipeline-events] [--catalog] [--objects DIR] [--telemetry]
-          [--per-tick-wear] [--time] [--no-time] [--width N] [--height N] [--otlp-endpoint URL]
+          [--per-tick-wear] [--every-instance-wear] [--time] [--no-time] [--width N] [--height N] [--otlp-endpoint URL]
           [--incentives PATH] [--inject PATH]
           [--compare DIR_OR_CKPT DIR_OR_CKPT] [--csv]
 
@@ -653,6 +656,7 @@ Options:
       --pipeline-events     Hash one Pipeline stage bitmask per living agent per tick (overlay [pipeline] hash_events)
       --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
       --per-tick-wear       Wear tools each tick (overlay [wear] per_tick; skips dawn wear)
+      --every-instance-wear Wear every slot on a decay pass (overlay [wear] every_instance)
       --objects DIR         Object definition TOML directory (default: configs/objects if present)
       --telemetry           Hash-neutral tick aggregates + RSS (overlay [telemetry] enabled)
       --time                Day/night clock (default on; overlay [time] enabled)

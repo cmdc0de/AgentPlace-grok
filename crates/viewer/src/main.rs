@@ -234,8 +234,9 @@ fn main() {
             sim.telemetry_enabled = tel.enabled;
             sim.telemetry_otlp_endpoint = tel.otlp_endpoint;
             apply_viewer_time(&mut sim, &text, parsed.time_on, parsed.no_time);
-            sim.wear_per_tick =
-                parsed.per_tick_wear || sim_core::WearParams::from_config_toml(&text).per_tick;
+            let wear = sim_core::WearParams::from_config_toml(&text);
+            sim.wear_per_tick = parsed.per_tick_wear || wear.per_tick;
+            sim.wear_every_instance = parsed.every_instance_wear || wear.every_instance;
             let defs = apply_viewer_objects(
                 &mut sim,
                 parsed.objects.as_deref(),
@@ -255,6 +256,7 @@ fn main() {
                 apply_viewer_objects(&mut sim, parsed.objects.as_deref(), parsed.catalog, None);
             apply_viewer_time(&mut sim, "", parsed.time_on, parsed.no_time);
             sim.wear_per_tick = parsed.per_tick_wear;
+            sim.wear_every_instance = parsed.every_instance_wear;
             scrub = CkptScrubber::discover(&path);
             (SimPlugin::from_simulation(sim), defs)
         }
@@ -348,6 +350,7 @@ struct ViewerArgs {
     objects: Option<PathBuf>,
     catalog: bool,
     per_tick_wear: bool,
+    every_instance_wear: bool,
     time_on: bool,
     no_time: bool,
     width: Option<u32>,
@@ -368,6 +371,7 @@ fn parse_args() -> ViewerArgs {
     let mut objects = None;
     let mut catalog = false;
     let mut per_tick_wear = false;
+    let mut every_instance_wear = false;
     let mut time_on = false;
     let mut no_time = false;
     let mut width = None;
@@ -420,6 +424,11 @@ fn parse_args() -> ViewerArgs {
                 i += 1;
                 continue;
             }
+            "--every-instance-wear" => {
+                every_instance_wear = true;
+                i += 1;
+                continue;
+            }
             "--time" => {
                 time_on = true;
                 i += 1;
@@ -467,6 +476,7 @@ fn parse_args() -> ViewerArgs {
         objects,
         catalog,
         per_tick_wear,
+        every_instance_wear,
         time_on,
         no_time,
         width,

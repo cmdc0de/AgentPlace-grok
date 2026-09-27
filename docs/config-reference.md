@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `bcd36485…`; `--no-time` shipped-objects `155d4492…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `092c3b9e…`; `--no-time` shipped-objects `9916abd1…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -291,7 +291,7 @@ Crate on a land cell (not pockets). Display floats → milli.
 |---|---|---|
 | `enabled` | `false` | `--catalog`. Hash `[sim]` from `--objects`. Empty catalog ≡ off. |
 
-Overlay `[wear]` (M66, omit = off; hashed **only when** `per_tick = true`): `per_tick` wears held then crate tools each tick (most-worn) and **skips dawn wear**. CLI `--per-tick-wear`.
+Overlay `[wear]` (omit = off): `per_tick` (M66, hashed **only when true**, tag `[1u8]`) wears held then crate tools each tick (most-worn) and **skips dawn wear**. CLI `--per-tick-wear`. `every_instance` (M67, hashed **only when true**, tag `[2u8]`) increments **every** wear slot on that decay pass, then consumes each at `uses`. CLI `--every-instance-wear`. Bonus-use still most-worn.
 
 Object `[sim]` sleep (M53, hashed with catalog): `sleep_bonus` (omit 0) millipoints of energy max at dawn; `sleep_size` (omit 1, max 8) is an N×N footprint. Optional `sleep_w` / `sleep_h` (omit = `sleep_size`, max 8) make a rectangle; extra dims hash **only when** non-square. `[sim] interior` (M65, omit false; hash **only when true**) blocks Move from outside onto the footprint except the origin door. `[visual.animations]` (not hashed) maps monikers `idle` / `walk` / `melee` / `ranged` / `flee` / `downed` / `death` to glb clip names (omit ⇒ no clip; M64 idle). `Place` consumes one held item. `Pickup` returns it. Combat: `attack_bonus` (omit 0); `attack_range` (omit 1, Chebyshev). Tools: `farm_bonus` / `fish_bonus` / `gather_bonus` / `stone_gather_bonus` (omit 0) added to Farm/Fish/vegetation-Gather/stone-Gather `skill_roll`. `uses` (omit 0) is successful bonus-uses until one qty breaks (per-instance wear; most-worn first). Held tools and **crate** contents also wear +1 on the most-worn instance at **dawn** (`--no-time` does not decay). Transfer and Store move the freshest wear slots with the item (crates keep a wear vec). `station` (omit false) is a Place-able 1×1 workstation. `[sim.craft] station` is a placed-station slug required for that Craft (flour → millstone; bread/stew/cooked_veg/jerky/biscuit/cake/dried_fish → spit). Native viewer `--otlp-endpoint` POSTs frame ns (hash-neutral). sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
 

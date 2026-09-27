@@ -82,7 +82,7 @@ Read this table first in a new session, then the specs, then [`remaining-feature
 | **M64** | Done (tag `M64`) | [`M64-plan.md`](M64-plan.md), walkthrough [`M64-test-plan.md`](M64-test-plan.md) | Non-square footprints, ranged projectile FX, agent idle clip |
 | **M65** | Done (tag `M65`) | [`M65-plan.md`](M65-plan.md), walkthrough [`M65-test-plan.md`](M65-test-plan.md) | Interior blocked Move, animation monikers, extra recipes |
 | **M66** | Done (tag `M66`) | [`M66-plan.md`](M66-plan.md), walkthrough [`M66-test-plan.md`](M66-test-plan.md) | Per-tick wear, household/invention/downed meshes, extra recipes |
-| **M67** | Planned — next | [`M67-plan.md`](M67-plan.md) | Every-instance wear, extra recipes |
+| **M67** | Done (tag `M67`) | [`M67-plan.md`](M67-plan.md), walkthrough [`M67-test-plan.md`](M67-test-plan.md) | Every-instance wear, extra recipes |
 | After M67 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now**. The living leftover list is [`remaining-features.md`](remaining-features.md); historical `M*-plan.md` later-tables are snapshots and are not rewritten. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
@@ -230,7 +230,8 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 70b | `M65-test-plan.md` | M65 walkthrough (interior blocked Move, animation monikers, extra recipes) |
 | 71 | `M66-plan.md` | Milestone 66 (done, tag `M66`): per-tick wear, household/invention/downed meshes, extra recipes |
 | 71b | `M66-test-plan.md` | M66 walkthrough (per-tick wear, household/invention/downed meshes, extra recipes) |
-| 72 | `M67-plan.md` | Milestone 67 (planned): every-instance wear, extra recipes |
+| 72 | `M67-plan.md` | Milestone 67 (done, tag `M67`): every-instance wear, extra recipes |
+| 72b | `M67-test-plan.md` | M67 walkthrough (every-instance wear, extra recipes) |
 
 ---
 
@@ -239,7 +240,7 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 **Option A – Recommended**  
 Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M67-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M67 is planned (`M67-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M67 is implemented (`M67-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -267,12 +268,12 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M66 are done. M67 is planned ([`M67-plan.md`](M67-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
+M1–M67 are done. M67 is implemented ([`M67-plan.md`](M67-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/remaining-features.md.
-M67 is planned (every-instance wear, extra recipes; M67-plan.md).
-PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3.
+M67 is implemented (every-instance wear, extra recipes;
+PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Leftovers are in remaining-features.md. Do not reconstruct them from M*-plan later-tables.
 Do not add protobuf, TLS, or Bevy in the browser unless asked.
 CI stays provider=mock with no network.

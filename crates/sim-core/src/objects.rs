@@ -44,6 +44,7 @@ impl CatalogParams {
 #[derive(Clone, Debug, Default)]
 pub struct WearParams {
     pub per_tick: bool,
+    pub every_instance: bool,
 }
 
 impl WearParams {
@@ -56,10 +57,12 @@ impl WearParams {
         #[derive(Default, Deserialize)]
         struct Table {
             per_tick: Option<bool>,
+            every_instance: Option<bool>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         Self {
             per_tick: slice.wear.per_tick.unwrap_or(false),
+            every_instance: slice.wear.every_instance.unwrap_or(false),
         }
     }
 }
@@ -1007,6 +1010,15 @@ pub fn max_held_bonus_item(
 
 /// Increment the most-worn instance; consume 1 qty when `uses` is reached.
 pub fn wear_tool(agent: &mut Agent, item: ItemId, uses: u32) {
+    wear_tool_impl(agent, item, uses, false);
+}
+
+/// Increment every wear slot; consume each that reaches `uses` (high index first).
+pub fn wear_all_tools(agent: &mut Agent, item: ItemId, uses: u32) {
+    wear_tool_impl(agent, item, uses, true);
+}
+
+fn wear_tool_impl(agent: &mut Agent, item: ItemId, uses: u32, every: bool) {
     if uses == 0 {
         return;
     }
@@ -1021,6 +1033,27 @@ pub fn wear_tool(agent: &mut Agent, item: ItemId, uses: u32) {
     }
     while v.len() > qty {
         v.pop();
+    }
+    if every {
+        for w in v.iter_mut() {
+            *w = w.saturating_add(1);
+        }
+        let mut broken = 0usize;
+        for i in (0..v.len()).rev() {
+            if v[i] >= uses {
+                v.remove(i);
+                broken += 1;
+            }
+        }
+        if v.is_empty() {
+            agent.tool_wear.remove(&item);
+        }
+        for _ in 0..broken {
+            if !agent.take_item(item, 1) {
+                let _ = agent.take_pack(item, 1);
+            }
+        }
+        return;
     }
     let mut idx = 0usize;
     let mut max = v[0];

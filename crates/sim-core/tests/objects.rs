@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M66 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "155d449267a13643920e185a46e5b3e28604276cb160ec5c7542868f32f2e099";
+/// `--no-time` shipped-objects 2-tick (M67 catalog: extra recipes).
+const IDLE_2_NO_TIME: &str = "9916abd1ddab9c8a126d0e987bb085068cd3bce7c39be7092cae7f5c7a3f1198";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "bcd3648573d414081e320245a5e768f86d81744467562a562e4f5d4a06acdeea";
+const IDLE_2: &str = "092c3b9ec73ffa87ffa418fc52242ddc26b0040ef5c919db459f4777fed1aac2";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -158,10 +158,15 @@ fn overlay_parses_catalog() {
 
 #[test]
 fn overlay_parses_wear() {
-    let on = WearParams::from_config_toml("[wear]\nper_tick = true\n");
+    let on = WearParams::from_config_toml("[wear]\nper_tick = true\nevery_instance = true\n");
     assert!(on.per_tick);
+    assert!(on.every_instance);
     let off = WearParams::from_config_toml("[llm]\nprovider = \"mock\"\n");
     assert!(!off.per_tick);
+    assert!(!off.every_instance);
+    let only = WearParams::from_config_toml("[wear]\nevery_instance = true\n");
+    assert!(!only.per_tick);
+    assert!(only.every_instance);
 }
 
 #[test]
@@ -2566,4 +2571,154 @@ fn catalog_on_craft_scone() {
     let mut sim = Simulation::new(tiny(0x66_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "scone", &[(ItemId::Food(1), 20)]);
+}
+
+#[test]
+fn every_instance_dawn_wears_all_held() {
+    let mut sim = Simulation::new(tiny(0x67_11)).unwrap();
+    apply_shipped(&mut sim);
+    sim.ticks_per_day = 2;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![3, 0]);
+    sim.run_ticks(2);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn every_instance_dawn_wears_crate() {
+    let mut sim = Simulation::new(tiny(0x67_12)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_per_tick = true;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let (x, y, axe) = store_axe_on_land(&mut sim, id, 1, vec![3]);
+    {
+        let c = sim.world.stockpiles.get_mut(&(x, y)).expect("crate");
+        *c.items.entry(axe).or_insert(0) = 2;
+        c.tool_wear.insert(axe, vec![3, 0]);
+    }
+    sim.run_ticks(1);
+    let wear = sim
+        .world
+        .stockpile_at(x, y)
+        .and_then(|c| c.tool_wear.get(&axe).cloned());
+    assert_eq!(wear, Some(vec![4, 1]));
+}
+
+#[test]
+fn every_instance_per_tick_wears_all_held() {
+    let mut sim = Simulation::new(tiny(0x67_13)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_per_tick = true;
+    sim.wear_every_instance = true;
+    sim.chooser = sim_core::Chooser::Wait;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![3, 0]);
+    sim.run_ticks(1);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn every_instance_consumes_all_at_uses() {
+    let mut sim = Simulation::new(tiny(0x67_14)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_per_tick = true;
+    sim.wear_every_instance = true;
+    sim.chooser = sim_core::Chooser::Wait;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![7, 7]);
+    sim.run_ticks(1);
+    assert_eq!(
+        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
+        0
+    );
+    assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
+}
+
+#[test]
+fn no_time_every_instance_per_tick_still_wears() {
+    let mut sim = Simulation::new(tiny(0x67_15)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_per_tick = true;
+    sim.wear_every_instance = true;
+    sim.chooser = sim_core::Chooser::Wait;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![0, 0]);
+    sim.run_ticks(1);
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![1, 1])
+    );
+}
+
+#[test]
+fn load_does_not_extra_every_instance_wear() {
+    let mut sim = Simulation::new(tiny(0x67_16)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_per_tick = true;
+    sim.wear_every_instance = true;
+    sim.chooser = sim_core::Chooser::Wait;
+    let id = AgentId(0);
+    let axe = give_axe(&mut sim, id, 2, vec![3, 0]);
+    sim.run_ticks(1);
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_shipped(&mut loaded);
+    loaded.wear_per_tick = true;
+    loaded.wear_every_instance = true;
+    loaded.time_enabled = false;
+    assert_eq!(
+        loaded.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn every_instance_overlay_on_vs_off_hash() {
+    let mut off = Simulation::new(tiny(0x67_17)).unwrap();
+    let mut on = Simulation::new(tiny(0x67_17)).unwrap();
+    on.wear_every_instance = true;
+    off.run_ticks(2);
+    on.run_ticks(2);
+    assert_ne!(off.state_hash(), on.state_hash());
+}
+
+#[test]
+fn catalog_on_craft_strut() {
+    let mut sim = Simulation::new(tiny(0x67_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "strut", &[(ItemId::Wood, 28)]);
+}
+
+#[test]
+fn catalog_on_craft_hood() {
+    let mut sim = Simulation::new(tiny(0x67_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "hood", &[(ItemId::Fiber, 28)]);
+}
+
+#[test]
+fn catalog_on_craft_sill() {
+    let mut sim = Simulation::new(tiny(0x67_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "sill", &[(ItemId::Stone, 24)]);
+}
+
+#[test]
+fn catalog_on_craft_muffin() {
+    let mut sim = Simulation::new(tiny(0x67_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "muffin", &[(ItemId::Food(1), 22)]);
 }

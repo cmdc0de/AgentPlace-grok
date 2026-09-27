@@ -97,11 +97,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-Locked for the current `/spec` slice. `/implement-m` moves these to Done.
-
-| ID | Theme | Size | Hash / wire | One-liner | Plan |
-|---|---|---|---|---|---|
-| RF-3 | durability | M | hashed wear | decay every instance, not just most-worn | [M67](M67-plan.md) |
+None. M67 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -111,6 +107,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-3 | durability | M | hashed wear | decay every instance, not just most-worn | [M67](M67-plan.md) |
 | RF-2 | durability | M | hashed wear | per-tick wear overlay; skip dawn wear while on | [M66](M66-plan.md) |
 | RF-1 | meshes | S | hash-neutral | household / invention / downed viewer meshes (visual-only TOML) | [M66](M66-plan.md) |
 | RF-20 | PG-6 | M | hash-neutral | Standard `[visual.animations]` monikers (walk/melee/ranged/flee/downed/death); idle already M64 | [M65](M65-plan.md) |

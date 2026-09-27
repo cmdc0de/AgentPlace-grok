@@ -713,6 +713,7 @@ impl Simulation {
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
             wear_per_tick: false,
+            wear_every_instance: false,
         };
         if sim.next_household_id == 0 {
             sim.next_household_id = 1;

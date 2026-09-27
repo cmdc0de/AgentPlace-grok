@@ -163,6 +163,8 @@ pub struct Simulation {
     pub ticks_per_day: u64,
     /// Overlay `[wear] per_tick`. Omit = false. Hashed when true.
     pub wear_per_tick: bool,
+    /// Overlay `[wear] every_instance`. Omit = false. Hashed when true (`[2u8]`).
+    pub wear_every_instance: bool,
 }
 
 impl Simulation {
@@ -272,6 +274,7 @@ impl Simulation {
             time_enabled: true,
             ticks_per_day: crate::clock::DEFAULT_TICKS_PER_DAY,
             wear_per_tick: false,
+            wear_every_instance: false,
         })
     }
 
@@ -1194,7 +1197,11 @@ impl Simulation {
             .collect();
         for (id, item, uses) in decay {
             if let Some(a) = self.agents.get_mut(&id) {
-                crate::objects::wear_tool(a, item, uses);
+                if self.wear_every_instance {
+                    crate::objects::wear_all_tools(a, item, uses);
+                } else {
+                    crate::objects::wear_tool(a, item, uses);
+                }
             }
         }
         let crate_decay: Vec<((u32, u32), crate::agent::ItemId, u32)> = self
@@ -1213,7 +1220,11 @@ impl Simulation {
             .collect();
         for ((x, y), item, uses) in crate_decay {
             if let Some(c) = self.world.stockpiles.get_mut(&(x, y)) {
-                c.wear_tool(item, uses);
+                if self.wear_every_instance {
+                    c.wear_all_tools(item, uses);
+                } else {
+                    c.wear_tool(item, uses);
+                }
             }
         }
         self.world.stockpiles.retain(|_, c| !c.is_empty());
@@ -1713,6 +1724,9 @@ impl Simulation {
         }
         if self.wear_per_tick {
             hasher.update([1u8]);
+        }
+        if self.wear_every_instance {
+            hasher.update([2u8]);
         }
         for (label, a, b, seed) in self.rngs.fingerprint() {
             hasher.update(label.as_bytes());

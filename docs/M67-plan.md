@@ -1,7 +1,8 @@
 # M67 — Every-instance wear, extra recipes
 
-**Status:** planned (not yet implemented)  
+**Status:** implemented  
 **Depends on:** M66 complete (`docs/M66-plan.md`, git tag `M66`, commit `848835a`)  
+**Walkthrough:** [`docs/M67-test-plan.md`](M67-test-plan.md)  
 **Specs:** [`remaining-features.md`](remaining-features.md) RF-3 / RF-PG9
 
 ## Context
@@ -78,8 +79,8 @@ No `uses` / `station` / interior. Catalog-off illegal. Default CLI shipped-objec
 | Test | Asserts |
 |---|---|
 | `--no-time` no-objects 2 ticks | hash `70e5204d…` |
-| default CLI 2 ticks | new shipped-objects hash (document on implement) |
-| `--no-time` shipped objects | new hash (document on implement) |
+| default CLI 2 ticks | hash `092c3b9e…` |
+| `--no-time` shipped objects | hash `9916abd1…` |
 | overlay off, two axes `[3, 0]` | dawn → `[4, 0]` (M61 identity) |
 | overlay on, 1 dawn, `[3, 0]` | `[4, 1]` |
 | overlay on, crate two axes | both crate slots +1 |
@@ -120,7 +121,7 @@ cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --qui
 
 ## Verification
 
-Walkthrough: `docs/M67-test-plan.md` (written on implement).
+Walkthrough: [`docs/M67-test-plan.md`](M67-test-plan.md).
 
 ```bash
 cargo test -p sim-core
@@ -129,7 +130,7 @@ cargo test -p sim-cli --test net
 cargo test -p shared
 ```
 
-Expect: `--no-time` no-objects hash `70e5204d…`; shipped-objects hashes documented on implement; Hello v5; format_version 3 write.
+Expect: `--no-time` no-objects hash `70e5204d…`; `--no-time` shipped-objects `9916abd1…`; default (time on) `092c3b9e…`; Hello v5; format_version 3 write.
 
 ## Risks
 
