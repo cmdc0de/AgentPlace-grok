@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M68 catalog: millstone foods + extra recipes).
-const IDLE_2_NO_TIME: &str = "979771cc93bc9ea26287608cf83b278a2ce3dab9859cabc9007103519f75e0ff";
+/// `--no-time` shipped-objects 2-tick (M69 catalog: ammo + extra recipes).
+const IDLE_2_NO_TIME: &str = "1910c33abbb9b4d5f4a3d9206c250164b371d2a49d53ef4a8946abe3ba5471b3";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "2e3ed5ab4bf70257defa0b807e16376f9305a36164fb8705073d8e171ce51bb6";
+const IDLE_2: &str = "98abaa858766e2399daad9053ac3e0d34906d8ceee8f2a8827ad169c0c7056ea";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -2809,4 +2809,32 @@ fn catalog_on_craft_roll() {
     let mut sim = Simulation::new(tiny(0x68_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "roll", &[(ItemId::Food(1), 24)]);
+}
+
+#[test]
+fn catalog_on_craft_joist() {
+    let mut sim = Simulation::new(tiny(0x69_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "joist", &[(ItemId::Wood, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_veil() {
+    let mut sim = Simulation::new(tiny(0x69_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "veil", &[(ItemId::Fiber, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_ashlar() {
+    let mut sim = Simulation::new(tiny(0x69_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "ashlar", &[(ItemId::Stone, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_loaf() {
+    let mut sim = Simulation::new(tiny(0x69_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "loaf", &[(ItemId::Food(1), 16)]);
 }

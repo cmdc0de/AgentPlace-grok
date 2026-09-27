@@ -257,6 +257,13 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
+    let ammo = crate::objects::ranged_ammo_item(atk, &sim.catalog, dist);
+    if let Some(item) = ammo {
+        if atk.held_qty(item) < 1 {
+            push(sim, id, SimEventKind::Wait);
+            return;
+        }
+    }
     let cost = crate::conflict::ATTACK_ENERGY_COST;
     let offense = if range > 1 && atk.sheet.dexterity != 0 {
         atk.sheet.dexterity
@@ -280,6 +287,13 @@ fn attack(sim: &mut Simulation, id: AgentId, target: AgentId) {
     if !pay_energy(sim, id, cost) {
         push(sim, id, SimEventKind::Wait);
         return;
+    }
+    if let Some(item) = ammo {
+        if let Some(a) = sim.agents.get_mut(&id) {
+            if !a.take_item(item, 1) {
+                let _ = a.take_pack(item, 1);
+            }
+        }
     }
     let mut down = false;
     let mut lethal = false;

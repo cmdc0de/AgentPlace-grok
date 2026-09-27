@@ -1,4 +1,4 @@
-id = "sling"
+id = "ashlar"
 kind = "item"
 
 [visual]
@@ -9,10 +9,7 @@ mid  = "assets/models/optimized/stones_and_grass.glb"
 far  = "assets/models/optimized/stones_and_grass.glb"
 
 [sim]
-weight_milli = 90
-attack_bonus = 400
-attack_range = 2
-ammo = "stone"
+weight_milli = 250
 [sim.craft]
-inputs = [["fiber", 2], ["stone", 1]]
+inputs = [["stone", 14]]
 output_qty = 1

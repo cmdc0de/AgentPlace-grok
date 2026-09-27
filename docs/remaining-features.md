@@ -38,10 +38,10 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-15 | viewer | L | n/a | Bevy in the browser |
 | RF-16 | storage | L | n/a | replacing JSONL |
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
-| RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) |
 | RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) |
 | RF-22 | durability | S | hashed wear | bonus-use (Gather/Farm/…) wears every instance (RF-3 this slice is decay pass only) |
 | RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) |
+| RF-24 | combat | S | catalog hash | dedicated arrow/bolt ammo item (RF-19 this slice is consume 1 stone) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
@@ -97,7 +97,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M68 is implemented. Next `/spec` picks from Open + Standing.
+None. M69 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -107,6 +107,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) | [M69](M69-plan.md) |
 | RF-4 | stations | S | catalog hash | remaining food crafts using millstone (M63 used spit) | [M68](M68-plan.md) |
 | RF-3 | durability | M | hashed wear | decay every instance, not just most-worn | [M67](M67-plan.md) |
 | RF-2 | durability | M | hashed wear | per-tick wear overlay; skip dawn wear while on | [M66](M66-plan.md) |

@@ -841,6 +841,7 @@ pub fn legal_actions(sim: &Simulation, agent: &Agent) -> Vec<PrimaryAction> {
                 && dist <= range
                 && agent.needs.energy >= crate::conflict::ATTACK_ENERGY_COST
                 && !sim.is_child(agent)
+                && crate::objects::ranged_attack_has_ammo(agent, &sim.catalog, dist)
             {
                 legal.push(PrimaryAction::Attack { target: other.id });
             }

@@ -192,6 +192,9 @@ pub struct SimDef {
     /// Sleep footprint blocks Move from outside except the origin door. Omit = false.
     #[serde(default)]
     pub interior: Option<bool>,
+    /// Item slug consumed on Attack Chebyshev > 1. Omit = none.
+    #[serde(default)]
+    pub ammo: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -227,6 +230,9 @@ pub struct CatalogEntry {
     pub station: bool,
     pub craft_station: String,
     pub interior: bool,
+    /// Ammo slug; empty = none. Hashed when non-empty.
+    pub ammo: String,
+    pub ammo_item: Option<ItemId>,
 }
 
 pub const MAX_SLEEP_SIZE: u32 = 8;
@@ -492,6 +498,12 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 station: sim.station.unwrap_or(false),
                 craft_station,
                 interior: sim.interior.unwrap_or(false),
+                ammo: sim.ammo.clone().unwrap_or_default(),
+                ammo_item: sim
+                    .ammo
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                    .and_then(|s| parse_catalog_item(s, &extra)),
             }
         })
         .collect()
@@ -687,6 +699,25 @@ pub fn max_held_attack_range(agent: &Agent, catalog: &[CatalogEntry]) -> u32 {
         .map(|e| e.attack_range.max(1))
         .max()
         .unwrap_or(1)
+}
+
+/// Ammo required for Attack at `dist` > 1 from the held weapon that enabled the shot.
+pub fn ranged_ammo_item(agent: &Agent, catalog: &[CatalogEntry], dist: u32) -> Option<ItemId> {
+    if dist <= 1 {
+        return None;
+    }
+    catalog
+        .iter()
+        .filter(|e| holds(agent, e.item) && e.attack_range >= dist)
+        .max_by_key(|e| e.attack_range)
+        .and_then(|e| e.ammo_item)
+}
+
+pub fn ranged_attack_has_ammo(agent: &Agent, catalog: &[CatalogEntry], dist: u32) -> bool {
+    match ranged_ammo_item(agent, catalog, dist) {
+        None => true,
+        Some(item) => agent.held_qty(item) >= 1,
+    }
 }
 
 fn holds(agent: &Agent, item: ItemId) -> bool {
@@ -1163,6 +1194,9 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.craft_station.as_bytes());
         if e.interior {
             hasher.update([1]);
+        }
+        if !e.ammo.is_empty() {
+            hasher.update(e.ammo.as_bytes());
         }
         hasher.update([0]);
         hasher.update((e.inputs.len() as u32).to_le_bytes());
