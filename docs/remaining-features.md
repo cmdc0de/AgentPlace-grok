@@ -28,7 +28,6 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 
 | ID | Theme | Size | Hash / wire | One-liner |
 |---|---|---|---|---|
-| RF-3 | durability | M | hashed wear | decay every instance, not just most-worn |
 | RF-4 | stations | S | catalog hash | remaining food crafts using millstone (M63 used spit) |
 | RF-7 | browser | M | hash-neutral | sql.js / ad-hoc SQL |
 | RF-8 | attach | M | maybe PROTOCOL | Unix sockets |
@@ -42,6 +41,7 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
 | RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) |
 | RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) |
+| RF-22 | durability | S | hashed wear | bonus-use (Gather/Farm/…) wears every instance (RF-3 this slice is decay pass only) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
@@ -97,7 +97,11 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M66 is implemented. Next `/spec` picks from Open + Standing.
+Locked for the current `/spec` slice. `/implement-m` moves these to Done.
+
+| ID | Theme | Size | Hash / wire | One-liner | Plan |
+|---|---|---|---|---|---|
+| RF-3 | durability | M | hashed wear | decay every instance, not just most-worn | [M67](M67-plan.md) |
 
 ---
 
