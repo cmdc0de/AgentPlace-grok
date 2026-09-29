@@ -41,7 +41,6 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-22 | durability | S | hashed wear | bonus-use (Gather/Farm/…) wears every instance (RF-3 this slice is decay pass only) |
 | RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) |
 | RF-24 | combat | S | catalog hash | dedicated arrow/bolt ammo item (RF-19 this slice is consume 1 stone) |
-| RF-25 | browser | S | hash-neutral | server-side POST `/query` / mutating SQL (RF-7 this slice is sql.js SELECT in the page) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
@@ -97,7 +96,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M70 is implemented. Next `/spec` picks from Open + Standing.
+None. M71 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -107,6 +106,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-25 | browser | S | hash-neutral | server-side POST `/query` / mutating SQL (RF-7 this slice is sql.js SELECT in the page) | [M71](M71-plan.md) |
 | RF-7 | browser | M | hash-neutral | sql.js / ad-hoc SQL | [M70](M70-plan.md) |
 | RF-19 | combat | S | hashed | ammo consume on ranged Attack (RF-6 this slice is projectile FX only) | [M69](M69-plan.md) |
 | RF-4 | stations | S | catalog hash | remaining food crafts using millstone (M63 used spit) | [M68](M68-plan.md) |

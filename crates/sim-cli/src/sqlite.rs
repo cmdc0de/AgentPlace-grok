@@ -90,6 +90,8 @@ CREATE INDEX IF NOT EXISTS events_kind ON events (kind);
 CREATE INDEX IF NOT EXISTS events_agent_tick ON events (agent, tick);
 "#;
 
+const MAX_HTTP_REQ: usize = 64 * 1024;
+
 pub struct SqliteLog {
     conn: Connection,
 }
@@ -250,8 +252,7 @@ pub const SQL_MEDIAN_WALL: &str =
 pub const SQL_MEDIAN_AGENT: &str = "SELECT (perceive_ns+retrieve_ns+select_ns+execute_ns+remember_ns) AS agent_ns FROM agent_timing ORDER BY 1 LIMIT 1 OFFSET (SELECT COUNT(*) FROM agent_timing) / 2";
 pub const SQL_EVENTS_BY_KIND: &str =
     "SELECT kind, COUNT(*) AS n FROM events GROUP BY kind ORDER BY n DESC, kind";
-pub const SQL_CRAFTS: &str =
-    "SELECT item, COUNT(*) AS n FROM events WHERE kind = 'craft' GROUP BY item ORDER BY n DESC, item";
+pub const SQL_CRAFTS: &str = "SELECT item, COUNT(*) AS n FROM events WHERE kind = 'craft' GROUP BY item ORDER BY n DESC, item";
 
 pub fn metrics_json(conn: &Connection) -> Result<serde_json::Value, rusqlite::Error> {
     use rusqlite::OptionalExtension;
@@ -308,7 +309,9 @@ pub fn spawn_metrics_http(
                 Ok((stream, _)) => {
                     let _ = handle_metrics_http(stream, &db_path);
                 }
-                Err(e) if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::Interrupted => {
+                Err(e)
+                    if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::Interrupted =>
+                {
                     thread::sleep(Duration::from_millis(20));
                 }
                 Err(_) => break,
@@ -319,15 +322,21 @@ pub fn spawn_metrics_http(
 }
 
 fn handle_metrics_http(mut stream: TcpStream, db_path: &Path) -> std::io::Result<()> {
+    let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-    let mut buf = [0u8; 2048];
-    let n = stream.read(&mut buf)?;
-    let req = String::from_utf8_lossy(&buf[..n]);
+    let buf = read_http_request(&mut stream)?;
+    let req = String::from_utf8_lossy(&buf);
     let first = req.lines().next().unwrap_or("");
-    let cors = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\n";
+    let cors = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\n";
     if first.starts_with("OPTIONS ") {
         let resp = format!("HTTP/1.1 204 No Content\r\n{cors}\r\n");
         stream.write_all(resp.as_bytes())?;
+        return Ok(());
+    }
+    if first.starts_with("POST /query") {
+        let body = http_body_bytes(&buf);
+        let json = run_sql_query(db_path, body).to_string();
+        write_json(&mut stream, cors, &json)?;
         return Ok(());
     }
     if first.starts_with("GET /sqlite") {
@@ -375,13 +384,155 @@ fn handle_metrics_http(mut stream: TcpStream, db_path: &Path) -> std::io::Result
     Ok(())
 }
 
+fn read_http_request(stream: &mut TcpStream) -> std::io::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 4096];
+    loop {
+        if buf.len() >= MAX_HTTP_REQ {
+            break;
+        }
+        let n = match stream.read(&mut tmp) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e)
+                if e.kind() == ErrorKind::WouldBlock
+                    || e.kind() == ErrorKind::TimedOut
+                    || e.kind() == ErrorKind::Interrupted =>
+            {
+                break;
+            }
+            Err(e) => return Err(e),
+        };
+        let room = MAX_HTTP_REQ - buf.len();
+        buf.extend_from_slice(&tmp[..n.min(room)]);
+        if let Some(pos) = find_header_end(&buf) {
+            let content_len = header_content_length(&buf[..pos]).unwrap_or(0);
+            let header_end = pos + 4;
+            let want = header_end.saturating_add(content_len).min(MAX_HTTP_REQ);
+            while buf.len() < want {
+                let n = match stream.read(&mut tmp) {
+                    Ok(0) => break,
+                    Ok(n) => n,
+                    Err(e)
+                        if e.kind() == ErrorKind::WouldBlock
+                            || e.kind() == ErrorKind::TimedOut
+                            || e.kind() == ErrorKind::Interrupted =>
+                    {
+                        break;
+                    }
+                    Err(e) => return Err(e),
+                };
+                let room = want - buf.len();
+                buf.extend_from_slice(&tmp[..n.min(room)]);
+            }
+            break;
+        }
+    }
+    Ok(buf)
+}
+
+fn find_header_end(buf: &[u8]) -> Option<usize> {
+    buf.windows(4).position(|w| w == b"\r\n\r\n")
+}
+
+fn header_content_length(headers: &[u8]) -> Option<usize> {
+    let s = String::from_utf8_lossy(headers);
+    for line in s.lines() {
+        let Some((k, v)) = line.split_once(':') else {
+            continue;
+        };
+        if k.eq_ignore_ascii_case("content-length") {
+            return v.trim().parse().ok();
+        }
+    }
+    None
+}
+
+fn http_body_bytes(buf: &[u8]) -> &[u8] {
+    match find_header_end(buf) {
+        Some(pos) => &buf[pos + 4..],
+        None => b"",
+    }
+}
+
+fn write_json(stream: &mut TcpStream, cors: &str, body: &str) -> std::io::Result<()> {
+    let resp = format!(
+        "HTTP/1.1 200 OK\r\n{cors}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(resp.as_bytes())?;
+    stream.write_all(body.as_bytes())?;
+    Ok(())
+}
+
+fn run_sql_query(db_path: &Path, body: &[u8]) -> serde_json::Value {
+    let parsed: serde_json::Value = match serde_json::from_slice(body) {
+        Ok(v) => v,
+        Err(e) => return serde_json::json!({"error": e.to_string()}),
+    };
+    let sql = parsed
+        .get("sql")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if sql.is_empty() {
+        return serde_json::json!({"error": "empty sql"});
+    }
+    let conn = match Connection::open(db_path) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": e.to_string()}),
+    };
+    let upper = sql.to_ascii_uppercase();
+    if upper.starts_with("SELECT") || upper.starts_with("WITH") {
+        match query_sql_json(&conn, sql) {
+            Ok(v) => v,
+            Err(e) => serde_json::json!({"error": e.to_string()}),
+        }
+    } else {
+        match conn.execute_batch(sql) {
+            Ok(()) => serde_json::json!({"ok": true, "changes": conn.changes()}),
+            Err(e) => serde_json::json!({"error": e.to_string()}),
+        }
+    }
+}
+
+fn query_sql_json(conn: &Connection, sql: &str) -> rusqlite::Result<serde_json::Value> {
+    let mut stmt = conn.prepare(sql)?;
+    let columns: Vec<String> = stmt
+        .column_names()
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    let col_n = columns.len();
+    let mut rows = Vec::new();
+    let mut q = stmt.query([])?;
+    while let Some(row) = q.next()? {
+        let mut vals = Vec::with_capacity(col_n);
+        for i in 0..col_n {
+            vals.push(sql_cell_json(row.get_ref(i)?));
+        }
+        rows.push(serde_json::Value::Array(vals));
+    }
+    Ok(serde_json::json!({"columns": columns, "rows": rows}))
+}
+
+fn sql_cell_json(v: rusqlite::types::ValueRef<'_>) -> serde_json::Value {
+    match v {
+        rusqlite::types::ValueRef::Null => serde_json::Value::Null,
+        rusqlite::types::ValueRef::Integer(n) => serde_json::json!(n),
+        rusqlite::types::ValueRef::Real(f) => serde_json::json!(f),
+        rusqlite::types::ValueRef::Text(t) => {
+            serde_json::Value::String(String::from_utf8_lossy(t).into_owned())
+        }
+        rusqlite::types::ValueRef::Blob(_) => serde_json::Value::String("<blob>".into()),
+    }
+}
+
 fn primary_action_name(v: &serde_json::Value) -> String {
     match v {
-        serde_json::Value::Object(map) => map
-            .keys()
-            .next()
-            .cloned()
-            .unwrap_or_else(|| "Wait".into()),
+        serde_json::Value::Object(map) => {
+            map.keys().next().cloned().unwrap_or_else(|| "Wait".into())
+        }
         serde_json::Value::String(s) => s.clone(),
         _ => "Wait".into(),
     }
@@ -717,7 +868,13 @@ mod tests {
     #[test]
     fn sqlite_no_json_column() {
         let (log, _path) = tmp_db();
-        for table in ["ticks", "agent_timing", "decisions", "decision_legal", "events"] {
+        for table in [
+            "ticks",
+            "agent_timing",
+            "decisions",
+            "decision_legal",
+            "events",
+        ] {
             let mut stmt = log
                 .conn
                 .prepare(&format!("PRAGMA table_info({table})"))
@@ -881,7 +1038,9 @@ mod tests {
             .trim_start_matches("http://")
             .trim_end_matches("/metrics");
         let mut stream = TcpStream::connect(addr).unwrap();
-        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
         stream
             .write_all(b"GET /metrics HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
             .unwrap();
@@ -895,7 +1054,9 @@ mod tests {
 
     fn http_exchange(addr: &str, req: &[u8]) -> Vec<u8> {
         let mut stream = TcpStream::connect(addr).unwrap();
-        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
         stream.write_all(req).unwrap();
         let mut buf = Vec::new();
         let _ = stream.read_to_end(&mut buf);
@@ -903,7 +1064,10 @@ mod tests {
     }
 
     fn http_body(buf: &[u8]) -> &[u8] {
-        let split = buf.windows(4).position(|w| w == b"\r\n\r\n").expect("headers");
+        let split = buf
+            .windows(4)
+            .position(|w| w == b"\r\n\r\n")
+            .expect("headers");
         &buf[split + 4..]
     }
 
@@ -938,10 +1102,7 @@ mod tests {
             "header {:?}",
             &body.get(..16)
         );
-        let tmp = std::env::temp_dir().join(format!(
-            "m70-http-sqlite-{}",
-            std::process::id()
-        ));
+        let tmp = std::env::temp_dir().join(format!("m70-http-sqlite-{}", std::process::id()));
         std::fs::write(&tmp, body).unwrap();
         let conn = rusqlite::Connection::open(&tmp).unwrap();
         let n: i64 = conn
@@ -967,6 +1128,86 @@ mod tests {
         let resp = String::from_utf8_lossy(&buf);
         assert!(resp.contains("204"), "{resp}");
         assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+        running.store(false, Ordering::Relaxed);
+    }
+
+    fn post_query(addr: &str, sql: &str) -> serde_json::Value {
+        let payload = serde_json::json!({"sql": sql}).to_string();
+        let req = format!(
+            "POST /query HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+            payload.len()
+        );
+        let buf = http_exchange(addr, req.as_bytes());
+        let resp = String::from_utf8_lossy(&buf);
+        assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+        assert!(resp.contains("application/json"), "{resp}");
+        serde_json::from_slice(http_body(&buf))
+            .unwrap_or_else(|_| panic!("json body {}", String::from_utf8_lossy(http_body(&buf))))
+    }
+
+    #[test]
+    fn sqlite_http_post_query_select() {
+        let (mut log, path) = tmp_db();
+        log.insert_events(
+            &[SimEvent {
+                tick: 1,
+                agent: AgentId(0),
+                kind: SimEventKind::Wait,
+            }],
+            &[],
+        )
+        .unwrap();
+        drop(log);
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path, Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let v = post_query(addr, "SELECT kind, COUNT(*) AS n FROM events GROUP BY kind");
+        assert!(v.get("error").is_none(), "{v}");
+        let cols = v["columns"].as_array().unwrap();
+        assert!(cols.iter().any(|c| c == "kind"), "{v}");
+        assert!(cols.iter().any(|c| c == "n"), "{v}");
+        let rows = v["rows"].as_array().unwrap();
+        assert!(!rows.is_empty(), "{v}");
+        running.store(false, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn sqlite_http_post_query_insert() {
+        let (_log, path) = tmp_db();
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path, Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let ins = post_query(
+            addr,
+            "INSERT INTO events (tick, agent, kind) VALUES (99, 0, 'wait')",
+        );
+        assert_eq!(ins["ok"], true, "{ins}");
+        assert!(ins["changes"].as_i64().unwrap_or(0) >= 1, "{ins}");
+        let sel = post_query(addr, "SELECT COUNT(*) AS n FROM events WHERE tick = 99");
+        assert_eq!(sel["rows"][0][0], 1, "{sel}");
+        running.store(false, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn sqlite_http_options_query_cors() {
+        let (_log, path) = tmp_db();
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path, Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let buf = http_exchange(
+            addr,
+            b"OPTIONS /query HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+        );
+        let resp = String::from_utf8_lossy(&buf);
+        assert!(resp.contains("204"), "{resp}");
+        assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+        assert!(resp.contains("POST"), "{resp}");
         running.store(false, Ordering::Relaxed);
     }
 }

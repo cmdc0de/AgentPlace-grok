@@ -90,10 +90,7 @@ fn sqlite_http_requires_sqlite() {
         .expect("sim-cli");
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        err.contains("--sqlite-http requires --sqlite"),
-        "{err}"
-    );
+    assert!(err.contains("--sqlite-http requires --sqlite"), "{err}");
 }
 
 #[test]
@@ -105,12 +102,10 @@ fn browser_page_has_sqljs_adhoc_ui() {
         "sqlite-fetch",
         "sqlite-sql",
         "sqlite-sql-run",
+        "sqlite-sql-server",
         "sqlite-sql-out",
     ] {
-        assert!(
-            text.contains(&format!("id=\"{id}\"")),
-            "missing {id}"
-        );
+        assert!(text.contains(&format!("id=\"{id}\"")), "missing {id}");
     }
     assert!(
         text.contains("sql.js@1.11.0/dist/sql-wasm.js"),

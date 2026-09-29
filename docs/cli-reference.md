@@ -28,7 +28,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 | `-q`, `--quiet` | off | Print `final_tick`, `final_hash`, and last/mean `tick_ns` only. |
 | `-o`, `--out-dir DIR` | off | Write checkpoints, Markdown summaries, JSONL events/decisions, optional timing JSONL. |
 | `--sqlite PATH` | off | Extra sink: same events/decisions/timing facts as JSONL, **typed columns** (no JSON blob). Does not replace JSONL. Hash-neutral. |
-| `--sqlite-http HOST:PORT` | off | Serve `GET /metrics` JSON and `GET /sqlite` DB bytes from `--sqlite` (CORS `*`). Requires `--sqlite`. Hash-neutral. |
+| `--sqlite-http HOST:PORT` | off | Serve `GET /metrics` JSON, `GET /sqlite` DB bytes, and `POST /query` SQL from `--sqlite` (CORS `*`). Requires `--sqlite`. Hash-neutral. |
 | `--width N` / `--height N` | TOML `[world]` (shipping 64×64) | Override map size for a **new** sim. **32..=256**. Hashed. Ignored with `--load` / `--connect`. |
 | `--otlp-endpoint URL` | overlay `otlp_endpoint` empty | POST OTLP/JSON `wall_ns` + RSS to `{url}/v1/metrics`. Implies `--telemetry`. Hash-neutral. No TLS. |
 | `--checkpoint-every K` | config `[checkpoint] auto_interval_ticks` if `--out-dir` | Checkpoint every *K* ticks. Implies an out-dir (config `directory` if `-o` omitted). |

@@ -64,9 +64,9 @@
     <label>Sqlite file <input id="sqlite-file" type="file" /></label>
     <button id="sqlite-fetch">Fetch DB</button>
   </div>
-  <p class="muted">Ad-hoc SQL runs in the page (sql.js). SELECT / WITH only. Fetch DB uses the metrics URL origin + /sqlite.</p>
+  <p class="muted">sql.js Run SQL is SELECT / WITH on a local copy. Run on server POSTs to {metrics origin}/query (mutating allowed).</p>
   <textarea id="sqlite-sql" rows="3" cols="72">SELECT kind, COUNT(*) AS n FROM events GROUP BY kind ORDER BY n DESC</textarea>
-  <div><button id="sqlite-sql-run">Run SQL</button></div>
+  <div><button id="sqlite-sql-run">Run SQL</button> <button id="sqlite-sql-server">Run on server</button></div>
   <div id="sqlite-sql-out" class="muted">Load a sqlite file or Fetch DB, then Run SQL.</div>
   <div id="metrics"></div>
   <h3>Session charts (last 256 ticks)</h3>
@@ -442,6 +442,48 @@
         const res = sqlDb.exec(sql);
         out.className = "";
         out.innerHTML = renderSqlTable(res);
+      } catch (e) {
+        out.className = "muted";
+        out.textContent = String(e);
+      }
+    };
+    function renderServerSql(j) {
+      if (!j || !j.columns) return "<p class=\"muted\">no rows</p>";
+      let html = "<table><thead><tr>";
+      for (const c of j.columns) html += "<th>" + esc(c) + "</th>";
+      html += "</tr></thead><tbody>";
+      for (const row of (j.rows || [])) {
+        html += "<tr>";
+        for (const cell of row) html += "<td>" + esc(cell) + "</td>";
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      return html;
+    }
+    document.getElementById("sqlite-sql-server").onclick = async () => {
+      const out = document.getElementById("sqlite-sql-out");
+      const sql = document.getElementById("sqlite-sql").value;
+      try {
+        const metrics = document.getElementById("sqlite-metrics-url").value.trim();
+        const origin = new URL(metrics || "http://127.0.0.1:9002/metrics").origin;
+        const r = await fetch(origin + "/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sql }),
+        });
+        const j = await r.json();
+        if (j.error) {
+          out.className = "muted";
+          out.textContent = String(j.error);
+          return;
+        }
+        if (j.ok) {
+          out.className = "muted";
+          out.textContent = "ok changes=" + j.changes;
+          return;
+        }
+        out.className = "";
+        out.innerHTML = renderServerSql(j);
       } catch (e) {
         out.className = "muted";
         out.textContent = String(e);
