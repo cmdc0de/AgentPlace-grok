@@ -12,13 +12,13 @@ use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `--no-time` shipped-objects 2-tick (M69 catalog: ammo + extra recipes).
-const IDLE_2_NO_TIME: &str = "1910c33abbb9b4d5f4a3d9206c250164b371d2a49d53ef4a8946abe3ba5471b3";
+/// `--no-time` shipped-objects 2-tick (M70 catalog: extra recipes).
+const IDLE_2_NO_TIME: &str = "3aa327eb0b69b3931ec91c5e0a171126959041b249f8b2569415c3d823b226b2";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "98abaa858766e2399daad9053ac3e0d34906d8ceee8f2a8827ad169c0c7056ea";
+const IDLE_2: &str = "8b76f66ef0a0118db35fc1cea5d3828899ebcbea10ba971a40508057df1a6022";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str =
     "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
@@ -2837,4 +2837,32 @@ fn catalog_on_craft_loaf() {
     let mut sim = Simulation::new(tiny(0x69_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "loaf", &[(ItemId::Food(1), 16)]);
+}
+
+#[test]
+fn catalog_on_craft_peg() {
+    let mut sim = Simulation::new(tiny(0x70_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "peg", &[(ItemId::Wood, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_band() {
+    let mut sim = Simulation::new(tiny(0x70_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "band", &[(ItemId::Fiber, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_coping() {
+    let mut sim = Simulation::new(tiny(0x70_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "coping", &[(ItemId::Stone, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_waffle() {
+    let mut sim = Simulation::new(tiny(0x70_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "waffle", &[(ItemId::Food(1), 16)]);
 }

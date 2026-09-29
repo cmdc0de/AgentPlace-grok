@@ -633,7 +633,7 @@ Options:
       --summarize           Print the Markdown world summary
       --report              Write food-economy report (md/csv); prints markdown if no --out-dir. With --listen, emit when the session ends
       --sqlite PATH         Write events/decisions/timing as sqlite columns (extra sink; JSONL unchanged)
-      --sqlite-http HOST:PORT  Serve GET /metrics JSON from --sqlite (needs --sqlite; CORS *)
+      --sqlite-http HOST:PORT  Serve GET /metrics JSON and GET /sqlite DB bytes (needs --sqlite; CORS *)
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
       --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS). Always binds; --report/--summarize do not skip it
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control

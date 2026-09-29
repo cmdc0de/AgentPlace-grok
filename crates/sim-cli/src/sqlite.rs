@@ -7,6 +7,7 @@ use sim_core::decision_log::DecisionRecord;
 use sim_core::event_log::{SimEvent, SimEventKind};
 use sim_core::objects::CatalogEntry;
 use sim_core::timing::TickTiming;
+use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -327,6 +328,28 @@ fn handle_metrics_http(mut stream: TcpStream, db_path: &Path) -> std::io::Result
     if first.starts_with("OPTIONS ") {
         let resp = format!("HTTP/1.1 204 No Content\r\n{cors}\r\n");
         stream.write_all(resp.as_bytes())?;
+        return Ok(());
+    }
+    if first.starts_with("GET /sqlite") {
+        match fs::read(db_path) {
+            Ok(bytes) => {
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\n{cors}Content-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n",
+                    bytes.len()
+                );
+                stream.write_all(resp.as_bytes())?;
+                stream.write_all(&bytes)?;
+            }
+            Err(_) => {
+                let body = b"not found";
+                let resp = format!(
+                    "HTTP/1.1 404 Not Found\r\n{cors}Content-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
+                    body.len()
+                );
+                stream.write_all(resp.as_bytes())?;
+                stream.write_all(body)?;
+            }
+        }
         return Ok(());
     }
     if !first.starts_with("GET /metrics") && !first.starts_with("GET / ") {
@@ -867,6 +890,83 @@ mod tests {
         let resp = String::from_utf8_lossy(&buf);
         assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
         assert!(resp.contains("median_wall_ns"), "{resp}");
+        running.store(false, Ordering::Relaxed);
+    }
+
+    fn http_exchange(addr: &str, req: &[u8]) -> Vec<u8> {
+        let mut stream = TcpStream::connect(addr).unwrap();
+        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream.write_all(req).unwrap();
+        let mut buf = Vec::new();
+        let _ = stream.read_to_end(&mut buf);
+        buf
+    }
+
+    fn http_body(buf: &[u8]) -> &[u8] {
+        let split = buf.windows(4).position(|w| w == b"\r\n\r\n").expect("headers");
+        &buf[split + 4..]
+    }
+
+    #[test]
+    fn sqlite_http_get_sqlite_opens() {
+        let (mut log, path) = tmp_db();
+        log.insert_events(
+            &[SimEvent {
+                tick: 1,
+                agent: AgentId(0),
+                kind: SimEventKind::Wait,
+            }],
+            &[],
+        )
+        .unwrap();
+        drop(log);
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path.clone(), Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let buf = http_exchange(
+            addr,
+            b"GET /sqlite HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+        );
+        let resp = String::from_utf8_lossy(&buf);
+        assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+        assert!(resp.contains("application/octet-stream"), "{resp}");
+        let body = http_body(&buf);
+        assert!(
+            body.starts_with(b"SQLite format 3"),
+            "header {:?}",
+            &body.get(..16)
+        );
+        let tmp = std::env::temp_dir().join(format!(
+            "m70-http-sqlite-{}",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, body).unwrap();
+        let conn = rusqlite::Connection::open(&tmp).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))
+            .unwrap();
+        assert!(n >= 1, "events rows={n}");
+        let _ = std::fs::remove_file(&tmp);
+        running.store(false, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn sqlite_http_options_sqlite_cors() {
+        let (_log, path) = tmp_db();
+        let running = Arc::new(AtomicBool::new(true));
+        let url = spawn_metrics_http("127.0.0.1:0", path, Arc::clone(&running)).unwrap();
+        let addr = url
+            .trim_start_matches("http://")
+            .trim_end_matches("/metrics");
+        let buf = http_exchange(
+            addr,
+            b"OPTIONS /sqlite HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+        );
+        let resp = String::from_utf8_lossy(&buf);
+        assert!(resp.contains("204"), "{resp}");
+        assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
         running.store(false, Ordering::Relaxed);
     }
 }

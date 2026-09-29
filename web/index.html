@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>AgentPlace attach (postcard v5)</title>
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/sql-wasm.js"></script>
   <style>
     body { font-family: sans-serif; margin: 1.5rem; max-width: 96rem; }
     #log { white-space: pre-wrap; background: #111; color: #eee; padding: 1rem; min-height: 6rem; max-height: 12rem; overflow: auto; }
@@ -59,6 +60,14 @@
     <button id="sqlite-metrics-refresh">Refresh</button>
   </div>
   <div id="sqlite-metrics" class="muted">Needs sim-cli --sqlite PATH --sqlite-http 127.0.0.1:9002</div>
+  <div>
+    <label>Sqlite file <input id="sqlite-file" type="file" /></label>
+    <button id="sqlite-fetch">Fetch DB</button>
+  </div>
+  <p class="muted">Ad-hoc SQL runs in the page (sql.js). SELECT / WITH only. Fetch DB uses the metrics URL origin + /sqlite.</p>
+  <textarea id="sqlite-sql" rows="3" cols="72">SELECT kind, COUNT(*) AS n FROM events GROUP BY kind ORDER BY n DESC</textarea>
+  <div><button id="sqlite-sql-run">Run SQL</button></div>
+  <div id="sqlite-sql-out" class="muted">Load a sqlite file or Fetch DB, then Run SQL.</div>
   <div id="metrics"></div>
   <h3>Session charts (last 256 ticks)</h3>
   <div id="charts">
@@ -355,6 +364,89 @@
       return null;
     }
     let ws = null;
+    const SQLJS_DIST = "https://cdn.jsdelivr.net/npm/sql.js@1.11.0/dist/";
+    let sqlJsMod = null;
+    let sqlDb = null;
+    function isReadOnlySql(s) {
+      const t = String(s || "").trim();
+      const u = t.toUpperCase();
+      return u.startsWith("SELECT") || u.startsWith("WITH");
+    }
+    async function loadSqlJs() {
+      if (sqlJsMod) return sqlJsMod;
+      if (typeof initSqlJs !== "function") {
+        throw new Error("sql.js CDN failed to load");
+      }
+      sqlJsMod = await initSqlJs({ locateFile: (f) => SQLJS_DIST + f });
+      return sqlJsMod;
+    }
+    async function openSqlDb(bytes) {
+      const SQL = await loadSqlJs();
+      if (sqlDb) sqlDb.close();
+      sqlDb = new SQL.Database(new Uint8Array(bytes));
+    }
+    function renderSqlTable(res) {
+      if (!res || !res.length) return "<p class=\"muted\">no rows</p>";
+      const r0 = res[0];
+      let html = "<table><thead><tr>";
+      for (const c of (r0.columns || [])) html += "<th>" + esc(c) + "</th>";
+      html += "</tr></thead><tbody>";
+      for (const row of (r0.values || [])) {
+        html += "<tr>";
+        for (const cell of row) html += "<td>" + esc(cell) + "</td>";
+        html += "</tr>";
+      }
+      html += "</tbody></table>";
+      return html;
+    }
+    document.getElementById("sqlite-file").onchange = async (ev) => {
+      const out = document.getElementById("sqlite-sql-out");
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      try {
+        const buf = await f.arrayBuffer();
+        await openSqlDb(buf);
+        out.className = "muted";
+        out.textContent = "loaded " + f.name + " (" + buf.byteLength + " bytes)";
+      } catch (e) {
+        out.className = "muted";
+        out.textContent = String(e);
+      }
+    };
+    document.getElementById("sqlite-fetch").onclick = async () => {
+      const out = document.getElementById("sqlite-sql-out");
+      try {
+        const metrics = document.getElementById("sqlite-metrics-url").value.trim();
+        const origin = new URL(metrics || "http://127.0.0.1:9002/metrics").origin;
+        const r = await fetch(origin + "/sqlite");
+        if (!r.ok) throw new Error("GET /sqlite " + r.status);
+        const buf = await r.arrayBuffer();
+        await openSqlDb(buf);
+        out.className = "muted";
+        out.textContent = "fetched " + buf.byteLength + " bytes";
+      } catch (e) {
+        out.className = "muted";
+        out.textContent = String(e);
+      }
+    };
+    document.getElementById("sqlite-sql-run").onclick = async () => {
+      const out = document.getElementById("sqlite-sql-out");
+      const sql = document.getElementById("sqlite-sql").value;
+      if (!isReadOnlySql(sql)) {
+        out.className = "muted";
+        out.textContent = "only SELECT / WITH";
+        return;
+      }
+      try {
+        if (!sqlDb) throw new Error("no database loaded");
+        const res = sqlDb.exec(sql);
+        out.className = "";
+        out.innerHTML = renderSqlTable(res);
+      } catch (e) {
+        out.className = "muted";
+        out.textContent = String(e);
+      }
+    };
     document.getElementById("sqlite-metrics-refresh").onclick = async () => {
       const url = document.getElementById("sqlite-metrics-url").value.trim();
       const el = document.getElementById("sqlite-metrics");

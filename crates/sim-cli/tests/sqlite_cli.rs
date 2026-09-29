@@ -95,3 +95,25 @@ fn sqlite_http_requires_sqlite() {
         "{err}"
     );
 }
+
+#[test]
+fn browser_page_has_sqljs_adhoc_ui() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/index.html");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    for id in [
+        "sqlite-file",
+        "sqlite-fetch",
+        "sqlite-sql",
+        "sqlite-sql-run",
+        "sqlite-sql-out",
+    ] {
+        assert!(
+            text.contains(&format!("id=\"{id}\"")),
+            "missing {id}"
+        );
+    }
+    assert!(
+        text.contains("sql.js@1.11.0/dist/sql-wasm.js"),
+        "sql.js 1.11.0 script src"
+    );
+}
