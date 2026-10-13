@@ -1,7 +1,7 @@
 use crate::action::{PrimaryAction, Recipe};
 use crate::agent::{Agent, AgentId, ItemId};
 use crate::event_log::{SimEvent, SimEventKind};
-use crate::memory::{MemoryEntry, MemoryKind, knows_toxin};
+use crate::memory::{knows_toxin, MemoryEntry, MemoryKind};
 use crate::observation::{crate_cell, neighbors4};
 use crate::simulation::Simulation;
 use crate::species::{Crop, Toxicity, VegYield};
@@ -531,7 +531,11 @@ fn reproduce(sim: &mut Simulation, id: AgentId, with: AgentId) {
     child.culture = {
         let ca = sim.agents.get(&parent_a).map(|p| p.culture).unwrap_or(0);
         let cb = sim.agents.get(&parent_b).map(|p| p.culture).unwrap_or(0);
-        if ca != 0 { ca } else { cb }
+        if ca != 0 {
+            ca
+        } else {
+            cb
+        }
     };
     child.kinship.parents = vec![parent_a, parent_b];
     child.kinship.household = sim
@@ -986,11 +990,7 @@ fn place(sim: &mut Simulation, id: AgentId, item: crate::agent::ItemId) {
     } else {
         sim.world.sleep_places.insert((x, y), item);
     }
-    push(
-        sim,
-        id,
-        SimEventKind::Placed { x, y, item },
-    );
+    push(sim, id, SimEventKind::Placed { x, y, item });
 }
 
 fn pickup(sim: &mut Simulation, id: AgentId) {
@@ -1035,23 +1035,12 @@ fn pickup(sim: &mut Simulation, id: AgentId) {
         push(sim, id, SimEventKind::Wait);
         return;
     }
-    push(
-        sim,
-        id,
-        SimEventKind::PickedUp {
-            x: ox,
-            y: oy,
-            item,
-        },
-    );
+    push(sim, id, SimEventKind::PickedUp { x: ox, y: oy, item });
 }
 
 fn rest(sim: &mut Simulation, id: AgentId) {
-    let regen = crate::inventions::apply_rest_regen(
-        sim.config.energy_regen_milli(),
-        &sim.inventions,
-        id,
-    );
+    let regen =
+        crate::inventions::apply_rest_regen(sim.config.energy_regen_milli(), &sim.inventions, id);
     let base = sim.config.energy_max_milli();
     if let Some(a) = sim.agents.get_mut(&id) {
         let max = a.sheet.energy_max(base);
@@ -1117,6 +1106,18 @@ fn move_rel(sim: &mut Simulation, id: AgentId, dx: i32, dy: i32) {
             to_y: ny as u32,
         },
     );
+}
+
+fn wear_bonus(sim: &mut Simulation, id: AgentId, item: ItemId, uses: u32) {
+    let every = sim.wear_every_instance;
+    let Some(a) = sim.agents.get_mut(&id) else {
+        return;
+    };
+    if every {
+        crate::objects::wear_all_tools(a, item, uses);
+    } else {
+        crate::objects::wear_tool(a, item, uses);
+    }
 }
 
 fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
@@ -1207,9 +1208,7 @@ fn gather(sim: &mut Simulation, id: AgentId, species: u8) {
     if let Some((item, uses)) =
         crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.gather_bonus)
     {
-        if let Some(a) = sim.agents.get_mut(&id) {
-            crate::objects::wear_tool(a, item, uses);
-        }
+        wear_bonus(sim, id, item, uses);
     }
     remember_obs(sim, id, species, x, y);
     push(
@@ -1257,14 +1256,10 @@ fn gather_stone(sim: &mut Simulation, id: AgentId) {
         if i < sim.world.minerals.len() {
             sim.world.minerals[i] = 0;
         }
-        if let Some((item, uses)) = crate::objects::held_wear_item(
-            &agent,
-            &sim.catalog,
-            |e| e.stone_gather_bonus,
-        ) {
-            if let Some(a) = sim.agents.get_mut(&id) {
-                crate::objects::wear_tool(a, item, uses);
-            }
+        if let Some((item, uses)) =
+            crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.stone_gather_bonus)
+        {
+            wear_bonus(sim, id, item, uses);
         }
     }
     push(
@@ -1510,9 +1505,7 @@ fn fish(sim: &mut Simulation, id: AgentId) {
         if let Some((item, uses)) =
             crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.fish_bonus)
         {
-            if let Some(a) = sim.agents.get_mut(&id) {
-                crate::objects::wear_tool(a, item, uses);
-            }
+            wear_bonus(sim, id, item, uses);
         }
     }
     push(sim, id, SimEventKind::Fish { success: ok });
@@ -1566,9 +1559,7 @@ fn farm(sim: &mut Simulation, id: AgentId, species: u8) {
     if let Some((item, uses)) =
         crate::objects::held_wear_item(&agent, &sim.catalog, |e| e.farm_bonus)
     {
-        if let Some(a) = sim.agents.get_mut(&id) {
-            crate::objects::wear_tool(a, item, uses);
-        }
+        wear_bonus(sim, id, item, uses);
     }
     push(sim, id, SimEventKind::Farm { species, x, y });
 }
@@ -1588,13 +1579,7 @@ fn craft(sim: &mut Simulation, id: AgentId, recipe: Recipe) {
         );
         return;
     };
-    if !crate::objects::craft_station_ok(
-        &sim.world,
-        &sim.catalog,
-        agent.x,
-        agent.y,
-        recipe,
-    ) {
+    if !crate::objects::craft_station_ok(&sim.world, &sim.catalog, agent.x, agent.y, recipe) {
         push(
             sim,
             id,

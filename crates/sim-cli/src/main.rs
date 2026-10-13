@@ -656,7 +656,7 @@ Options:
       --pipeline-events     Hash one Pipeline stage bitmask per living agent per tick (overlay [pipeline] hash_events)
       --catalog             Hash [sim] catalog items from --objects (does not imply --sheet)
       --per-tick-wear       Wear tools each tick (overlay [wear] per_tick; skips dawn wear)
-      --every-instance-wear Wear every slot on a decay pass (overlay [wear] every_instance)
+      --every-instance-wear Wear every slot on a decay pass and on bonus-use (overlay [wear] every_instance)
       --objects DIR         Object definition TOML directory (default: configs/objects if present)
       --telemetry           Hash-neutral tick aggregates + RSS (overlay [telemetry] enabled)
       --time                Day/night clock (default on; overlay [time] enabled)

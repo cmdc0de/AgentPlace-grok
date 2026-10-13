@@ -64,7 +64,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `3aa327eb…` (M70 extra recipes). Default (time on) shipped-objects is `8b76f66e…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `53972084…` (M72 extra recipes). Default (time on) shipped-objects is `5a14ef91…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -79,7 +79,7 @@ These are **or** with the same-named overlay table. `[time]` **omit = true** (cl
 | `--pipeline-events` | `[pipeline] hash_events` | One hashed `Pipeline { stages }` per living agent per tick (complete mock = `31`). Does **not** hash wall-clock ns. |
 | `--catalog` | `[catalog] enabled` | Hash `[sim]` catalog items loaded from `--objects`. Does not imply `--sheet`. Empty catalog ≡ off for hash. |
 | `--per-tick-wear` | `[wear] per_tick` | Wear held then crate tools each tick (most-worn). Skips dawn wear while on. Omit = false; hashed only when true. |
-| `--every-instance-wear` | `[wear] every_instance` | Decay pass increments **every** wear slot, then consumes each at `uses`. Omit = false; hashed only when true (`[2u8]`, distinct from `per_tick`). Bonus-use still most-worn. |
+| `--every-instance-wear` | `[wear] every_instance` | Decay pass **and** successful bonus-use (vegetation Gather / stone Gather / Farm / Fish) increment **every** wear slot, then consume each at `uses`. Omit = false; hashed only when true (`[2u8]`, distinct from `per_tick`). Overlay off: most-worn. |
 | `--objects DIR` | default `configs/objects` if present | Object-definition TOML directory (visuals + hashed `[sim]` when catalog on). |
 | `--telemetry` | `[telemetry] enabled` | In-process tick aggregates + RSS + CPU ns/percent + disk + optional `--out-dir` bytes. Hash-neutral. |
 | `--time` | `[time] enabled` omit = **true** | Day/night clock (hashed `ticks_per_day`). Redundant with the default. |
@@ -100,12 +100,12 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=8b76f66e…
+# final_hash=5a14ef91…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=3aa327eb…
+# final_hash=53972084…
 ```
 
-`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Bow/sling Attack Chebyshev > 1 consumes 1 stone (no stone ⇒ illegal); melee dist 1 does not. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held; `--per-tick-wear` instead wears each tick and skips dawn wear). `--every-instance-wear` increments every slot on that decay pass. Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone; cooked_veg/jerky/biscuit/cake/dried_fish also need a placed millstone; bread/stew need a placed spit. Crate contents with `uses` also wear at dawn (or each tick if `--per-tick-wear`). Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
+`--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Bow/sling Attack Chebyshev > 1 consumes 1 stone (no stone ⇒ illegal); melee dist 1 does not. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held; `--per-tick-wear` instead wears each tick and skips dawn wear). `--every-instance-wear` increments every slot on that decay pass **and** on a successful bonus-use. Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone; cooked_veg/jerky/biscuit/cake/dried_fish also need a placed millstone; bread/stew need a placed spit. Crate contents with `uses` also wear at dawn (or each tick if `--per-tick-wear`). Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
 
 Listen paused for the viewer (Play in the window / `/play` from a control client):
 
@@ -198,7 +198,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `8b76f66e…`. `--no-time` shipped-objects is `3aa327eb…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `5a14ef91…`. `--no-time` shipped-objects is `53972084…`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

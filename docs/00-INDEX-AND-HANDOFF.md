@@ -87,7 +87,8 @@ Read this table first in a new session, then the specs, then [`remaining-feature
 | **M69** | Done (tag `M69`) | [`M69-plan.md`](M69-plan.md), walkthrough [`M69-test-plan.md`](M69-test-plan.md) | Ranged ammo consume, extra recipes |
 | **M70** | Done (tag `M70`) | [`M70-plan.md`](M70-plan.md), walkthrough [`M70-test-plan.md`](M70-test-plan.md) | Browser sql.js ad-hoc SQL, extra recipes |
 | **M71** | Done (tag `M71`) | [`M71-plan.md`](M71-plan.md), walkthrough [`M71-test-plan.md`](M71-test-plan.md) | Server POST `/query` (mutating SQL), extra recipes |
-| After M71 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
+| **M72** | Done (tag `M72`) | [`M72-plan.md`](M72-plan.md), walkthrough [`M72-test-plan.md`](M72-test-plan.md) | Bonus-use every-instance wear, extra recipes |
+| After M72 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now**. The living leftover list is [`remaining-features.md`](remaining-features.md); historical `M*-plan.md` later-tables are snapshots and are not rewritten. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -244,15 +245,17 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 75b | `M70-test-plan.md` | M70 walkthrough (browser sql.js ad-hoc SQL, extra recipes) |
 | 76 | `M71-plan.md` | Milestone 71 (done, tag `M71`): server POST `/query` (mutating SQL), extra recipes |
 | 76b | `M71-test-plan.md` | M71 walkthrough (server POST `/query` mutating SQL, extra recipes) |
+| 77 | `M72-plan.md` | Milestone 72 (done, tag `M72`): bonus-use every-instance wear, extra recipes |
+| 77b | `M72-test-plan.md` | M72 walkthrough (bonus-use every-instance wear, extra recipes) |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M71-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M72-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M71 is implemented (`M71-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M72 is implemented (`M72-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -280,11 +283,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M71 are done. M71 is implemented ([`M71-plan.md`](M71-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
+M1–M72 are done. M72 is implemented ([`M72-plan.md`](M72-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/remaining-features.md.
-M71 is implemented (server POST /query mutating SQL, extra recipes;
+M72 is implemented (bonus-use every-instance wear, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Leftovers are in remaining-features.md. Do not reconstruct them from M*-plan later-tables.
 Do not add protobuf, TLS, or Bevy in the browser unless asked.

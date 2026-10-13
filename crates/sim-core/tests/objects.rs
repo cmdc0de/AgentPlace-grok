@@ -3,9 +3,9 @@
 use sim_core::action::{PrimaryAction, Recipe};
 use sim_core::agent::ItemId;
 use sim_core::objects::{
-    CatalogParams, ObjectDef, WearParams, catalog_entries, default_objects_dir, farm_skill_bonus,
-    fish_skill_bonus, gather_skill_bonus, load_object_defs, lod_band, pick_visual_path,
-    stone_gather_skill_bonus,
+    catalog_entries, default_objects_dir, farm_skill_bonus, fish_skill_bonus, gather_skill_bonus,
+    load_object_defs, lod_band, pick_visual_path, stone_gather_skill_bonus, CatalogParams,
+    ObjectDef, WearParams,
 };
 use sim_core::observation::{legal_actions, neighbors4};
 use sim_core::{AgentId, ExperimentConfig, Simulation};
@@ -13,15 +13,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// `--no-time` shipped-objects 2-tick (M71 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "720b5da35bd25caa8046059c1804d9355c107b16b1b124551b9d94bd826fe371";
+const IDLE_2_NO_TIME: &str = "53972084b862db814f81a7d39a7ee110b03b9c5b25b869fde704b8c250175f1a";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "ec74cad0c79ec3602f290650bdc186f462acbdadb4edf99fc025ea13c99a0b99";
+const IDLE_2: &str = "5a14ef91dbc73643683d5a8bf390b46a072b8fccebe0840c42473a94b632594a";
 /// Default (time on) no-catalog 2-tick.
-const IDLE_2_NO_CATALOG: &str =
-    "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
+const IDLE_2_NO_CATALOG: &str = "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
 
 fn shipped_objects() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../configs/objects")
@@ -1171,7 +1170,11 @@ fn catalog_on_craft_club() {
 fn catalog_on_craft_satchel() {
     let mut sim = Simulation::new(tiny(0x50_12)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(&mut sim, "satchel", &[(ItemId::Fiber, 4), (ItemId::Wood, 4)]);
+    craft_catalog_slug(
+        &mut sim,
+        "satchel",
+        &[(ItemId::Fiber, 4), (ItemId::Wood, 4)],
+    );
 }
 
 #[test]
@@ -1205,11 +1208,7 @@ fn catalog_off_new_m50_crafts_not_legal() {
 fn catalog_on_craft_tent() {
     let mut sim = Simulation::new(tiny(0x51_11)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "tent",
-        &[(ItemId::Fiber, 6), (ItemId::Wood, 4)],
-    );
+    craft_catalog_slug(&mut sim, "tent", &[(ItemId::Fiber, 6), (ItemId::Wood, 4)]);
 }
 
 #[test]
@@ -1224,11 +1223,7 @@ fn catalog_on_craft_stew() {
 fn catalog_on_craft_cabin() {
     let mut sim = Simulation::new(tiny(0x53_11)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "cabin",
-        &[(ItemId::Wood, 8), (ItemId::Stone, 4)],
-    );
+    craft_catalog_slug(&mut sim, "cabin", &[(ItemId::Wood, 8), (ItemId::Stone, 4)]);
 }
 
 #[test]
@@ -1246,22 +1241,14 @@ fn catalog_on_craft_house() {
 fn catalog_on_craft_torch() {
     let mut sim = Simulation::new(tiny(0x54_11)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "torch",
-        &[(ItemId::Wood, 2), (ItemId::Fiber, 2)],
-    );
+    craft_catalog_slug(&mut sim, "torch", &[(ItemId::Wood, 2), (ItemId::Fiber, 2)]);
 }
 
 #[test]
 fn catalog_on_craft_axe() {
     let mut sim = Simulation::new(tiny(0x54_12)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "axe",
-        &[(ItemId::Wood, 4), (ItemId::Stone, 2)],
-    );
+    craft_catalog_slug(&mut sim, "axe", &[(ItemId::Wood, 4), (ItemId::Stone, 2)]);
 }
 
 #[test]
@@ -1332,12 +1319,7 @@ fn hoe_farm_bonus_25_vs_zero() {
     let id = AgentId(0);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(farm_skill_bonus(a, &sim.catalog), 0);
-    let item = sim
-        .catalog
-        .iter()
-        .find(|e| e.slug == "hoe")
-        .unwrap()
-        .item;
+    let item = sim.catalog.iter().find(|e| e.slug == "hoe").unwrap().item;
     sim.agents.get_mut(&id).unwrap().try_add_item(item, 1);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(farm_skill_bonus(a, &sim.catalog), 25);
@@ -1350,12 +1332,7 @@ fn net_fish_bonus_25_bare_minus_15_rod_net_max() {
     let id = AgentId(0);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(fish_skill_bonus(a, &sim.catalog), -15);
-    let net = sim
-        .catalog
-        .iter()
-        .find(|e| e.slug == "net")
-        .unwrap()
-        .item;
+    let net = sim.catalog.iter().find(|e| e.slug == "net").unwrap().item;
     sim.agents.get_mut(&id).unwrap().try_add_item(net, 1);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(fish_skill_bonus(a, &sim.catalog), 25);
@@ -1428,7 +1405,12 @@ fn hammer_stone_gather_bonus_25_max_not_sum() {
     let id = AgentId(0);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(stone_gather_skill_bonus(a, &sim.catalog), 0);
-    let hammer = sim.catalog.iter().find(|e| e.slug == "hammer").unwrap().item;
+    let hammer = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "hammer")
+        .unwrap()
+        .item;
     sim.agents.get_mut(&id).unwrap().try_add_item(hammer, 1);
     let a = sim.agents.get(&id).unwrap();
     assert_eq!(stone_gather_skill_bonus(a, &sim.catalog), 25);
@@ -1450,10 +1432,19 @@ fn vegetation_gather_with_hammer_unchanged() {
     let mut sim = Simulation::new(tiny(0x57_22)).unwrap();
     apply_shipped(&mut sim);
     let id = AgentId(0);
-    let hammer = sim.catalog.iter().find(|e| e.slug == "hammer").unwrap().item;
+    let hammer = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == "hammer")
+        .unwrap()
+        .item;
     sim.agents.get_mut(&id).unwrap().try_add_item(hammer, 1);
     let a = sim.agents.get(&id).unwrap();
-    assert_eq!(gather_skill_bonus(a, &sim.catalog), 0, "hammer is not vegetation");
+    assert_eq!(
+        gather_skill_bonus(a, &sim.catalog),
+        0,
+        "hammer is not vegetation"
+    );
     sim.agents
         .get_mut(&id)
         .unwrap()
@@ -1484,22 +1475,14 @@ fn catalog_on_craft_mat() {
 fn catalog_on_craft_snare() {
     let mut sim = Simulation::new(tiny(0x56_13)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "snare",
-        &[(ItemId::Fiber, 4), (ItemId::Wood, 2)],
-    );
+    craft_catalog_slug(&mut sim, "snare", &[(ItemId::Fiber, 4), (ItemId::Wood, 2)]);
 }
 
 #[test]
 fn catalog_on_craft_spit() {
     let mut sim = Simulation::new(tiny(0x56_14)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "spit",
-        &[(ItemId::Wood, 4), (ItemId::Fiber, 2)],
-    );
+    craft_catalog_slug(&mut sim, "spit", &[(ItemId::Wood, 4), (ItemId::Fiber, 2)]);
 }
 
 #[test]
@@ -1592,11 +1575,7 @@ fn axe_breaks_after_8_successful_gathers() {
     for _ in 0..400 {
         sim.world.set_vegetation(vx, vy, tag);
         let before = sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0);
-        sim_core::execute::execute_primary(
-            &mut sim,
-            id,
-            &PrimaryAction::Gather { species: tag },
-        );
+        sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Gather { species: tag });
         if sim.events.events.last().is_some_and(|e| {
             matches!(
                 e.kind,
@@ -1677,11 +1656,7 @@ fn flour_needs_placed_millstone() {
             }
         }
     }
-    sim_core::execute::execute_primary(
-        &mut sim,
-        id,
-        &PrimaryAction::Place { item: mill },
-    );
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Place { item: mill });
     assert!(sim.world.work_places.values().any(|i| *i == mill));
     craft_catalog_slug(&mut sim, "flour", &[(ItemId::Food(1), 6)]);
 }
@@ -1708,11 +1683,7 @@ fn catalog_on_craft_bellows() {
 fn catalog_on_craft_table() {
     let mut sim = Simulation::new(tiny(0x58_13)).unwrap();
     apply_shipped(&mut sim);
-    craft_catalog_slug(
-        &mut sim,
-        "table",
-        &[(ItemId::Wood, 6), (ItemId::Fiber, 2)],
-    );
+    craft_catalog_slug(&mut sim, "table", &[(ItemId::Wood, 6), (ItemId::Fiber, 2)]);
 }
 
 #[test]
@@ -1759,11 +1730,7 @@ fn two_axes_wear_separately() {
             .get(&axe)
             .and_then(|v| v.iter().copied().max())
             .unwrap_or(0);
-        sim_core::execute::execute_primary(
-            &mut sim,
-            id,
-            &PrimaryAction::Gather { species: tag },
-        );
+        sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Gather { species: tag });
         let qty = sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0);
         let wear_max = sim.agents[&id]
             .tool_wear
@@ -1868,22 +1835,10 @@ fn transfer_moves_freshest_wear_slot() {
             to: b,
         },
     );
-    assert_eq!(
-        sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
-    assert_eq!(
-        sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
-    assert_eq!(
-        sim.agents[&a].tool_wear.get(&axe).cloned(),
-        Some(vec![3])
-    );
-    assert_eq!(
-        sim.agents[&b].tool_wear.get(&axe).cloned(),
-        Some(vec![0])
-    );
+    assert_eq!(sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0), 1);
+    assert_eq!(sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0), 1);
+    assert_eq!(sim.agents[&a].tool_wear.get(&axe).cloned(), Some(vec![3]));
+    assert_eq!(sim.agents[&b].tool_wear.get(&axe).cloned(), Some(vec![0]));
 }
 
 #[test]
@@ -1909,19 +1864,10 @@ fn transfer_moves_single_worn_slot() {
             to: b,
         },
     );
-    assert_eq!(
-        sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0),
-        0
-    );
+    assert_eq!(sim.agents[&a].inventory.get(&axe).copied().unwrap_or(0), 0);
     assert!(sim.agents[&a].tool_wear.get(&axe).is_none());
-    assert_eq!(
-        sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
-    assert_eq!(
-        sim.agents[&b].tool_wear.get(&axe).cloned(),
-        Some(vec![7])
-    );
+    assert_eq!(sim.agents[&b].inventory.get(&axe).copied().unwrap_or(0), 1);
+    assert_eq!(sim.agents[&b].tool_wear.get(&axe).cloned(), Some(vec![7]));
 }
 
 #[test]
@@ -1940,22 +1886,9 @@ fn store_still_drops_freshest_wear() {
         a.try_add_item(axe, 2);
         a.tool_wear.insert(axe, vec![3, 0]);
     }
-    sim_core::execute::execute_primary(
-        &mut sim,
-        id,
-        &PrimaryAction::Store {
-            item: axe,
-            qty: 1,
-        },
-    );
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![3])
-    );
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Store { item: axe, qty: 1 });
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 1);
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![3]));
     assert!(sim.world.has_stockpile(land.0, land.1));
 }
 
@@ -1969,10 +1902,7 @@ fn give_item_mints_fresh_wear() {
     assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
     let added = sim.give_item(id, axe, 1).unwrap();
     assert_eq!(added, 1);
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 1);
     assert!(
         sim.agents[&id].tool_wear.get(&axe).is_none(),
         "minted axe is fresh (no wear map)"
@@ -2008,7 +1938,12 @@ fn catalog_on_craft_biscuit() {
     craft_catalog_slug(&mut sim, "biscuit", &[(ItemId::Food(1), 10)]);
 }
 
-fn give_axe(sim: &mut Simulation, id: AgentId, qty: u32, wear: Vec<u32>) -> sim_core::agent::ItemId {
+fn give_axe(
+    sim: &mut Simulation,
+    id: AgentId,
+    qty: u32,
+    wear: Vec<u32>,
+) -> sim_core::agent::ItemId {
     let axe = sim.catalog.iter().find(|e| e.slug == "axe").unwrap().item;
     let ag = sim.agents.get_mut(&id).unwrap();
     ag.inventory_cap = 32;
@@ -2026,10 +1961,7 @@ fn dawn_decays_held_axe() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(2);
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![1])
-    );
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![1]));
 }
 
 #[test]
@@ -2040,10 +1972,7 @@ fn eight_dawns_consume_one_axe() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(16);
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        0
-    );
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 0);
     assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
 }
 
@@ -2056,14 +1985,8 @@ fn no_time_does_not_decay_held_axe() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(16);
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![0])
-    );
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        1
-    );
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![0]));
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 1);
 }
 
 #[test]
@@ -2110,8 +2033,7 @@ fn catalog_on_craft_cake() {
 }
 
 fn catalog_id(sim: &Simulation, slug: &str) -> u16 {
-    let ItemId::Catalog(n) = sim.catalog.iter().find(|e| e.slug == slug).unwrap().item
-    else {
+    let ItemId::Catalog(n) = sim.catalog.iter().find(|e| e.slug == slug).unwrap().item else {
         panic!("{slug} catalog");
     };
     n
@@ -2183,18 +2105,8 @@ fn store_then_retrieve_roundtrips_wear() {
         a.x = land.0;
         a.y = land.1;
     }
-    sim_core::execute::execute_primary(
-        &mut sim,
-        id,
-        &PrimaryAction::Store {
-            item: axe,
-            qty: 1,
-        },
-    );
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![3])
-    );
+    sim_core::execute::execute_primary(&mut sim, id, &PrimaryAction::Store { item: axe, qty: 1 });
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![3]));
     let crate_wear = sim
         .world
         .stockpile_at(land.0, land.1)
@@ -2203,19 +2115,13 @@ fn store_then_retrieve_roundtrips_wear() {
     sim_core::execute::execute_primary(
         &mut sim,
         id,
-        &PrimaryAction::Retrieve {
-            item: axe,
-            qty: 1,
-        },
+        &PrimaryAction::Retrieve { item: axe, qty: 1 },
     );
     assert_eq!(
         sim.agents[&id].tool_wear.get(&axe).cloned(),
         Some(vec![3, 0])
     );
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        2
-    );
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 2);
 }
 
 #[test]
@@ -2246,7 +2152,12 @@ fn catalog_on_craft_pie() {
     craft_catalog_slug(&mut sim, "pie", &[(ItemId::Food(1), 14)]);
 }
 
-fn store_axe_on_land(sim: &mut Simulation, id: AgentId, qty: u32, wear: Vec<u32>) -> (u32, u32, sim_core::agent::ItemId) {
+fn store_axe_on_land(
+    sim: &mut Simulation,
+    id: AgentId,
+    qty: u32,
+    wear: Vec<u32>,
+) -> (u32, u32, sim_core::agent::ItemId) {
     let land = sim.world.land_cells()[0];
     let axe = give_axe(sim, id, qty, wear);
     {
@@ -2254,14 +2165,7 @@ fn store_axe_on_land(sim: &mut Simulation, id: AgentId, qty: u32, wear: Vec<u32>
         a.x = land.0;
         a.y = land.1;
     }
-    sim_core::execute::execute_primary(
-        sim,
-        id,
-        &PrimaryAction::Store {
-            item: axe,
-            qty,
-        },
-    );
+    sim_core::execute::execute_primary(sim, id, &PrimaryAction::Store { item: axe, qty });
     let (fx, fy) = sim
         .world
         .land_cells()
@@ -2301,7 +2205,18 @@ fn eight_crate_dawns_consume_one_axe() {
     let id = AgentId(0);
     let (x, y, axe) = store_axe_on_land(&mut sim, id, 1, vec![0]);
     sim.run_ticks(16);
-    assert!(sim.world.stockpile_at(x, y).is_none() || sim.world.stockpile_at(x, y).unwrap().items.get(&axe).copied().unwrap_or(0) == 0);
+    assert!(
+        sim.world.stockpile_at(x, y).is_none()
+            || sim
+                .world
+                .stockpile_at(x, y)
+                .unwrap()
+                .items
+                .get(&axe)
+                .copied()
+                .unwrap_or(0)
+                == 0
+    );
 }
 
 #[test]
@@ -2498,10 +2413,7 @@ fn per_tick_wears_held_axe() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(1);
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![1])
-    );
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![1]));
 }
 
 #[test]
@@ -2513,10 +2425,7 @@ fn eight_per_tick_consume_one_axe() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(8);
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        0
-    );
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 0);
 }
 
 #[test]
@@ -2544,10 +2453,7 @@ fn no_time_per_tick_still_wears() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 1, vec![0]);
     sim.run_ticks(2);
-    assert_eq!(
-        sim.agents[&id].tool_wear.get(&axe).cloned(),
-        Some(vec![2])
-    );
+    assert_eq!(sim.agents[&id].tool_wear.get(&axe).cloned(), Some(vec![2]));
 }
 
 #[test]
@@ -2698,10 +2604,7 @@ fn every_instance_consumes_all_at_uses() {
     let id = AgentId(0);
     let axe = give_axe(&mut sim, id, 2, vec![7, 7]);
     sim.run_ticks(1);
-    assert_eq!(
-        sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0),
-        0
-    );
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 0);
     assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
 }
 
@@ -2893,4 +2796,314 @@ fn catalog_on_craft_crumpet() {
     let mut sim = Simulation::new(tiny(0x71_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "crumpet", &[(ItemId::Food(1), 16)]);
+}
+
+fn give_slug(
+    sim: &mut Simulation,
+    id: AgentId,
+    slug: &str,
+    qty: u32,
+    wear: Vec<u32>,
+) -> sim_core::agent::ItemId {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug} missing"))
+        .item;
+    let ag = sim.agents.get_mut(&id).unwrap();
+    ag.inventory_cap = 32;
+    ag.needs = sim_core::Needs::maxed(1000, 1000, 1000);
+    ag.abilities.gather = 100;
+    ag.abilities.farm = 100;
+    ag.abilities.fish = 100;
+    ag.try_add_item(item, qty);
+    ag.tool_wear.insert(item, wear);
+    item
+}
+
+fn until_wear_changes(
+    sim: &mut Simulation,
+    id: AgentId,
+    item: ItemId,
+    mut act: impl FnMut(&mut Simulation),
+) {
+    let start = sim.agents[&id].tool_wear.get(&item).cloned();
+    for _ in 0..80 {
+        act(sim);
+        let now = sim.agents[&id].tool_wear.get(&item).cloned();
+        if now != start {
+            return;
+        }
+    }
+    panic!("wear never changed from {start:?}");
+}
+
+fn park_on_first_land(sim: &mut Simulation, id: AgentId) -> (u32, u32) {
+    let (x, y) = sim.world.land_cells()[0];
+    let a = sim.agents.get_mut(&id).unwrap();
+    a.x = x;
+    a.y = y;
+    (x, y)
+}
+
+fn clear_farm_neighbor(sim: &mut Simulation, id: AgentId) {
+    let (ax, ay) = {
+        let a = &sim.agents[&id];
+        (a.x, a.y)
+    };
+    for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+        let nx = ax as i32 + dx;
+        let ny = ay as i32 + dy;
+        if nx < 0 || ny < 0 {
+            continue;
+        }
+        let (x, y) = (nx as u32, ny as u32);
+        if !sim.world.is_land(x, y) {
+            continue;
+        }
+        sim.world.set_vegetation(x, y, 0);
+        let i = (y * sim.world.width + x) as usize;
+        if i < sim.world.minerals.len() {
+            sim.world.minerals[i] = 0;
+        }
+        sim.world.crops.remove(&(x, y));
+        return;
+    }
+    panic!("no farm neighbor");
+}
+
+fn park_by_water(sim: &mut Simulation, id: AgentId) {
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            if !sim.world.is_water(x, y) {
+                continue;
+            }
+            for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+                let nx = x as i32 + dx;
+                let ny = y as i32 + dy;
+                if nx < 0 || ny < 0 {
+                    continue;
+                }
+                let (lx, ly) = (nx as u32, ny as u32);
+                if !sim.world.is_land(lx, ly) {
+                    continue;
+                }
+                let a = sim.agents.get_mut(&id).unwrap();
+                a.x = lx;
+                a.y = ly;
+                sim.world.add_fish(x, y, 4);
+                return;
+            }
+        }
+    }
+    panic!("no water beside land");
+}
+
+fn park_by_mineral(sim: &mut Simulation, id: AgentId) {
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            if sim.world.has_mineral(x, y) {
+                park_adj_land(sim, id, x, y);
+                return;
+            }
+        }
+    }
+    let (ax, ay) = park_on_first_land(sim, id);
+    for (dx, dy) in [(1i32, 0), (-1, 0), (0, 1), (0, -1)] {
+        let nx = ax as i32 + dx;
+        let ny = ay as i32 + dy;
+        if nx < 0 || ny < 0 {
+            continue;
+        }
+        let (x, y) = (nx as u32, ny as u32);
+        if x < sim.world.width && y < sim.world.height {
+            let i = (y * sim.world.width + x) as usize;
+            sim.world.minerals[i] = 1;
+            return;
+        }
+    }
+    panic!("no mineral neighbor");
+}
+
+#[test]
+fn bonus_every_gather_off_most_worn_only() {
+    let mut sim = Simulation::new(tiny(0x72_11)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = false;
+    let id = AgentId(0);
+    let axe = give_slug(&mut sim, id, "axe", 2, vec![3, 0]);
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    until_wear_changes(&mut sim, id, axe, |sim| {
+        sim.world.set_vegetation(vx, vy, tag);
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Gather { species: tag });
+    });
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 0])
+    );
+}
+
+#[test]
+fn bonus_every_gather_wears_all_held() {
+    let mut sim = Simulation::new(tiny(0x72_12)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let axe = give_slug(&mut sim, id, "axe", 2, vec![3, 0]);
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    until_wear_changes(&mut sim, id, axe, |sim| {
+        sim.world.set_vegetation(vx, vy, tag);
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Gather { species: tag });
+    });
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn bonus_every_gather_consumes_all_at_uses() {
+    let mut sim = Simulation::new(tiny(0x72_13)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let axe = give_slug(&mut sim, id, "axe", 2, vec![7, 7]);
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    until_wear_changes(&mut sim, id, axe, |sim| {
+        sim.world.set_vegetation(vx, vy, tag);
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Gather { species: tag });
+    });
+    assert_eq!(sim.agents[&id].inventory.get(&axe).copied().unwrap_or(0), 0);
+    assert!(sim.agents[&id].tool_wear.get(&axe).is_none());
+}
+
+#[test]
+fn bonus_every_farm_wears_all_hoes() {
+    let mut sim = Simulation::new(tiny(0x72_14)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let hoe = give_slug(&mut sim, id, "hoe", 2, vec![3, 0]);
+    park_on_first_land(&mut sim, id);
+    sim.agents
+        .get_mut(&id)
+        .unwrap()
+        .try_add_item(ItemId::Food(1), 8);
+    until_wear_changes(&mut sim, id, hoe, |sim| {
+        clear_farm_neighbor(sim, id);
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Farm { species: 1 });
+    });
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&hoe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn bonus_every_fish_wears_all_nets() {
+    let mut sim = Simulation::new(tiny(0x72_15)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let net = give_slug(&mut sim, id, "net", 2, vec![3, 0]);
+    park_by_water(&mut sim, id);
+    until_wear_changes(&mut sim, id, net, |sim| {
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Fish);
+    });
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&net).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn bonus_every_stone_gather_wears_all_hammers() {
+    let mut sim = Simulation::new(tiny(0x72_16)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let hammer = give_slug(&mut sim, id, "hammer", 2, vec![3, 0]);
+    park_by_mineral(&mut sim, id);
+    until_wear_changes(&mut sim, id, hammer, |sim| {
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Gather { species: 0 });
+    });
+    assert_eq!(
+        sim.agents[&id].tool_wear.get(&hammer).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn bonus_every_overlay_off_idle_hash_unchanged() {
+    let mut base = Simulation::new(tiny(0x72_17)).unwrap();
+    apply_shipped(&mut base);
+    let mut off = Simulation::new(tiny(0x72_17)).unwrap();
+    apply_shipped(&mut off);
+    off.wear_every_instance = false;
+    base.run_ticks(2);
+    off.run_ticks(2);
+    assert_eq!(base.state_hash(), off.state_hash());
+}
+
+#[test]
+fn load_does_not_extra_bonus_every_wear() {
+    let mut sim = Simulation::new(tiny(0x72_18)).unwrap();
+    apply_shipped(&mut sim);
+    sim.time_enabled = false;
+    sim.wear_every_instance = true;
+    let id = AgentId(0);
+    let axe = give_slug(&mut sim, id, "axe", 2, vec![3, 0]);
+    let (vx, vy, tag) = find_veg(&sim);
+    park_adj_land(&mut sim, id, vx, vy);
+    until_wear_changes(&mut sim, id, axe, |sim| {
+        sim.world.set_vegetation(vx, vy, tag);
+        sim_core::execute::execute_primary(sim, id, &PrimaryAction::Gather { species: tag });
+    });
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_shipped(&mut loaded);
+    loaded.wear_every_instance = true;
+    loaded.time_enabled = false;
+    assert_eq!(
+        loaded.agents[&id].tool_wear.get(&axe).cloned(),
+        Some(vec![4, 1])
+    );
+}
+
+#[test]
+fn catalog_on_craft_stud() {
+    let mut sim = Simulation::new(tiny(0x72_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "stud", &[(ItemId::Wood, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_glove() {
+    let mut sim = Simulation::new(tiny(0x72_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "glove", &[(ItemId::Fiber, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_dado() {
+    let mut sim = Simulation::new(tiny(0x72_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "dado", &[(ItemId::Stone, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_pikelet() {
+    let mut sim = Simulation::new(tiny(0x72_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "pikelet", &[(ItemId::Food(1), 16)]);
 }
