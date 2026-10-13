@@ -16,10 +16,43 @@ pub struct OpenAiCompatClient {
     pub base_url: String,
     pub api_key: Option<String>,
     pub model: String,
+    /// Choose-call model. Empty = `model`. Not used by insight/plan/reflect/flavor/importance.
+    pub system1_model: String,
     pub timeout: Duration,
     pub temperature: f32,
     pub max_retries: u32,
     pub species: sim_core::species::SpeciesTables,
+}
+
+/// Model id for one LLM call. Only `choose` may use `system1`.
+pub fn model_for_call(call: &str, model: &str, system1: &str) -> String {
+    if call == "choose" {
+        let s = system1.trim();
+        if !s.is_empty() {
+            return s.to_string();
+        }
+    }
+    model.to_string()
+}
+
+/// Chat-completions JSON. `think` / `response_format` follow `model`, not a different call.
+pub fn chat_request_body(model: &str, temperature: f32, seed: u64, prompt: &str) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "model": model,
+        "temperature": temperature,
+        "messages": [
+            {"role": "system", "content": "You are a simulation agent. Reply with a single JSON object only."},
+            {"role": "user", "content": prompt}
+        ],
+        "seed": seed,
+    });
+    if !model.contains("grok") {
+        body["think"] = serde_json::json!(false);
+    }
+    if model.contains("grok") {
+        body["response_format"] = serde_json::json!({"type": "json_object"});
+    }
+    body
 }
 
 impl OpenAiCompatClient {
@@ -52,6 +85,7 @@ impl OpenAiCompatClient {
             base_url: base.trim_end_matches('/').into(),
             api_key,
             model,
+            system1_model: String::new(),
             timeout: Duration::from_millis(cfg.llm.timeout_ms.max(1)),
             temperature: cfg.llm.action_temperature as f32,
             max_retries: cfg.llm.max_retries,
@@ -59,24 +93,15 @@ impl OpenAiCompatClient {
         }
     }
 
-    fn post_once(&self, seed: u64, prompt: &str, temperature: f32) -> Result<String, ChooseError> {
+    fn post_once(
+        &self,
+        model: &str,
+        seed: u64,
+        prompt: &str,
+        temperature: f32,
+    ) -> Result<String, ChooseError> {
         let url = format!("{}/chat/completions", self.base_url);
-        let mut body = serde_json::json!({
-            "model": self.model,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": "You are a simulation agent. Reply with a single JSON object only."},
-                {"role": "user", "content": prompt}
-            ],
-            "seed": seed,
-        });
-        // Nemotron-class thinking models: skip the reasoning channel when the server honors it.
-        if !self.model.contains("grok") {
-            body["think"] = serde_json::json!(false);
-        }
-        if self.model.contains("grok") {
-            body["response_format"] = serde_json::json!({"type": "json_object"});
-        }
+        let body = chat_request_body(model, temperature, seed, prompt);
         let mut req = ureq::post(&url).timeout(self.timeout);
         if let Some(key) = &self.api_key {
             req = req.set("Authorization", &format!("Bearer {key}"));
@@ -136,11 +161,12 @@ impl ActionChooser for OpenAiCompatClient {
         obs: &Observation,
     ) -> Result<(ChosenAction, String), ChooseError> {
         let prompt = build_prompt(obs, &self.species);
+        let model = model_for_call("choose", &self.model, &self.system1_model);
         let mut temp = self.temperature;
         let mut last = ChooseError::Malformed;
         let attempts = self.max_retries.saturating_add(1);
         for i in 0..attempts {
-            match self.post_once(call_seed, &prompt, temp) {
+            match self.post_once(&model, call_seed, &prompt, temp) {
                 Ok(text) => {
                     let payload = extract_json_payload(&text);
                     let choice = parse_choice_json(&payload, &obs.legal, &self.species)?;
@@ -170,7 +196,7 @@ impl ActionChooser for OpenAiCompatClient {
         let prompt = format!(
             "These memories were forgotten. Summarise them as one short reflection.\n{lines}Reply JSON only: {{\"reflection\":\"...\"}}"
         );
-        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let text = self.post_once(&self.model, seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);
         let v: serde_json::Value =
             serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
@@ -193,7 +219,7 @@ impl ActionChooser for OpenAiCompatClient {
             obs.energy,
             memos.join(" | "),
         );
-        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let text = self.post_once(&self.model, seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);
         let v: serde_json::Value =
             serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
@@ -214,7 +240,7 @@ impl ActionChooser for OpenAiCompatClient {
             "Agent {} invented {kind_slug} at ({}, {}). Write one short flavor sentence.\nReply JSON only: {{\"flavor\":\"...\"}}",
             obs.agent_id.0, obs.x, obs.y,
         );
-        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let text = self.post_once(&self.model, seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);
         let v: serde_json::Value =
             serde_json::from_str(&payload).map_err(|_| ChooseError::Malformed)?;
@@ -241,7 +267,7 @@ impl ActionChooser for OpenAiCompatClient {
             "Agent {} at ({}, {}). Hunger {} thirst {} energy {}.\nCurrent plan: {current}\nPropose up to {n} next actions as JSON objects (executed if legal).\nReply JSON only: {{\"plan\":[{{\"action\":\"Wait\"}}]}}",
             obs.agent_id.0, obs.x, obs.y, obs.hunger, obs.thirst, obs.energy,
         );
-        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let text = self.post_once(&self.model, seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);
         sim_core::llm::parse_plan_json(&payload, n).ok_or(ChooseError::Malformed)
     }
@@ -262,7 +288,7 @@ impl ActionChooser for OpenAiCompatClient {
         let prompt = format!(
             "Adjust importance of one retrieved memory (0-255).\n{lines}Reply JSON only: {{\"id\":0,\"importance\":0}}"
         );
-        let text = self.post_once(seed, &prompt, self.temperature)?;
+        let text = self.post_once(&self.model, seed, &prompt, self.temperature)?;
         let payload = extract_json_payload(&text);
         sim_core::llm::parse_importance_json(&payload)
             .map(|(id, imp)| sim_core::llm::importance_record_json(id, imp))
@@ -400,6 +426,14 @@ pub fn build_prompt(obs: &Observation, species: &sim_core::species::SpeciesTable
 }
 
 pub fn chooser_from_config(cfg: &sim_core::ExperimentConfig) -> Result<sim_core::Chooser, String> {
+    chooser_with_system1(cfg, "")
+}
+
+/// `system1` is the choose-call model. Empty = `[llm] model`. Mock and wait ignore it.
+pub fn chooser_with_system1(
+    cfg: &sim_core::ExperimentConfig,
+    system1: &str,
+) -> Result<sim_core::Chooser, String> {
     match cfg.llm.provider.as_str() {
         "" | "mock" => Ok(sim_core::Chooser::Mock),
         "wait" => Ok(sim_core::Chooser::Wait),
@@ -407,7 +441,8 @@ pub fn chooser_from_config(cfg: &sim_core::ExperimentConfig) -> Result<sim_core:
             if cfg.llm.base_url.trim().is_empty() {
                 return Ok(sim_core::Chooser::Mock);
             }
-            let client = OpenAiCompatClient::from_config(cfg);
+            let mut client = OpenAiCompatClient::from_config(cfg);
+            client.system1_model = system1.trim().to_string();
             Ok(sim_core::Chooser::Custom(std::sync::Arc::new(client)))
         }
         other => Err(format!("unknown llm provider '{other}'")),
@@ -499,6 +534,45 @@ count = 2
             "empty Observation.incentives must not invent banners: {p}"
         );
         assert!(p.contains("Active incentives: []"), "{p}");
+    }
+
+    #[test]
+    fn choose_model_uses_system1_other_calls_do_not() {
+        assert_eq!(model_for_call("choose", "nemotron3:33b", ""), "nemotron3:33b");
+        assert_eq!(
+            model_for_call("choose", "nemotron3:33b", "  grok-4-fast  "),
+            "grok-4-fast"
+        );
+        for call in ["insight", "plan", "reflect", "invent_flavor", "importance"] {
+            assert_eq!(
+                model_for_call(call, "nemotron3:33b", "grok-4-fast"),
+                "nemotron3:33b",
+                "{call}"
+            );
+        }
+    }
+
+    #[test]
+    fn chat_body_follows_the_call_model() {
+        let choose = chat_request_body("grok-4-fast", 0.2, 1, "hi");
+        assert_eq!(choose["model"], "grok-4-fast");
+        assert_eq!(choose["response_format"]["type"], "json_object");
+        assert!(choose.get("think").is_none());
+        let insight = chat_request_body("nemotron3:33b", 0.2, 1, "hi");
+        assert_eq!(insight["model"], "nemotron3:33b");
+        assert_eq!(insight["think"], false);
+        assert!(insight.get("response_format").is_none());
+    }
+
+    #[test]
+    fn mock_and_wait_ignore_system1_model() {
+        let mut c = cfg("mock", "http://127.0.0.1:9");
+        c.llm.model = "nemotron3:33b".into();
+        let ch = chooser_with_system1(&c, "grok-4-fast").unwrap();
+        assert!(matches!(ch, Chooser::Mock));
+        c.llm.provider = "wait".into();
+        let ch = chooser_with_system1(&c, "grok-4-fast").unwrap();
+        assert!(matches!(ch, Chooser::Wait));
     }
 
     #[test]

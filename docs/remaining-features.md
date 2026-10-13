@@ -93,7 +93,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M73 is implemented. Next `/spec` picks from Open + Standing.
+None. M74 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -103,6 +103,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-26 | llm | S | hash-neutral | `[llm] system1_model` for the action-choose call only; insight/plan/reflect stay on `model` | [M74](M74-plan.md) |
 | RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) | [M73](M73-plan.md) |
 | RF-24 | combat | S | catalog hash | dedicated arrow/bolt ammo item (RF-19 this slice is consume 1 stone) | [M73](M73-plan.md) |
 | RF-22 | durability | S | hashed wear | bonus-use (Gather/Farm/…) wears every instance (RF-3 this slice is decay pass only) | [M72](M72-plan.md) |

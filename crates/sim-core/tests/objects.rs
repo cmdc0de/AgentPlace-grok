@@ -13,12 +13,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// `--no-time` shipped-objects 2-tick (M71 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "cd81a0bf17f5274381130b79d081a5ee1617ebdfbe9faa45288d76b412554168";
+const IDLE_2_NO_TIME: &str = "22e66700f38f673ebce8bae99438cc90666eb865a1a4ffc7821710cd26303fcb";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "232b02e6b8d39361fe3c2045811eeac589d8122581034a7a5b412e0c3f9e2d18";
+const IDLE_2: &str = "62b5ce21a511ab7f433c81bd47d352dce6e341b44dfdabf9b65f2250219f44ab";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str = "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
 
@@ -3141,4 +3141,32 @@ fn catalog_on_craft_bagel() {
     let mut sim = Simulation::new(tiny(0x73_45)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "bagel", &[(ItemId::Food(1), 17)]);
+}
+
+#[test]
+fn catalog_on_craft_batten() {
+    let mut sim = Simulation::new(tiny(0x74_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "batten", &[(ItemId::Wood, 21)]);
+}
+
+#[test]
+fn catalog_on_craft_wimple() {
+    let mut sim = Simulation::new(tiny(0x74_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "wimple", &[(ItemId::Fiber, 21)]);
+}
+
+#[test]
+fn catalog_on_craft_voussoir() {
+    let mut sim = Simulation::new(tiny(0x74_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "voussoir", &[(ItemId::Stone, 19)]);
+}
+
+#[test]
+fn catalog_on_craft_bannock() {
+    let mut sim = Simulation::new(tiny(0x74_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "bannock", &[(ItemId::Food(1), 18)]);
 }

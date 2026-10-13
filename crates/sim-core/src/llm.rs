@@ -235,6 +235,8 @@ pub struct LlmBarrierParams {
     pub execute_plan: bool,
     /// Overlay `[llm] reflect_importance`. Not hashed.
     pub reflect_importance: bool,
+    /// Overlay `[llm] system1_model`. Choose-call model id. Empty = use `[llm] model`. Not hashed.
+    pub system1_model: String,
 }
 
 impl Default for LlmBarrierParams {
@@ -248,6 +250,7 @@ impl Default for LlmBarrierParams {
             plan_length: 4,
             execute_plan: false,
             reflect_importance: false,
+            system1_model: String::new(),
         }
     }
 }
@@ -270,6 +273,7 @@ impl LlmBarrierParams {
             plan_length: Option<u32>,
             execute_plan: Option<bool>,
             reflect_importance: Option<bool>,
+            system1_model: Option<String>,
         }
         let slice: Slice = toml::from_str(s).unwrap_or_default();
         let mut p = Self::default();
@@ -296,6 +300,9 @@ impl LlmBarrierParams {
         }
         if let Some(r) = slice.llm.reflect_importance {
             p.reflect_importance = r;
+        }
+        if let Some(m) = slice.llm.system1_model {
+            p.system1_model = m.trim().to_string();
         }
         p
     }

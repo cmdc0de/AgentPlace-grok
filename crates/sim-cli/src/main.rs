@@ -45,6 +45,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut csv = false;
     let mut connect: Option<String> = None;
     let mut start_paused = false;
+    let mut llm_system1: Option<String> = None;
     let mut llm_barrier = false;
     let mut llm_barrier_retries: Option<u32> = None;
     let mut lockstep = false;
@@ -217,6 +218,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ));
             }
             "--llm-reflect-importance" => llm_reflect_importance = true,
+            "--llm-system1-model" => {
+                i += 1;
+                llm_system1 = Some(
+                    args.get(i)
+                        .ok_or("--llm-system1-model requires a name")?
+                        .clone(),
+                );
+            }
             "--llm-barrier" => llm_barrier = true,
             "--llm-barrier-retries" => {
                 i += 1;
@@ -304,8 +313,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(provider) = &llm_override {
         sim.config.llm.provider = provider.clone();
     }
-    sim.chooser = sim_llm::chooser_from_config(&sim.config)?;
-
     let net = network::NetworkParams::from_path(&config_path);
     allow_control = allow_control || net.allow_control;
     lockstep = lockstep || net.lockstep;
@@ -342,6 +349,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         sim.llm_plan_every_n = llm_plan_every.unwrap_or(barrier.plan_every_n_ticks);
         sim.llm_plan_length = barrier.plan_length;
         sim.llm_execute_plan = llm_execute_plan || barrier.execute_plan;
+        let mut system1 = barrier.system1_model;
+        if let Some(name) = &llm_system1 {
+            if !name.trim().is_empty() {
+                system1 = name.trim().to_string();
+            }
+        }
+        sim.chooser = sim_llm::chooser_with_system1(&sim.config, &system1)?;
         sim.llm_reflect_importance = llm_reflect_importance || barrier.reflect_importance;
         let cp = sim_core::ConflictParams::from_config_toml(&text);
         sim.conflict_enabled = conflict || cp.enabled;
@@ -665,6 +679,7 @@ Options:
       --height N            Override [world] height for a new sim (32..=256; ignored with --load)
       --otlp-endpoint URL   POST OTLP/JSON metrics (implies --telemetry; hash-neutral)
       --llm-reflect-importance  Extra LLM call after retrieve may rewrite memory importance
+      --llm-system1-model NAME  Action-choose model id (overlay [llm] system1_model; empty keeps [llm] model)
       --llm-barrier         Retry timeout/parse (default 3 extra attempts) then Wait; overlay [llm] barrier
       --llm-barrier-retries N  Extra attempts after the first (implies --llm-barrier; 0 = one attempt)
       --token SECRET        Require matching token on Hello (LAN auth, not TLS)

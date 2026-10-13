@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `232b02e6…`; `--no-time` shipped-objects `cd81a0bf…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `62b5ce21…`; `--no-time` shipped-objects `22e66700…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -175,7 +175,7 @@ Magic `AGTN`. Write `format_version` **3**; read v2 and v3.
 | `timeout_ms` | `120000` | Per call. Timeout ⇒ Wait that agent. |
 | `replay_file` | `""` | If set, replay recorded JSON instead of calling. |
 
-Barrier / reflect / plan keys on `[llm]` are **overlay** (next section).
+Barrier / reflect / plan keys on `[llm]` are **overlay** (next section). `system1_model` (M74, omit empty) is also overlay: the action-choose HTTP call uses it; insight, plan, reflect, invent flavor, and importance stay on `model`. Empty CLI `--llm-system1-model` does not clear a TOML value. Not hashed. Not `config_hash`. Mock and `wait` ignore it.
 
 ### `[proposals]`
 

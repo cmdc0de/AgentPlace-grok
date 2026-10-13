@@ -49,6 +49,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 | `--llm-plan-every N` | overlay `0` (off) | Short-term plan every *N* ticks. |
 | `--llm-execute-plan` | overlay false | If `plan[0]` is legal action JSON, execute it and skip choose. |
 | `--llm-reflect-importance` | overlay false | Extra call after retrieve may rewrite a memory’s importance. |
+| `--llm-system1-model NAME` | overlay `[llm] system1_model` empty | Action-choose HTTP model id. Empty ⇒ `[llm] model`. Insight/plan/reflect/flavor/importance stay on `model`. Hash-neutral. Not `config_hash`. Mock ignores it. |
 
 ### Network / attach
 
@@ -64,7 +65,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `cd81a0bf…` (M73 arrow + recipes). Default (time on) shipped-objects is `232b02e6…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `22e66700…` (M74 recipes). Default (time on) shipped-objects is `62b5ce21…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -100,9 +101,9 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=232b02e6…
+# final_hash=62b5ce21…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=cd81a0bf…
+# final_hash=22e66700…
 ```
 
 `--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Bow/sling Attack Chebyshev > 1 consumes 1 **arrow** (no arrow ⇒ illegal; stone does not count); melee dist 1 does not. `interior` sleep footprints block outside entry except the door: omit `door` is the origin cell; `door = "n"|"e"|"s"|"w"` is that edge. The viewer draws a `fence` mesh on the other perimeter cells. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held; `--per-tick-wear` instead wears each tick and skips dawn wear). `--every-instance-wear` increments every slot on that decay pass **and** on a successful bonus-use. Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone; cooked_veg/jerky/biscuit/cake/dried_fish also need a placed millstone; bread/stew need a placed spit. Crate contents with `uses` also wear at dawn (or each tick if `--per-tick-wear`). Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
@@ -198,7 +199,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `232b02e6…`. `--no-time` shipped-objects is `cd81a0bf…`.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `62b5ce21…`. `--no-time` shipped-objects is `22e66700…`. `[llm] system1_model` does not change `state_hash` or `config_hash`.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

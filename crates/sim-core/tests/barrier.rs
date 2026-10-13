@@ -9,6 +9,48 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
+#[test]
+fn system1_model_parses_and_does_not_change_hashes() {
+    let off = r#"
+master_seed = 74
+[simulation]
+max_ticks = 1000
+[world]
+width = 32
+height = 32
+max_height = 8
+[agents]
+count = 2
+[llm]
+provider = "mock"
+model = "nemotron3:33b"
+"#;
+    let on = format!("{off}system1_model = \"  grok-4-fast  \"\n");
+    assert!(LlmBarrierParams::from_config_toml(off).system1_model.is_empty());
+    assert_eq!(
+        LlmBarrierParams::from_config_toml(&on).system1_model,
+        "grok-4-fast"
+    );
+    let mut s_off = Simulation::new(ExperimentConfig::from_toml_str(off).unwrap()).unwrap();
+    let mut s_on = Simulation::new(ExperimentConfig::from_toml_str(&on).unwrap()).unwrap();
+    assert_eq!(s_off.config_hash().unwrap(), s_on.config_hash().unwrap());
+    s_off.run_ticks(2);
+    s_on.run_ticks(2);
+    assert_eq!(s_off.state_hash(), s_on.state_hash());
+}
+
+#[test]
+fn load_does_not_extra_choose() {
+    let mut sim = Simulation::new(tiny(0x74_02, 2)).unwrap();
+    sim.run_ticks(1);
+    let n = sim.events.events.len();
+    let tick = sim.tick;
+    let bytes = sim.encode_checkpoint().unwrap();
+    let loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    assert_eq!(loaded.tick, tick);
+    assert_eq!(loaded.events.events.len(), n);
+}
+
 fn tiny(seed: u64, agents: u32) -> ExperimentConfig {
     ExperimentConfig::from_toml_str(&format!(
         r#"
