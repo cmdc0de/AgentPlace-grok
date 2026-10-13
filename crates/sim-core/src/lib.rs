@@ -72,8 +72,9 @@ pub use llm::{
 pub use objects::{
     AnimDef, AnimMoniker, CatalogEntry, CatalogParams, ObjectDef, VisualDef, WearParams,
     agent_idle_this_tick, animation_moniker_this_tick, apply_species_defs, catalog_entries,
-    clip_name_for, idle_clip_name, load_object_defs, move_into_interior_blocked,
+    clip_name_for, door_cells, idle_clip_name, load_object_defs, move_into_interior_blocked,
     pick_visual_path, ranged_ammo_item, ranged_attack_has_ammo, sleep_dims, visual_for_id,
+    wall_cells,
     visual_scale_for,
 };
 pub use observation::{IncentiveView, InventoryView};

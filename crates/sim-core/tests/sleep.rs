@@ -5,7 +5,7 @@ use sim_core::agent::ItemId;
 use sim_core::clock::{dawn_energy, dawn_refill};
 use sim_core::event_log::SimEventKind;
 use sim_core::observation::legal_actions;
-use sim_core::objects::{can_place, sleep_covers};
+use sim_core::objects::{can_place, sleep_covers, wall_cells};
 use sim_core::sheet::AbilitySheet;
 use sim_core::{AgentId, ExperimentConfig, Simulation};
 use std::fs;
@@ -1182,4 +1182,185 @@ fn no_time_interior_still_blocks() {
         &PrimaryAction::MoveRelative { dx, dy },
     );
     assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (ox, oy));
+}
+
+fn apply_hall_door(sim: &mut Simulation, tag: &str, door: Option<&str>) {
+    let dir = std::env::temp_dir().join(format!(
+        "agentplace-m73-door-{}-{tag}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let door_line = match door {
+        Some(d) => format!("door = \"{d}\"\n"),
+        None => String::new(),
+    };
+    fs::write(
+        dir.join("hall.toml"),
+        format!(
+            r#"
+id = "hall"
+kind = "item"
+[sim]
+sleep_bonus = 50
+sleep_size = 3
+interior = true
+{door_line}"#
+        ),
+    )
+    .unwrap();
+    sim.apply_objects_dir(&dir).unwrap();
+}
+
+fn force_land(sim: &mut Simulation, x: u32, y: u32) {
+    if x < sim.world.width && y < sim.world.height {
+        let i = (y * sim.world.width + x) as usize;
+        if i < sim.world.water.len() {
+            sim.world.water[i] = 0;
+        }
+    }
+}
+
+fn place_hall(sim: &mut Simulation) -> (AgentId, u32, u32) {
+    let id = AgentId(0);
+    let (x, y) = land_rect_open(sim, 3, 3);
+    park(sim, id, x, y);
+    let item = catalog_item(sim, "hall");
+    give(sim, id, "hall");
+    sim_core::execute::execute_primary(sim, id, &PrimaryAction::Place { item });
+    (id, x, y)
+}
+
+fn step_toward(sim: &mut Simulation, id: AgentId, tx: u32, ty: u32) {
+    let (x, y) = (sim.agents[&id].x, sim.agents[&id].y);
+    fill_energy(sim, id);
+    sim_core::execute::execute_primary(
+        sim,
+        id,
+        &PrimaryAction::MoveRelative {
+            dx: tx as i32 - x as i32,
+            dy: ty as i32 - y as i32,
+        },
+    );
+}
+
+#[test]
+fn door_omit_still_origin_only() {
+    let mut sim = Simulation::new(tiny(0x73_11)).unwrap();
+    apply_hall_door(&mut sim, "omit", None);
+    let (id, x, y) = place_hall(&mut sim);
+    force_land(&mut sim, x + 1, y.saturating_sub(1));
+    park(&mut sim, id, x + 1, y - 1);
+    step_toward(&mut sim, id, x + 1, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 1, y - 1));
+    assert!(sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
+    force_land(&mut sim, x.saturating_sub(1), y);
+    park(&mut sim, id, x - 1, y);
+    step_toward(&mut sim, id, x, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x, y));
+}
+
+#[test]
+fn door_north_edge_not_origin() {
+    let mut sim = Simulation::new(tiny(0x73_12)).unwrap();
+    apply_hall_door(&mut sim, "north", Some("n"));
+    let (id, x, y) = place_hall(&mut sim);
+    force_land(&mut sim, x + 1, y + 3);
+    park(&mut sim, id, x + 1, y + 3);
+    step_toward(&mut sim, id, x + 1, y + 2);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 1, y + 2));
+    force_land(&mut sim, x, y.saturating_sub(1));
+    park(&mut sim, id, x, y - 1);
+    step_toward(&mut sim, id, x, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x, y - 1));
+    assert!(sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
+}
+
+#[test]
+fn door_east_edge_from_outside() {
+    let mut sim = Simulation::new(tiny(0x73_13)).unwrap();
+    apply_hall_door(&mut sim, "east", Some("e"));
+    let (id, x, y) = place_hall(&mut sim);
+    force_land(&mut sim, x + 3, y);
+    park(&mut sim, id, x + 3, y);
+    step_toward(&mut sim, id, x + 2, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 2, y));
+}
+
+#[test]
+fn door_north_inside_and_exit() {
+    let mut sim = Simulation::new(tiny(0x73_14)).unwrap();
+    apply_hall_door(&mut sim, "inout", Some("n"));
+    let (id, x, y) = place_hall(&mut sim);
+    step_toward(&mut sim, id, x + 1, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 1, y));
+    force_land(&mut sim, x + 1, y.saturating_sub(1));
+    step_toward(&mut sim, id, x + 1, y - 1);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x + 1, y - 1));
+}
+
+#[test]
+fn load_keeps_door_rule_without_replace() {
+    let mut sim = Simulation::new(tiny(0x73_15)).unwrap();
+    apply_hall_door(&mut sim, "load", Some("n"));
+    let (id, x, y) = place_hall(&mut sim);
+    let item = catalog_item(&sim, "hall");
+    let bytes = sim.encode_checkpoint().unwrap();
+    let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
+    apply_hall_door(&mut loaded, "load2", Some("n"));
+    assert_eq!(loaded.world.sleep_places.len(), 1);
+    sim_core::execute::execute_primary(&mut loaded, id, &PrimaryAction::Place { item });
+    assert_eq!(loaded.world.sleep_places.len(), 1);
+    force_land(&mut loaded, x + 1, y + 3);
+    park(&mut loaded, id, x + 1, y + 3);
+    step_toward(&mut loaded, id, x + 1, y + 2);
+    assert_eq!(
+        (loaded.agents[&id].x, loaded.agents[&id].y),
+        (x + 1, y + 2)
+    );
+}
+
+#[test]
+fn no_time_door_north_still_blocks_origin() {
+    let mut sim = Simulation::new(tiny(0x73_16)).unwrap();
+    sim.time_enabled = false;
+    apply_hall_door(&mut sim, "notime", Some("n"));
+    let (id, x, y) = place_hall(&mut sim);
+    force_land(&mut sim, x, y.saturating_sub(1));
+    park(&mut sim, id, x, y - 1);
+    step_toward(&mut sim, id, x, y);
+    assert_eq!((sim.agents[&id].x, sim.agents[&id].y), (x, y - 1));
+}
+
+#[test]
+fn wall_cells_north_drops_north_edge() {
+    let cells = wall_cells(10, 20, 3, 3, true, "n");
+    assert_eq!(cells.len(), 5);
+    assert!(cells.iter().all(|&(_, y)| y != 22));
+    assert!(cells.contains(&(10, 20)));
+    assert!(!cells.contains(&(11, 21)));
+}
+
+#[test]
+fn wall_cells_interior_false_is_empty() {
+    assert!(wall_cells(0, 0, 3, 3, false, "n").is_empty());
+}
+
+fn hall_hash(seed: u64, tag: &str, door: Option<&str>) -> sim_core::StateHash {
+    let mut sim = Simulation::new(tiny(seed)).unwrap();
+    apply_hall_door(&mut sim, tag, door);
+    sim.state_hash()
+}
+
+#[test]
+fn door_north_hash_differs_from_omit() {
+    let omit = hall_hash(0x73_17, "ha", None);
+    let north = hall_hash(0x73_17, "hb", Some("n"));
+    assert_ne!(omit, north);
+}
+
+#[test]
+fn door_unknown_hashes_like_omit() {
+    let omit = hall_hash(0x73_18, "ua", None);
+    let nope = hall_hash(0x73_18, "ub", Some("nope"));
+    assert_eq!(omit, nope);
 }

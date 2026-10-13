@@ -189,9 +189,12 @@ pub struct SimDef {
     /// Place-able 1×1 workstation (not a sleep place). Omit = false.
     #[serde(default)]
     pub station: Option<bool>,
-    /// Sleep footprint blocks Move from outside except the origin door. Omit = false.
+    /// Sleep footprint blocks Move from outside except the door. Omit = false.
     #[serde(default)]
     pub interior: Option<bool>,
+    /// Door side when `interior`: `n`/`e`/`s`/`w`. Omit or unknown = origin cell only.
+    #[serde(default)]
+    pub door: Option<String>,
     /// Item slug consumed on Attack Chebyshev > 1. Omit = none.
     #[serde(default)]
     pub ammo: Option<String>,
@@ -230,6 +233,8 @@ pub struct CatalogEntry {
     pub station: bool,
     pub craft_station: String,
     pub interior: bool,
+    /// `n`/`e`/`s`/`w`, or empty (origin cell). Hashed only for a known side.
+    pub door: String,
     /// Ammo slug; empty = none. Hashed when non-empty.
     pub ammo: String,
     pub ammo_item: Option<ItemId>,
@@ -498,6 +503,7 @@ pub fn catalog_entries(defs: &[ObjectDef]) -> Vec<CatalogEntry> {
                 station: sim.station.unwrap_or(false),
                 craft_station,
                 interior: sim.interior.unwrap_or(false),
+                door: normalize_door(sim.door.as_deref().unwrap_or("")),
                 ammo: sim.ammo.clone().unwrap_or_default(),
                 ammo_item: sim
                     .ammo
@@ -905,6 +911,55 @@ pub fn clip_name_for<'a>(
     name.filter(|s| !s.is_empty())
 }
 
+fn normalize_door(raw: &str) -> String {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "n" | "e" | "s" | "w" => raw.trim().to_ascii_lowercase(),
+        _ => String::new(),
+    }
+}
+
+/// Door cells of a footprint. Empty `door` is the origin cell only.
+pub fn door_cells(ox: u32, oy: u32, w: u32, h: u32, door: &str) -> Vec<(u32, u32)> {
+    let w = w.max(1);
+    let h = h.max(1);
+    match normalize_door(door).as_str() {
+        "n" => (0..w).map(|dx| (ox + dx, oy + h - 1)).collect(),
+        "e" => (0..h).map(|dy| (ox + w - 1, oy + dy)).collect(),
+        "s" => (0..w).map(|dx| (ox + dx, oy)).collect(),
+        "w" => (0..h).map(|dy| (ox, oy + dy)).collect(),
+        _ => vec![(ox, oy)],
+    }
+}
+
+/// Perimeter cells that are not door cells. Empty when `interior` is false.
+pub fn wall_cells(
+    ox: u32,
+    oy: u32,
+    w: u32,
+    h: u32,
+    interior: bool,
+    door: &str,
+) -> Vec<(u32, u32)> {
+    if !interior {
+        return Vec::new();
+    }
+    let w = w.max(1);
+    let h = h.max(1);
+    let doors: std::collections::BTreeSet<(u32, u32)> =
+        door_cells(ox, oy, w, h, door).into_iter().collect();
+    let mut out = Vec::new();
+    for dy in 0..h {
+        for dx in 0..w {
+            let edge = dx == 0 || dy == 0 || dx + 1 == w || dy + 1 == h;
+            let cell = (ox + dx, oy + dy);
+            if edge && !doors.contains(&cell) {
+                out.push(cell);
+            }
+        }
+    }
+    out
+}
+
 /// True when Move from `(fx,fy)` to `(tx,ty)` must Wait (interior, not door, not already inside).
 pub fn move_into_interior_blocked(
     world: &crate::world::World,
@@ -923,7 +978,8 @@ pub fn move_into_interior_blocked(
     if !entry.interior {
         return false;
     }
-    if (tx, ty) == dest_origin {
+    let (w, h) = sleep_dims(entry);
+    if door_cells(dest_origin.0, dest_origin.1, w, h, &entry.door).contains(&(tx, ty)) {
         return false;
     }
     match sleep_origin_at(world, catalog, fx, fy) {
@@ -1194,6 +1250,13 @@ pub fn hash_catalog(entries: &[CatalogEntry], hasher: &mut impl Digest) {
         hasher.update(e.craft_station.as_bytes());
         if e.interior {
             hasher.update([1]);
+        }
+        match e.door.as_str() {
+            "n" => hasher.update([1]),
+            "e" => hasher.update([2]),
+            "s" => hasher.update([3]),
+            "w" => hasher.update([4]),
+            _ => {}
         }
         if !e.ammo.is_empty() {
             hasher.update(e.ammo.as_bytes());

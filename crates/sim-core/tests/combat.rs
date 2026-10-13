@@ -654,7 +654,7 @@ fn bow_attack_legal_at_chebyshev_3_not_4() {
     let b = ids[1];
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "bow");
-    sim.agents.get_mut(&a).unwrap().try_add_item(sim_core::agent::ItemId::Stone, 1);
+    give_slug(&mut sim, a, "arrow");
     park_at_chebyshev(&mut sim, a, b, 3);
     let d = sim_core::observation::chebyshev(
         sim.agents[&a].x,
@@ -812,30 +812,38 @@ fn defender_dex_0_bow_always_hits() {
     }
 }
 
-fn stone_qty(sim: &Simulation, id: AgentId) -> u32 {
-    sim.agents[&id].held_qty(sim_core::agent::ItemId::Stone)
+fn slug_qty(sim: &Simulation, id: AgentId, slug: &str) -> u32 {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug}"))
+        .item;
+    sim.agents[&id].held_qty(item)
 }
 
-fn give_stone(sim: &mut Simulation, id: AgentId, n: u32) {
-    let added = sim
-        .agents
-        .get_mut(&id)
-        .unwrap()
-        .try_add_item(sim_core::agent::ItemId::Stone, n);
-    assert_eq!(added, n, "give stone");
+fn give_n(sim: &mut Simulation, id: AgentId, slug: &str, n: u32) {
+    let item = sim
+        .catalog
+        .iter()
+        .find(|e| e.slug == slug)
+        .unwrap_or_else(|| panic!("{slug}"))
+        .item;
+    let added = sim.agents.get_mut(&id).unwrap().try_add_item(item, n);
+    assert_eq!(added, n, "give {slug}");
 }
 
 #[test]
-fn melee_bow_does_not_consume_stone() {
+fn melee_bow_does_not_consume_arrow() {
     let mut sim = Simulation::new(tiny(0x69_11)).unwrap();
     sim.conflict_enabled = true;
     sim.apply_objects_dir(&shipped_objects()).unwrap();
     let (a, b) = place_adjacent(&mut sim);
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "bow");
-    give_stone(&mut sim, a, 1);
+    give_n(&mut sim, a, "arrow", 1);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 1);
+    assert_eq!(slug_qty(&sim, a, "arrow"), 1);
     assert!(sim.events.events.iter().any(|e| matches!(
         e.kind,
         SimEventKind::Attack { target, .. } if target == b
@@ -843,7 +851,7 @@ fn melee_bow_does_not_consume_stone() {
 }
 
 #[test]
-fn bow_ranged_consumes_one_stone() {
+fn bow_ranged_consumes_one_arrow() {
     let mut sim = Simulation::new(tiny(0x69_12)).unwrap();
     sim.conflict_enabled = true;
     sim.apply_objects_dir(&shipped_objects()).unwrap();
@@ -852,10 +860,10 @@ fn bow_ranged_consumes_one_stone() {
     let b = ids[1];
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "bow");
-    give_stone(&mut sim, a, 1);
+    give_n(&mut sim, a, "arrow", 1);
     park_at_chebyshev(&mut sim, a, b, 2);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 0);
+    assert_eq!(slug_qty(&sim, a, "arrow"), 0);
     assert!(sim.events.events.iter().any(|e| matches!(
         e.kind,
         SimEventKind::Attack { target, .. } if target == b
@@ -863,7 +871,7 @@ fn bow_ranged_consumes_one_stone() {
 }
 
 #[test]
-fn bow_ranged_no_stone_is_wait() {
+fn bow_ranged_stone_does_not_count() {
     let mut sim = Simulation::new(tiny(0x69_13)).unwrap();
     sim.conflict_enabled = true;
     sim.apply_objects_dir(&shipped_objects()).unwrap();
@@ -873,6 +881,10 @@ fn bow_ranged_no_stone_is_wait() {
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     let energy = sim.agents[&a].needs.energy;
     give_slug(&mut sim, a, "bow");
+    sim.agents
+        .get_mut(&a)
+        .unwrap()
+        .try_add_item(sim_core::agent::ItemId::Stone, 1);
     park_at_chebyshev(&mut sim, a, b, 2);
     let legal = legal_actions(&sim, sim.agents.get(&a).unwrap());
     assert!(!legal
@@ -880,11 +892,15 @@ fn bow_ranged_no_stone_is_wait() {
         .any(|x| matches!(x, PrimaryAction::Attack { target } if *target == b)));
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
     assert_eq!(sim.agents[&a].needs.energy, energy);
+    assert_eq!(
+        sim.agents[&a].held_qty(sim_core::agent::ItemId::Stone),
+        1
+    );
     assert!(sim.events.events.iter().any(|e| matches!(e.kind, SimEventKind::Wait)));
 }
 
 #[test]
-fn sling_ranged_consumes_one_stone() {
+fn sling_ranged_consumes_one_arrow() {
     let mut sim = Simulation::new(tiny(0x69_14)).unwrap();
     sim.conflict_enabled = true;
     sim.apply_objects_dir(&shipped_objects()).unwrap();
@@ -893,14 +909,14 @@ fn sling_ranged_consumes_one_stone() {
     let b = ids[1];
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "sling");
-    give_stone(&mut sim, a, 1);
+    give_n(&mut sim, a, "arrow", 1);
     park_at_chebyshev(&mut sim, a, b, 2);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 0);
+    assert_eq!(slug_qty(&sim, a, "arrow"), 0);
 }
 
 #[test]
-fn spear_ranged_needs_no_stone() {
+fn spear_ranged_needs_no_arrow() {
     let mut sim = Simulation::new(tiny(0x69_15)).unwrap();
     sim.conflict_enabled = true;
     sim.apply_objects_dir(&shipped_objects()).unwrap();
@@ -922,7 +938,7 @@ fn spear_ranged_needs_no_stone() {
 }
 
 #[test]
-fn bow_miss_still_consumes_stone() {
+fn bow_miss_still_consumes_arrow() {
     use sim_core::sheet::AbilitySheet;
     let mut sim = Simulation::new(tiny(0x69_16)).unwrap();
     sim.conflict_enabled = true;
@@ -939,10 +955,10 @@ fn bow_miss_still_consumes_stone() {
     sim.tick = tick;
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "bow");
-    give_stone(&mut sim, a, 1);
+    give_n(&mut sim, a, "arrow", 1);
     park_at_chebyshev(&mut sim, a, b, 2);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 0);
+    assert_eq!(slug_qty(&sim, a, "arrow"), 0);
     assert_eq!(last_attack_miss(&sim, b), Some(true));
 }
 
@@ -956,15 +972,15 @@ fn load_does_not_extra_consume_ammo() {
     let b = ids[1];
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
     give_slug(&mut sim, a, "bow");
-    give_stone(&mut sim, a, 1);
+    give_n(&mut sim, a, "arrow", 1);
     park_at_chebyshev(&mut sim, a, b, 2);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 0);
+    assert_eq!(slug_qty(&sim, a, "arrow"), 0);
     let bytes = sim.encode_checkpoint().unwrap();
     let mut loaded = Simulation::decode_checkpoint(&bytes).unwrap();
     loaded.apply_objects_dir(&shipped_objects()).unwrap();
     loaded.conflict_enabled = true;
-    assert_eq!(stone_qty(&loaded, a), 0);
+    assert_eq!(slug_qty(&loaded, a, "arrow"), 0);
 }
 
 #[test]
@@ -973,9 +989,7 @@ fn catalog_off_unarmed_attack_no_ammo() {
     sim.conflict_enabled = true;
     let (a, b) = place_adjacent(&mut sim);
     sim.agents.get_mut(&a).unwrap().needs.energy = 10_000;
-    assert_eq!(stone_qty(&sim, a), 0);
     sim_core::execute::execute_primary(&mut sim, a, &PrimaryAction::Attack { target: b });
-    assert_eq!(stone_qty(&sim, a), 0);
     assert!(sim.events.events.iter().any(|e| matches!(
         e.kind,
         SimEventKind::Attack { target, .. } if target == b

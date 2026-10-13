@@ -72,6 +72,15 @@ struct SleepPlaceVisual {
 }
 
 #[derive(Component)]
+struct InteriorWallVisual {
+    x: u32,
+    y: u32,
+}
+
+/// Perimeter wall stem for an interior sleep place. Existing fence glb.
+const INTERIOR_WALL_STEM: &str = "fence";
+
+#[derive(Component)]
 struct HouseholdVisual {
     x: u32,
     y: u32,
@@ -335,6 +344,7 @@ fn main() {
             )
                 .chain(),
         )
+        .add_systems(Update, sync_interior_walls)
         .add_systems(Last, ui::persist_ui_on_exit)
         .run();
 }
@@ -934,6 +944,48 @@ fn spawn_sleep_place(
         tf,
         extra,
     );
+}
+
+fn sync_interior_walls(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    state: Res<SimState>,
+    visuals: Res<ObjectVisuals>,
+    existing: Query<(Entity, &InteriorWallVisual)>,
+) {
+    let mut live = std::collections::BTreeSet::new();
+    for (&(ox, oy), &item) in &state.sim.world.sleep_places {
+        let Some(entry) = state.sim.catalog.iter().find(|e| e.item == item) else {
+            continue;
+        };
+        let (w, h) = sim_core::sleep_dims(entry);
+        for (x, y) in sim_core::wall_cells(ox, oy, w, h, entry.interior, &entry.door) {
+            live.insert((x, y));
+        }
+    }
+    let have: std::collections::BTreeSet<(u32, u32)> =
+        existing.iter().map(|(_, v)| (v.x, v.y)).collect();
+    for (e, v) in existing.iter() {
+        if !live.contains(&(v.x, v.y)) {
+            commands.entity(e).despawn();
+        }
+    }
+    for (x, y) in live {
+        if have.contains(&(x, y)) {
+            continue;
+        }
+        let pos = resource_world_pos(&state.sim.world, x, y, 0.45);
+        let tf = Transform::from_translation(pos);
+        let _ = try_spawn_model(
+            &mut commands,
+            &assets,
+            &visuals,
+            INTERIOR_WALL_STEM,
+            models::camera_dist_cells(state.sim.world.width, state.sim.world.height, x, y),
+            tf,
+            (WorldMarker { x, y }, InteriorWallVisual { x, y }),
+        );
+    }
 }
 
 fn sync_sleep_places(
@@ -2156,5 +2208,13 @@ fn update_fog_visibility(
         } else {
             Visibility::Hidden
         };
+    }
+}
+
+#[cfg(test)]
+mod interior_wall_tests {
+    #[test]
+    fn interior_wall_stem_is_fence() {
+        assert_eq!(super::INTERIOR_WALL_STEM, "fence");
     }
 }

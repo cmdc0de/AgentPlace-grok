@@ -13,12 +13,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// `--no-time` shipped-objects 2-tick (M71 catalog: extra recipes).
-const IDLE_2_NO_TIME: &str = "53972084b862db814f81a7d39a7ee110b03b9c5b25b869fde704b8c250175f1a";
+const IDLE_2_NO_TIME: &str = "cd81a0bf17f5274381130b79d081a5ee1617ebdfbe9faa45288d76b412554168";
 /// `--no-time` no-catalog 2-tick (M51 identity).
 const IDLE_2_NO_CATALOG_NO_TIME: &str =
     "70e5204df22e5bcb44e4d84e6b5886e418e2f275e865029987c21e2d8dbdb7dc";
 /// Default (time on) shipped-objects 2-tick.
-const IDLE_2: &str = "5a14ef91dbc73643683d5a8bf390b46a072b8fccebe0840c42473a94b632594a";
+const IDLE_2: &str = "232b02e6b8d39361fe3c2045811eeac589d8122581034a7a5b412e0c3f9e2d18";
 /// Default (time on) no-catalog 2-tick.
 const IDLE_2_NO_CATALOG: &str = "9c3b270de2658f24531f05220ec4a40313f3859db1ded003a63b681106882131";
 
@@ -3106,4 +3106,39 @@ fn catalog_on_craft_pikelet() {
     let mut sim = Simulation::new(tiny(0x72_44)).unwrap();
     apply_shipped(&mut sim);
     craft_catalog_slug(&mut sim, "pikelet", &[(ItemId::Food(1), 16)]);
+}
+
+#[test]
+fn catalog_on_craft_arrow() {
+    let mut sim = Simulation::new(tiny(0x73_41)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "arrow", &[(ItemId::Wood, 2)]);
+}
+
+#[test]
+fn catalog_on_craft_purlin() {
+    let mut sim = Simulation::new(tiny(0x73_42)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "purlin", &[(ItemId::Wood, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_gaiter() {
+    let mut sim = Simulation::new(tiny(0x73_43)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "gaiter", &[(ItemId::Fiber, 20)]);
+}
+
+#[test]
+fn catalog_on_craft_cornice() {
+    let mut sim = Simulation::new(tiny(0x73_44)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "cornice", &[(ItemId::Stone, 18)]);
+}
+
+#[test]
+fn catalog_on_craft_bagel() {
+    let mut sim = Simulation::new(tiny(0x73_45)).unwrap();
+    apply_shipped(&mut sim);
+    craft_catalog_slug(&mut sim, "bagel", &[(ItemId::Food(1), 17)]);
 }
