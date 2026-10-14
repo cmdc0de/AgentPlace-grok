@@ -58,12 +58,32 @@ impl From<CodecError> for TransportError {
 pub enum Scheme {
     Tcp,
     Ws,
+    Unix,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListenUrl {
     pub scheme: Scheme,
     pub addr: SocketAddr,
+}
+
+/// `unix:///tmp/agentplace.sock` → `/tmp/agentplace.sock`. Empty and `@abstract` are errors.
+pub fn parse_unix_path(s: &str) -> Result<std::path::PathBuf, TransportError> {
+    let s = s.trim();
+    let Some(rest) = s.strip_prefix("unix://") else {
+        return Err(TransportError::BadUrl(format!(
+            "expected unix://path, got {s}"
+        )));
+    };
+    if rest.is_empty() {
+        return Err(TransportError::BadUrl("unix:// path is empty".into()));
+    }
+    if rest.starts_with('@') {
+        return Err(TransportError::BadUrl(
+            "abstract unix sockets are not supported".into(),
+        ));
+    }
+    Ok(std::path::PathBuf::from(rest))
 }
 
 pub fn parse_listen_url(s: &str) -> Result<ListenUrl, TransportError> {
@@ -87,58 +107,123 @@ pub fn parse_listen_url(s: &str) -> Result<ListenUrl, TransportError> {
     Ok(ListenUrl { scheme, addr })
 }
 
+enum ListenInner {
+    Tcp {
+        listener: TcpListener,
+        scheme: Scheme,
+    },
+    #[cfg(unix)]
+    Unix {
+        listener: std::os::unix::net::UnixListener,
+        path: std::path::PathBuf,
+    },
+}
+
 pub struct Listener {
-    inner: TcpListener,
-    scheme: Scheme,
+    inner: ListenInner,
 }
 
 impl Listener {
     pub fn bind(url: &str) -> Result<Self, TransportError> {
+        if url.trim().starts_with("unix://") {
+            return bind_unix(url);
+        }
         let parsed = parse_listen_url(url)?;
-        let inner = TcpListener::bind(parsed.addr)?;
-        inner.set_nonblocking(false)?;
+        let listener = TcpListener::bind(parsed.addr)?;
+        listener.set_nonblocking(false)?;
         Ok(Self {
-            inner,
-            scheme: parsed.scheme,
+            inner: ListenInner::Tcp {
+                listener,
+                scheme: parsed.scheme,
+            },
         })
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr, TransportError> {
-        Ok(self.inner.local_addr()?)
+        match &self.inner {
+            ListenInner::Tcp { listener, .. } => Ok(listener.local_addr()?),
+            #[cfg(unix)]
+            ListenInner::Unix { .. } => Err(TransportError::BadUrl(
+                "unix listener has no tcp address".into(),
+            )),
+        }
     }
 
     pub fn local_url(&self) -> Result<String, TransportError> {
-        let addr = self.local_addr()?;
-        let scheme = match self.scheme {
-            Scheme::Tcp => "tcp",
-            Scheme::Ws => "ws",
-        };
-        Ok(format!("{scheme}://{addr}"))
+        match &self.inner {
+            ListenInner::Tcp { listener, scheme } => {
+                let addr = listener.local_addr()?;
+                let name = match scheme {
+                    Scheme::Tcp => "tcp",
+                    Scheme::Ws => "ws",
+                    Scheme::Unix => "unix",
+                };
+                Ok(format!("{name}://{addr}"))
+            }
+            #[cfg(unix)]
+            ListenInner::Unix { path, .. } => Ok(format!("unix://{}", path.display())),
+        }
     }
 
     pub fn scheme(&self) -> Scheme {
-        self.scheme
+        match &self.inner {
+            ListenInner::Tcp { scheme, .. } => *scheme,
+            #[cfg(unix)]
+            ListenInner::Unix { .. } => Scheme::Unix,
+        }
     }
 
     pub fn accept(&self) -> Result<Connection, TransportError> {
-        let (stream, _) = self.inner.accept()?;
-        Connection::from_accepted(stream, self.scheme)
+        match &self.inner {
+            ListenInner::Tcp { listener, scheme } => {
+                let (stream, _) = listener.accept()?;
+                Connection::from_accepted(stream, *scheme)
+            }
+            #[cfg(unix)]
+            ListenInner::Unix { listener, .. } => {
+                let (stream, _) = listener.accept()?;
+                Connection::from_unix(stream)
+            }
+        }
     }
 
     /// Returns `Ok(None)` when no connection is pending.
     pub fn accept_nonblocking(&self) -> Result<Option<Connection>, TransportError> {
-        match self.accept_tcp_nonblocking()? {
-            Some(stream) => Ok(Some(Connection::from_accepted(stream, self.scheme)?)),
-            None => Ok(None),
+        match &self.inner {
+            ListenInner::Tcp { .. } => match self.accept_tcp_nonblocking()? {
+                Some(stream) => Ok(Some(Connection::from_accepted(stream, self.scheme())?)),
+                None => Ok(None),
+            },
+            #[cfg(unix)]
+            ListenInner::Unix { listener, .. } => {
+                listener.set_nonblocking(true)?;
+                let result = listener.accept();
+                listener.set_nonblocking(false)?;
+                match result {
+                    Ok((stream, _)) => Ok(Some(Connection::from_unix(stream)?)),
+                    Err(e)
+                        if e.kind() == ErrorKind::WouldBlock
+                            || e.kind() == ErrorKind::Interrupted =>
+                    {
+                        Ok(None)
+                    }
+                    Err(e) => Err(e.into()),
+                }
+            }
         }
     }
 
     /// TCP accept only. WebSocket handshake is done in `Connection::from_accepted`
     /// so the accept loop can spawn it on a worker thread.
     pub fn accept_tcp_nonblocking(&self) -> Result<Option<TcpStream>, TransportError> {
-        self.inner.set_nonblocking(true)?;
-        let result = self.inner.accept();
-        self.inner.set_nonblocking(false)?;
+        let ListenInner::Tcp { listener, .. } = &self.inner else {
+            return Err(TransportError::BadUrl(
+                "accept_tcp_nonblocking is only for tcp/ws".into(),
+            ));
+        };
+        listener.set_nonblocking(true)?;
+        let result = listener.accept();
+        listener.set_nonblocking(false)?;
         match result {
             Ok((stream, _)) => Ok(Some(stream)),
             Err(e) if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::Interrupted => {
@@ -149,9 +234,33 @@ impl Listener {
     }
 }
 
+fn bind_unix(url: &str) -> Result<Listener, TransportError> {
+    let path = parse_unix_path(url)?;
+    #[cfg(unix)]
+    {
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
+        let listener = std::os::unix::net::UnixListener::bind(&path)?;
+        listener.set_nonblocking(false)?;
+        Ok(Listener {
+            inner: ListenInner::Unix { listener, path },
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Err(TransportError::BadUrl(
+            "unix sockets are not supported on this OS".into(),
+        ))
+    }
+}
+
 pub enum Connection {
     Tcp(TcpStream),
     Ws(WebSocket<TcpStream>),
+    #[cfg(unix)]
+    Unix(std::os::unix::net::UnixStream),
 }
 
 impl Connection {
@@ -166,10 +275,23 @@ impl Connection {
                 let ws = ws_accept(stream).map_err(|e| TransportError::Handshake(e.to_string()))?;
                 Ok(Connection::Ws(ws))
             }
+            Scheme::Unix => Err(TransportError::BadUrl(
+                "unix accept is not a tcp stream".into(),
+            )),
         }
     }
 
+    #[cfg(unix)]
+    pub fn from_unix(stream: std::os::unix::net::UnixStream) -> Result<Self, TransportError> {
+        stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+        Ok(Connection::Unix(stream))
+    }
+
     pub fn connect(url: &str) -> Result<Self, TransportError> {
+        if url.trim().starts_with("unix://") {
+            return connect_unix(url);
+        }
         let parsed = parse_listen_url(url)?;
         let stream = TcpStream::connect_timeout(&parsed.addr, Duration::from_secs(15))?;
         stream.set_nodelay(true)?;
@@ -195,6 +317,9 @@ impl Connection {
                     .map_err(|e| TransportError::Handshake(e.to_string()))?;
                 Ok(Connection::Ws(ws))
             }
+            Scheme::Unix => Err(TransportError::BadUrl(
+                "unix connect is not a tcp address".into(),
+            )),
         }
     }
 
@@ -210,6 +335,12 @@ impl Connection {
                 ws.send(Message::Binary(frame.into()))
                     .map_err(|e| ws_err(e))?;
             }
+            #[cfg(unix)]
+            Connection::Unix(stream) => {
+                use std::io::Write;
+                stream.write_all(&frame)?;
+                stream.flush()?;
+            }
         }
         Ok(())
     }
@@ -217,6 +348,8 @@ impl Connection {
     pub fn recv_msg<T: DeserializeOwned>(&mut self) -> Result<T, TransportError> {
         match self {
             Connection::Tcp(stream) => Ok(protocol::read_frame(stream)?),
+            #[cfg(unix)]
+            Connection::Unix(stream) => Ok(protocol::read_frame(stream)?),
             Connection::Ws(ws) => loop {
                 match ws.read() {
                     Ok(Message::Binary(data)) => {
@@ -242,6 +375,8 @@ impl Connection {
     pub fn set_read_timeout(&mut self, timeout: Option<Duration>) -> Result<(), TransportError> {
         match self {
             Connection::Tcp(stream) => stream.set_read_timeout(timeout)?,
+            #[cfg(unix)]
+            Connection::Unix(stream) => stream.set_read_timeout(timeout)?,
             Connection::Ws(ws) => ws.get_mut().set_read_timeout(timeout)?,
         }
         Ok(())
@@ -250,6 +385,8 @@ impl Connection {
     pub fn set_write_timeout(&mut self, timeout: Option<Duration>) -> Result<(), TransportError> {
         match self {
             Connection::Tcp(stream) => stream.set_write_timeout(timeout)?,
+            #[cfg(unix)]
+            Connection::Unix(stream) => stream.set_write_timeout(timeout)?,
             Connection::Ws(ws) => ws.get_mut().set_write_timeout(timeout)?,
         }
         Ok(())
@@ -258,6 +395,8 @@ impl Connection {
     pub fn peer_addr(&self) -> Option<SocketAddr> {
         match self {
             Connection::Tcp(s) => s.peer_addr().ok(),
+            #[cfg(unix)]
+            Connection::Unix(_) => None,
             Connection::Ws(ws) => ws.get_ref().peer_addr().ok(),
         }
     }
@@ -267,12 +406,32 @@ impl Connection {
             Connection::Tcp(s) => {
                 let _ = s.shutdown(Shutdown::Both);
             }
+            #[cfg(unix)]
+            Connection::Unix(s) => {
+                let _ = s.shutdown(Shutdown::Both);
+            }
             Connection::Ws(mut ws) => {
                 let _ = ws.close(None);
                 let _ = ws.get_mut().shutdown(Shutdown::Both);
             }
         }
         Ok(())
+    }
+}
+
+fn connect_unix(url: &str) -> Result<Connection, TransportError> {
+    let path = parse_unix_path(url)?;
+    #[cfg(unix)]
+    {
+        let stream = std::os::unix::net::UnixStream::connect(&path)?;
+        Connection::from_unix(stream)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Err(TransportError::BadUrl(
+            "unix sockets are not supported on this OS".into(),
+        ))
     }
 }
 
@@ -297,6 +456,7 @@ mod tests {
         let prefix = match scheme {
             Scheme::Tcp => "tcp",
             Scheme::Ws => "ws",
+            Scheme::Unix => "unix",
         };
         let listener = Listener::bind(&format!("{prefix}://127.0.0.1:0")).unwrap();
         let url = listener.local_url().unwrap();
@@ -348,6 +508,61 @@ mod tests {
     #[test]
     fn ws_loopback_hello_snapshot() {
         loopback(Scheme::Ws);
+    }
+
+    #[test]
+    fn parse_unix_absolute_path() {
+        let path = parse_unix_path("unix:///tmp/agentplace.sock").unwrap();
+        assert_eq!(path, std::path::PathBuf::from("/tmp/agentplace.sock"));
+        let err = parse_unix_path("unix://").unwrap_err();
+        assert!(format!("{err}").contains("empty"), "{err}");
+        let err = parse_unix_path("unix://@abstract").unwrap_err();
+        assert!(format!("{err}").contains("abstract"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_loopback_hello_snapshot() {
+        let path = std::env::temp_dir().join(format!(
+            "agentplace-m77-shared-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let url = format!("unix://{}", path.display());
+        let listener = Listener::bind(&url).unwrap();
+        let bound = listener.local_url().unwrap();
+        let server = thread::spawn(move || {
+            let mut conn = listener.accept().unwrap();
+            let hello: ClientMessage = conn.recv_msg().unwrap();
+            match hello {
+                ClientMessage::Hello {
+                    protocol_version, ..
+                } => assert_eq!(protocol_version, PROTOCOL_VERSION),
+                other => panic!("expected Hello, got {other:?}"),
+            }
+            conn.send_msg(&ServerMessage::Welcome {
+                tick: 0,
+                state_hash: [0; 32],
+                experiment_id: "unix".into(),
+            })
+            .unwrap();
+        });
+        let mut client = Connection::connect(&bound).unwrap();
+        client.send_msg(&hello(None)).unwrap();
+        let welcome: ServerMessage = client.recv_msg().unwrap();
+        match welcome {
+            ServerMessage::Welcome { experiment_id, .. } => assert_eq!(experiment_id, "unix"),
+            other => panic!("expected Welcome, got {other:?}"),
+        }
+        server.join().unwrap();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn unix_unsupported_on_this_os() {
+        let err = Listener::bind("unix:///tmp/agentplace.sock").unwrap_err();
+        assert!(format!("{err}").contains("not supported"), "{err}");
     }
 
     #[test]

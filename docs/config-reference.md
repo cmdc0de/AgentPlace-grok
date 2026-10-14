@@ -12,7 +12,7 @@ CLI flags that turn the same features on: [`cli-reference.md`](cli-reference.md)
 
 | Path | Role |
 |---|---|
-| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `e3f2686b…`; `--no-time` shipped-objects `9abb3e07…`. |
+| [`configs/default.toml`](../configs/default.toml) | Shipping experiment. Default `--config` for `sim-cli` and `viewer`. Idle mock 2-tick (time on) `42e90831…`; `--no-time` shipped-objects `e624f373…`. |
 | [`configs/incentives/`](../configs/incentives/) | Overlay **schedules** (one file = many `[[incentives]]`). Not hashed. Pass `--incentives` / `--inject` / `/inject`. |
 | [`configs/objects/`](../configs/objects/) | One TOML per world/item kind. `[visual]` is hash-neutral. `[sim]` is hashed when `--catalog` / `[catalog] enabled`. |
 
@@ -212,7 +212,7 @@ Not hashed. Prefer CLI `--listen`.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `tcp_listen` / `ws_listen` | `""` | Listen URLs if CLI omits `--listen`. |
+| `tcp_listen` / `ws_listen` / `unix_listen` | `""` | Listen URLs if CLI omits `--listen`. `unix_listen` is a path or `unix://path`. Same frames as TCP. Hash-neutral. |
 | `token` | `""` | Hello secret. |
 | `allow_control` | `false` | Accept Control. |
 | `lockstep` | `false` | Wait for AckTick every tick. |

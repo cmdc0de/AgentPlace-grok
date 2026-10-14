@@ -133,7 +133,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 i += 1;
                 listen.push(
                     args.get(i)
-                        .ok_or("--listen requires tcp:// or ws:// URL")?
+                        .ok_or("--listen requires tcp://, ws://, or unix:// URL")?
                         .clone(),
                 );
             }
@@ -141,7 +141,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 i += 1;
                 connect = Some(
                     args.get(i)
-                        .ok_or("--connect requires tcp:// or ws:// URL")?
+                        .ok_or("--connect requires tcp://, ws://, or unix:// URL")?
                         .clone(),
                 );
             }
@@ -622,8 +622,8 @@ Usage:
   sim-cli [--config PATH] [--ticks N] [--quiet]
           [--out-dir DIR] [--sqlite PATH] [--sqlite-http HOST:PORT] [--checkpoint-every K]
           [--load PATH] [--summarize] [--report]
-          [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT]
-          [--connect tcp://HOST:PORT]
+          [--listen tcp://HOST:PORT] [--listen ws://HOST:PORT] [--listen unix://PATH]
+          [--connect tcp://HOST:PORT] [--connect unix://PATH]
           [--allow-control] [--start-paused] [--lockstep] [--lockstep-timeout-ms N]
           [--token SECRET]
           [--llm-barrier] [--llm-barrier-retries N] [--llm-reflect-on-evict]
@@ -649,7 +649,7 @@ Options:
       --sqlite PATH         Write events/decisions/timing as sqlite columns (extra sink; JSONL unchanged)
       --sqlite-http HOST:PORT  Serve GET /metrics, GET /sqlite, POST /query (needs --sqlite; CORS *)
       --llm PROVIDER        mock | wait | ollama | openai_compatible (empty base_url ⇒ mock)
-      --listen URL          Repeatable. tcp://host:port and/or ws://host:port (no TLS). Always binds; --report/--summarize do not skip it
+      --listen URL          Repeatable. tcp://host:port, ws://host:port, or unix://path (no TLS). Always binds; --report/--summarize do not skip it
       --connect URL         Welcome/Tick hash tail. With --allow-control, stdin slash commands send Control
       --allow-control       Listen: accept Control. Connect: send Control from stdin
       --start-paused        Listen without ticking until a client sends Play (needs --listen and --allow-control)

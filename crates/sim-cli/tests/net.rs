@@ -98,7 +98,7 @@ fn spawn_listen_on(
         .recv_timeout(Duration::from_secs(20))
         .expect("listen url on stderr");
     assert!(
-        url.starts_with("tcp://") || url.starts_with("ws://"),
+        url.starts_with("tcp://") || url.starts_with("ws://") || url.starts_with("unix://"),
         "bad listen url {url:?}"
     );
     (child, url, out_h, err_h)
@@ -138,6 +138,73 @@ fn dummy_read_hello(
         }
     }
     Err(last)
+}
+
+#[test]
+fn listen_and_connect_is_still_exclusive() {
+    let out = Command::new(bin())
+        .args([
+            "--config",
+            config().to_str().unwrap(),
+            "--ticks",
+            "1",
+            "--llm",
+            "mock",
+            "--quiet",
+            "--listen",
+            "unix:///tmp/agentplace-m77-a.sock",
+            "--connect",
+            "unix:///tmp/agentplace-m77-b.sock",
+        ])
+        .output()
+        .expect("spawn");
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("mutually exclusive"), "{err}");
+}
+
+#[cfg(unix)]
+#[test]
+fn unix_loopback_hello_and_hash_neutral() {
+    let no = Command::new(bin())
+        .args([
+            "--config",
+            config().to_str().unwrap(),
+            "--ticks",
+            "2",
+            "--llm",
+            "mock",
+            "--quiet",
+        ])
+        .output()
+        .expect("run without listen");
+    assert!(no.status.success(), "{}", String::from_utf8_lossy(&no.stderr));
+    let hash_a = parse_hash(&String::from_utf8_lossy(&no.stdout));
+
+    let path = std::env::temp_dir().join(format!(
+        "agentplace-m77-{}-{}.sock",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let url = format!("unix://{}", path.display());
+    let (mut child, bound, out_h, err_h) = spawn_listen_on(&url, &["--ticks", "2"]);
+    let (_conn, welcome, snap) = dummy_read_hello(&bound, None).expect("unix hello");
+    match welcome {
+        ServerMessage::Welcome { .. } => {}
+        other => panic!("expected Welcome, got {other:?}"),
+    }
+    match snap {
+        ServerMessage::Snapshot { checkpoint_bytes } => {
+            assert!(checkpoint_bytes.starts_with(b"AGTN"));
+        }
+        other => panic!("expected Snapshot, got {other:?}"),
+    }
+    let hash_b = wait_hash(&mut child, out_h, err_h);
+    assert_eq!(hash_a, hash_b, "unix attach must be hash-neutral");
+    let _ = std::fs::remove_file(&path);
 }
 
 #[test]

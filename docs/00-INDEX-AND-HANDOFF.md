@@ -92,7 +92,8 @@ Read this table first in a new session, then the specs, then [`remaining-feature
 | **M74** | Done (tag `M74`) | [`M74-plan.md`](M74-plan.md), walkthrough [`M74-test-plan.md`](M74-test-plan.md) | System-1 model id for action choose, extra recipes |
 | **M75** | Done (tag `M75`) | [`M75-plan.md`](M75-plan.md), walkthrough [`M75-test-plan.md`](M75-test-plan.md) | Dual-station food crafts, extra recipes |
 | **M76** | Done (tag `M76`) | [`M76-plan.md`](M76-plan.md), walkthrough [`M76-test-plan.md`](M76-test-plan.md) | wasm32 on Windows and macOS, extra recipes |
-| After M76 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
+| **M77** | Done (tag `M77`) | [`M77-plan.md`](M77-plan.md), walkthrough [`M77-test-plan.md`](M77-test-plan.md) | Unix sockets for local attach, extra recipes |
+| After M77 | Not started | [`remaining-features.md`](remaining-features.md) | leftover inventory for `/spec` |
 
 Specs remain the long-term source of truth. Milestone plans record **what we are building now**. The living leftover list is [`remaining-features.md`](remaining-features.md); historical `M*-plan.md` later-tables are snapshots and are not rewritten. If a milestone plan and a spec disagree on timing, the milestone plan wins for the current slice; do not silently expand scope.
 
@@ -259,15 +260,17 @@ Specs remain the long-term source of truth. Milestone plans record **what we are
 | 80b | `M75-test-plan.md` | M75 walkthrough (dual-station food crafts, extra recipes) |
 | 81 | `M76-plan.md` | Milestone 76 (done, tag `M76`): wasm32 on Windows and macOS, extra recipes |
 | 81b | `M76-test-plan.md` | M76 walkthrough (wasm32 on Windows and macOS, extra recipes) |
+| 82 | `M77-plan.md` | Milestone 77 (done, tag `M77`): Unix sockets for local attach, extra recipes |
+| 82b | `M77-test-plan.md` | M77 walkthrough (Unix sockets for local attach, extra recipes) |
 
 ---
 
 ## How to give this context to Grok Build
 
 **Option A – Recommended**  
-Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M76-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
+Upload or attach the specification files **and** the milestone plans (`M2-plan.md` through `M77-plan.md`) plus this `00-INDEX-AND-HANDOFF.md` and `remaining-features.md`. Start the conversation with:
 
-> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M76 is implemented (`M76-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
+> “Here are the design specifications and milestone plans. Read `00-INDEX-AND-HANDOFF.md` first (progress table). M77 is implemented (`M77-plan.md`). Leftovers are in `remaining-features.md`. Do not expand into items it defers (protobuf/TLS, Bevy in the browser).”
 
 **Option B – Single file**  
 If Grok Build prefers one document, ask the previous chat (or this one) to produce a concatenated `FULL-SPEC.md`. The individual files remain the source of truth.
@@ -295,11 +298,11 @@ Start Grok Build with only the Index + Architecture + Seeding docs, then feed th
 
 ## Suggested next request to Grok Build
 
-M1–M76 are done. M76 is implemented ([`M76-plan.md`](M76-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
+M1–M77 are done. M77 is implemented ([`M77-plan.md`](M77-plan.md)); leftovers are in [`remaining-features.md`](remaining-features.md).
 
 ```
 Read docs/00-INDEX-AND-HANDOFF.md, then docs/remaining-features.md.
-M76 is implemented (wasm32 on Windows and macOS, extra recipes;
+M77 is implemented (Unix sockets for local attach, extra recipes;
 PROTOCOL_VERSION=5; format_version writes 3, reads v2+v3).
 Leftovers are in remaining-features.md. Do not reconstruct them from M*-plan later-tables.
 Do not add protobuf, TLS, or Bevy in the browser unless asked.

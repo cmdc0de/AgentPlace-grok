@@ -55,7 +55,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--listen URL` | overlay `[network] tcp_listen` / `ws_listen` | Repeatable. `tcp://host:port` and/or `ws://host:port`. **No TLS / no `wss`**. Always binds; `--report` / `--summarize` do not skip it. Prints `listen={url}` on **stderr** after the socket is open (still printed with `--quiet`). |
+| `--listen URL` | overlay `[network] tcp_listen` / `ws_listen` / `unix_listen` | Repeatable. `tcp://host:port`, `ws://host:port`, or `unix://path`. **No TLS / no `wss`**. Unix is the same postcard frames as TCP (`PROTOCOL_VERSION` 5). Not supported on Windows (clear error, no bind). Always binds; `--report` / `--summarize` do not skip it. Prints `listen={url}` on **stderr** after the socket is open (still printed with `--quiet`). |
 | `--connect URL` | off | Attach as a client: print Welcome/Tick hash tail. Hash-neutral without `--allow-control`. |
 | `--allow-control` | overlay `[network] allow_control` | Listen: accept Control. Connect: stdin slash commands send Control. |
 | `--start-paused` | off | Listen without ticking until a client sends Play. Needs `--listen` **and** `--allow-control`. Viewer `--connect` does **not** auto-unpause. |
@@ -65,7 +65,7 @@ Default `--config` is `configs/default.toml`. Default `--ticks` is **100** (not 
 
 ### Overlay feature flags
 
-These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `9abb3e07…` (M76 recipes). Default (time on) shipped-objects is `e3f2686b…`.
+These are **or** with the same-named overlay table. `[time]` **omit = true** (clock on by default). `--no-time` no-objects is `70e5204d…`. `--no-time` shipped-objects 2-tick is `e624f373…` (M77 recipes). Default (time on) shipped-objects is `42e90831…`.
 
 | Flag | Overlay | What it does |
 |---|---|---|
@@ -101,9 +101,9 @@ Idle hash with shipped objects (time **on** by default):
 
 ```bash
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet
-# final_hash=e3f2686b…
+# final_hash=42e90831…
 cargo run -p sim-cli -- --config configs/default.toml --ticks 2 --llm mock --quiet --no-time
-# final_hash=9abb3e07…
+# final_hash=e624f373…
 ```
 
 `--no-time` without `configs/objects` is `70e5204d…`. Overlay-off telemetry does not change hashes. Night makes Hunt/Farm illegal. `Place` / `Pickup` tent/cabin/house on land (N×N) and millstone/spit 1×1 stations. Spear/sling/bow have Attack range. Bow/sling Attack Chebyshev > 1 consumes 1 **arrow** (no arrow ⇒ illegal; stone does not count); melee dist 1 does not. `interior` sleep footprints block outside entry except the door: omit `door` is the origin cell; `door = "n"|"e"|"s"|"w"` is that edge. The viewer draws a `fence` mesh on the other perimeter cells. Hoe/net/axe/hammer raise Farm/Fish/vegetation-Gather/stone-Gather odds and break after 8 uses (bonus-use **or** dawn while held; `--per-tick-wear` instead wears each tick and skips dawn wear). `--every-instance-wear` increments every slot on that decay pass **and** on a successful bonus-use. Transfer and Store move that instance’s wear with the item. Flour Craft needs a placed millstone. cooked_veg/jerky/biscuit/cake/dried_fish need a placed millstone **or** spit (`station = "millstone|spit"`). bread/stew need a placed spit. Crate contents with `uses` also wear at dawn (or each tick if `--per-tick-wear`). Native viewer `--otlp-endpoint` POSTs `agentplace.viewer.frame_ns`. sim-cli OTLP includes `agentplace.process.cpu_percent` and `agentplace.process.out_dir_bytes`.
@@ -199,7 +199,7 @@ Prefix `/` is optional in the viewer parser.
 ## Hash / overlay rules (every flag)
 
 - Shipping `configs/default.toml` / `configs/incentives/coop.toml` unchanged unless a milestone says otherwise.
-- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `e3f2686b…`. `--no-time` shipped-objects is `9abb3e07…`. `[llm] system1_model` does not change `state_hash` or `config_hash`. The wasm32 CI build is hash-neutral.
+- Overlay off + mock ⇒ same hash as no flag. Default CLI (time on, loads `configs/objects`) 2-tick hash `42e90831…`. `--no-time` shipped-objects is `e624f373…`. `[llm] system1_model` does not change `state_hash` or `config_hash`. The wasm32 CI build and Unix attach are hash-neutral.
 - Visuals / glb / LOD / imgui / wall-clock ns are **never** hashed.
 - Catalog-on hashes `[sim]` (including recipes). Extra catalog files can change catalog-on hashes; v3 checkpoints store **slugs** so holdings remap.
 - Do not pass `--llm ollama` in CI.

@@ -15,6 +15,8 @@ pub struct NetworkParams {
     #[serde(default)]
     pub ws_listen: String,
     #[serde(default)]
+    pub unix_listen: String,
+    #[serde(default)]
     pub token: String,
     #[serde(default)]
     pub allow_control: bool,

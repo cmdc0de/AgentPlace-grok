@@ -4,7 +4,7 @@ use crate::network::NetworkParams;
 use crate::sqlite::SqliteLog;
 use shared::PROTOCOL_VERSION;
 use shared::protocol::{ClientMessage, ControlVerb, ErrorCode, ServerMessage};
-use shared::transport::{Connection, Listener, TransportError};
+use shared::transport::{Connection, Listener, Scheme, TransportError};
 use sim_core::{
     AgentId, SimEvent, Simulation, append_decisions_jsonl, append_events_jsonl,
     append_timing_jsonl, build_report, ckpt_at_or_before, experiment_id, find_events_jsonl,
@@ -647,6 +647,31 @@ fn accept_loop(
 ) {
     let scheme = listener.scheme();
     while running.load(Ordering::Relaxed) {
+        if scheme == Scheme::Unix {
+            match listener.accept_nonblocking() {
+                Ok(Some(conn)) => {
+                    let id = next_id.fetch_add(1, Ordering::Relaxed);
+                    let hub = Arc::clone(&hub);
+                    let attach = Arc::clone(&attach);
+                    let token = token.clone();
+                    thread::spawn(move || {
+                        eprintln!("net: client {id} connected");
+                        if let Err(e) = handle_client(id, conn, hub, attach, token) {
+                            if !matches!(e, TransportError::Closed | TransportError::Timeout) {
+                                eprintln!("net: client {id} error: {e}");
+                            }
+                        }
+                        eprintln!("net: client {id} disconnected");
+                    });
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(30)),
+                Err(e) => {
+                    eprintln!("net: accept error: {e}");
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
+            continue;
+        }
         match listener.accept_tcp_nonblocking() {
             Ok(Some(stream)) => {
                 let id = next_id.fetch_add(1, Ordering::Relaxed);
@@ -876,6 +901,9 @@ pub fn merge_listen(net: &NetworkParams, cli: &[String]) -> Vec<String> {
     }
     if !net.ws_listen.trim().is_empty() {
         out.push(normalize_listen(&net.ws_listen, "ws"));
+    }
+    if !net.unix_listen.trim().is_empty() {
+        out.push(normalize_listen(&net.unix_listen, "unix"));
     }
     for u in cli {
         out.push(u.clone());
