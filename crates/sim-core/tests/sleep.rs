@@ -773,11 +773,13 @@ fn land_rect(sim: &Simulation, w: u32, h: u32) -> (u32, u32) {
 }
 
 fn apply_rect_hut(sim: &mut Simulation) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(0);
+    let n = N.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!(
-        "agentplace-m64-rect-hut-{}",
+        "agentplace-m64-rect-hut-{}-{n}",
         std::process::id()
     ));
-    let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::write(
         dir.join("lean_to.toml"),

@@ -1059,7 +1059,13 @@ pub fn craft_station_ok(
     if entry.craft_station.is_empty() {
         return true;
     }
-    near_placed_station(world, catalog, x, y, &entry.craft_station)
+    // `a|b` means either placed station (trim, skip empty). One is enough.
+    entry
+        .craft_station
+        .split('|')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .any(|slug| near_placed_station(world, catalog, x, y, slug))
 }
 
 pub fn near_placed_station(

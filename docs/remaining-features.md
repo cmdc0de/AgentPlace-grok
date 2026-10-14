@@ -37,7 +37,6 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-15 | viewer | L | n/a | Bevy in the browser |
 | RF-16 | storage | L | n/a | replacing JSONL |
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
-| RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
 
@@ -93,7 +92,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M74 is implemented. Next `/spec` picks from Open + Standing.
+None. M75 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -103,6 +102,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) | [M75](M75-plan.md) |
 | RF-26 | llm | S | hash-neutral | `[llm] system1_model` for the action-choose call only; insight/plan/reflect stay on `model` | [M74](M74-plan.md) |
 | RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) | [M73](M73-plan.md) |
 | RF-24 | combat | S | catalog hash | dedicated arrow/bolt ammo item (RF-19 this slice is consume 1 stone) | [M73](M73-plan.md) |
