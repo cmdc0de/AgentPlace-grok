@@ -31,8 +31,7 @@ jobs:
           cargo test -p sim-cli --test net
           cargo test -p viewer
           cargo test -p sim-wasm
-      - name: Wasm32 sim-wasm (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Wasm32 sim-wasm
         shell: bash
         run: |
           rustup target add wasm32-unknown-unknown

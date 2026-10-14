@@ -29,7 +29,6 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | ID | Theme | Size | Hash / wire | One-liner |
 |---|---|---|---|---|
 | RF-8 | attach | M | maybe PROTOCOL | Unix sockets |
-| RF-10 | CI | M | hash-neutral | wasm32 on Win/mac |
 | RF-11 | PG-8 | L | likely format bump | Food/Wood as strings |
 | RF-12 | PG-11 | L | not JSON | OTLP protobuf/gRPC |
 | RF-13 | wire | L | PROTOCOL | protobuf/TLS/`wss` |
@@ -92,7 +91,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M75 is implemented. Next `/spec` picks from Open + Standing.
+None. M76 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -102,6 +101,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-10 | CI | M | hash-neutral | wasm32 on Win/mac | [M76](M76-plan.md) |
 | RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) | [M75](M75-plan.md) |
 | RF-26 | llm | S | hash-neutral | `[llm] system1_model` for the action-choose call only; insight/plan/reflect stay on `model` | [M74](M74-plan.md) |
 | RF-21 | world | M | hashed | interior wall meshes / door-side enum (RF-18 this slice is origin-door blocked Move only) | [M73](M73-plan.md) |
