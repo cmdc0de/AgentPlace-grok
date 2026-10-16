@@ -32,8 +32,8 @@ Recommendable for a typical 1–3 pick unless noted. Size is a planning hint (S/
 | RF-12 | PG-11 | L | not JSON | OTLP protobuf/gRPC |
 | RF-13 | wire | L | PROTOCOL | protobuf/TLS/`wss` |
 | RF-14 | wire | L | PROTOCOL | `PROTOCOL_VERSION` bump |
-| RF-15 | viewer | L | n/a | Bevy in the browser |
 | RF-16 | storage | L | n/a | replacing JSONL |
+| RF-27 | viewer | L | hash-neutral | browser Bevy glbs, imgui, and attach (M78 is primitives only) |
 | RF-17 | config | L | hashed defaults | flipping shipping `default.toml` / `coop.toml` |
 
 RF-11…RF-17 stay pickable. `/spec` must **not recommend** them unless the user asks. Same for extra LLM call types and new combat systems not listed here.
@@ -90,7 +90,7 @@ Do not recommend unless asked: RF-11…RF-17, extra LLM call types, Bevy in the 
 
 ## Scheduled
 
-None. M77 is implemented. Next `/spec` picks from Open + Standing.
+None. M78 is implemented. Next `/spec` picks from Open + Standing.
 
 ---
 
@@ -100,6 +100,7 @@ Shipped RF rows. `/spec` does not pick from here. Newest first.
 
 | ID | Theme | Size | Hash / wire | One-liner | Done |
 |---|---|---|---|---|---|
+| RF-15 | viewer | L | hash-neutral | Bevy in the browser (M78: primitive scene only; glbs/imgui/attach are RF-27) | [M78](M78-plan.md) |
 | RF-8 | attach | M | hash-neutral | Unix sockets (same postcard frames as TCP; `PROTOCOL_VERSION` stays 5) | [M77](M77-plan.md) |
 | RF-10 | CI | M | hash-neutral | wasm32 on Win/mac | [M76](M76-plan.md) |
 | RF-23 | stations | S | catalog hash | dual-station crafts (spit **or** millstone; RF-4 this slice is millstone instead of spit) | [M75](M75-plan.md) |

@@ -36,3 +36,4 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo build -p sim-wasm --target wasm32-unknown-unknown
+          cargo build -p viewer-web --target wasm32-unknown-unknown
